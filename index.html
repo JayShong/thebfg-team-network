@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheBFG.Team Network</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <!-- QR Code & Scanner -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <!-- App Shell -->
+    <div id="app-container">
+        
+        <!-- Header -->
+        <header id="main-header" class="glass-header">
+            <div class="logo">
+                <i class="fa-solid fa-leaf text-gradient"></i> 
+                <span>TheBFG.Team</span>
+            </div>
+            <div class="header-actions" style="display:flex; gap: 0.5rem;">
+                <button class="icon-btn" onclick="app.navigate('about')">
+                    <i class="fa-solid fa-circle-info"></i>
+                </button>
+                <button id="nav-profile-btn" class="icon-btn" onclick="app.navigate('profile')">
+                    <i class="fa-solid fa-user-circle"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            
+            <!-- Login View -->
+            <section id="view-login" class="view hidden">
+                <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem;">
+                    <i class="fa-solid fa-leaf text-gradient" style="font-size: 4rem; margin-bottom: 1rem;"></i>
+                    <h1 style="margin-bottom: 0.5rem; text-align: center;">Welcome to TheBFG.Team</h1>
+                    <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">A private commercial network connecting socially conscious consumers with empathetic businesses.</p>
+                    
+                    <div class="glass-card" style="width: 100%; max-width: 400px;">
+                        <div class="form-group">
+                            <label>Nickname (Your Introduction Marker)</label>
+                            <input type="text" id="login-nickname" class="input-modern" placeholder="e.g. EarthFriend99">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" id="login-email" class="input-modern" placeholder="hello@example.com">
+                        </div>
+                        <button class="btn btn-primary btn-block mt-4" onclick="app.login()">
+                            Join the Network
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard View -->
+            <section id="view-dashboard" class="view active">
+                <div class="page-header">
+                    <h1>Dashboard</h1>
+                    <p>Network impact overview</p>
+                </div>
+                
+                <!-- Global Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card glass-card">
+                        <i class="fa-solid fa-users stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Consumers</h3>
+                            <p id="stat-global-consumers" class="stat-value">...</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card">
+                        <i class="fa-solid fa-store stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Businesses</h3>
+                            <p id="stat-global-businesses" class="stat-value">...</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card feature-gradient">
+                        <i class="fa-solid fa-location-dot stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Total Check-ins</h3>
+                            <p id="stat-global-checkins" class="stat-value">...</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card success-gradient">
+                        <i class="fa-solid fa-receipt stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Total Purchases</h3>
+                            <p id="stat-global-purchases" class="stat-value">...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-header mt-4">
+                    <h2>Your Impact</h2>
+                </div>
+                
+                <!-- Personal Stats -->
+                <div class="stats-grid personal">
+                    <div class="stat-card glass-card highlight-border">
+                        <i class="fa-solid fa-location-dot stat-icon" style="color:var(--accent-primary)"></i>
+                        <div class="stat-info">
+                            <h3>Your Check-ins</h3>
+                            <p id="stat-personal-checkins" class="stat-value">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card highlight-border">
+                        <i class="fa-solid fa-receipt stat-icon" style="color:var(--accent-success)"></i>
+                        <div class="stat-info">
+                            <h3>Your Purchases</h3>
+                            <p id="stat-personal-purchases" class="stat-value">0</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Directory View -->
+            <section id="view-directory" class="view hidden">
+                <div class="page-header">
+                    <h1>Directory</h1>
+                    <p>Discover humanistic businesses</p>
+                </div>
+                <div id="business-list" class="business-list">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Business Detail View -->
+            <section id="view-business-detail" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('directory')">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                </button>
+                <div id="business-detail-content" class="business-detail-container">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Scanner View -->
+            <section id="view-scanner" class="view hidden">
+                <div class="page-header">
+                    <h1>Scanner</h1>
+                    <p>Check in or verify a purchase</p>
+                </div>
+                <div class="scanner-container glass-card" style="padding: 1.5rem;">
+                    <div id="reader-container" style="display: none; margin-bottom: 1rem;">
+                        <div id="reader" style="width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;"></div>
+                        <button class="btn btn-secondary btn-block mt-4" onclick="app.stopScanner()">Stop Scanner</button>
+                    </div>
+                    <div class="scanner-actions" id="scanner-actions">
+                        <button class="btn btn-primary btn-block" onclick="app.startScanner()">
+                            <i class="fa-solid fa-camera"></i> Start Camera Scanner
+                        </button>
+                        <button class="btn btn-secondary btn-block" style="margin-top: 1rem;" onclick="app.mockScanSuccess()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Simulate Scan
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile View -->
+            <section id="view-profile" class="view hidden">
+                <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h1>Your Badge</h1>
+                        <p>TheBFG.Team Member</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="app.openSettings()" title="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+                <div class="profile-card glass-card">
+                    <div class="badge-header">
+                        <i class="fa-solid fa-certificate badge-icon"></i>
+                        <h2>TheBFG.Team</h2>
+                    </div>
+                    <div class="user-info">
+                        <div class="avatar-placeholder">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <h3 id="profile-name">Nickname</h3>
+                        <p id="profile-email" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.2rem;">email@example.com</p>
+                        <p class="user-id" onclick="app.handleAdminClick()" style="cursor:pointer; margin-top: 0.5rem;" title="Tap 5 times to toggle admin status">ID: <span id="profile-id">---</span></p>
+                    </div>
+                    <div class="badge-footer" style="margin-top: 1.5rem;">
+                        <div id="admin-portal-container" style="display: none; margin-bottom: 1rem;">
+                            <button class="btn btn-secondary btn-block" onclick="app.navigate('admin')">
+                                <i class="fa-solid fa-shield-halved"></i> Admin Portal
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary btn-block" style="border: 1px solid var(--text-warning); color: var(--text-warning);" onclick="app.logout()">
+                            <i class="fa-solid fa-right-from-bracket"></i> Save & Sign Out
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="view-settings" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('profile')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Profile
+                </button>
+                <div class="page-header">
+                    <h1>Settings</h1>
+                    <p>Update your personal information</p>
+                </div>
+                <div class="glass-card">
+                    <h3>Basic Information</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                        <div class="form-group">
+                            <label>Nickname</label>
+                            <input type="text" id="settings-nickname" class="input-modern">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <input type="email" id="settings-email" class="input-modern" style="flex: 1;">
+                                <button id="btn-verify-email" class="btn btn-secondary" onclick="app.promptVerifyEmail()" style="display:none; white-space:nowrap;">Verify Email</button>
+                                <span id="badge-verified" style="display:none; align-items:center; color:var(--accent-success); font-weight:bold;"><i class="fa-solid fa-circle-check" style="margin-right:0.3rem;"></i> Verified</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <select id="settings-gender" class="input-modern">
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Prefer not to say">Prefer not to say</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" id="settings-city" class="input-modern" placeholder="e.g. Kuala Lumpur">
+                        </div>
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" id="settings-dob" class="input-modern">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card mt-4">
+                    <h3>Causes You Support</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Select the causes in Malaysia you are most passionate about.</p>
+                    <div id="settings-causes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem;">
+                        <label class="checkbox-container"><input type="checkbox" value="Poverty Eradication"> <span class="checkmark"></span> Poverty Eradication</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Quality Education"> <span class="checkmark"></span> Quality Education</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Food Security"> <span class="checkmark"></span> Food Security</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Wildlife Conservation"> <span class="checkmark"></span> Wildlife Conservation</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Healthcare Access"> <span class="checkmark"></span> Healthcare Access</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Clean Water"> <span class="checkmark"></span> Clean Water</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Affordable Housing"> <span class="checkmark"></span> Affordable Housing</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Climate Action"> <span class="checkmark"></span> Climate Action</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Gender Equality"> <span class="checkmark"></span> Gender Equality</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Indigenous Rights"> <span class="checkmark"></span> Indigenous Rights</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block mt-4" onclick="app.saveSettings()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                </button>
+            </section>
+
+            <!-- Admin View -->
+            <section id="view-admin" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('profile')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Profile
+                </button>
+                <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h1>Admin Portal</h1>
+                        <p>Manage the network</p>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                        <button class="btn btn-secondary" onclick="app.exportData()" title="Backup Database"><i class="fa-solid fa-download"></i></button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()" title="Restore Database"><i class="fa-solid fa-upload"></i></button>
+                        <input type="file" id="import-file" style="display:none;" accept=".json" onchange="app.importData(event)">
+                    </div>
+                </div>
+                <div class="glass-card">
+                    <h3 style="margin-bottom: 1.5rem;">Add New Business</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Business Name</label>
+                            <input type="text" id="admin-biz-name" class="input-modern" placeholder="e.g. Earthly Goods">
+                        </div>
+                        <div class="form-group">
+                            <label>Founder Name</label>
+                            <input type="text" id="admin-biz-founder" class="input-modern" placeholder="e.g. Jane Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email</label>
+                            <input type="email" id="admin-biz-contact" class="input-modern" placeholder="hello@business.com">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Founder's Story</label>
+                            <textarea id="admin-biz-story" class="input-modern" rows="3" placeholder="Their conviction..."></textarea>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Location (Full Address for Google Maps)</label>
+                            <input type="text" id="admin-biz-location" class="input-modern" placeholder="e.g. 1600 Amphitheatre Pkwy, Mountain View, CA">
+                        </div>
+                        <div class="form-group">
+                            <label>Shopfront Image</label>
+                            <input type="file" id="admin-biz-shopfront" class="input-modern" accept="image/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Founder Headshot</label>
+                            <input type="file" id="admin-biz-founder-img" class="input-modern" accept="image/*">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>TheBFG.Team Paradigm Score (A-D)</label>
+                            <div class="score-inputs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem;">
+                                <select id="score-shareholder" class="input-modern"><option value="A">Shareholder: A</option><option value="B">Shareholder: B</option><option value="C">Shareholder: C</option><option value="D">Shareholder: D</option></select>
+                                <select id="score-employee" class="input-modern"><option value="A">Employee: A</option><option value="B">Employee: B</option><option value="C">Employee: C</option><option value="D">Employee: D</option></select>
+                                <select id="score-customer" class="input-modern"><option value="A">Customer: A</option><option value="B">Customer: B</option><option value="C">Customer: C</option><option value="D">Customer: D</option></select>
+                                <select id="score-society" class="input-modern"><option value="A">Society: A</option><option value="B">Society: B</option><option value="C">Society: C</option><option value="D">Society: D</option></select>
+                                <select id="score-env" class="input-modern"><option value="A">Environment: A</option><option value="B">Environment: B</option><option value="C">Environment: C</option><option value="D">Environment: D</option></select>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-add-biz" class="btn btn-primary btn-block mt-4" onclick="app.addBusiness()">
+                        <i class="fa-solid fa-plus"></i> Add Business
+                    </button>
+                    <p id="admin-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Processing images, please wait...</p>
+                </div>
+            </section>
+
+            <!-- About View -->
+            <section id="view-about" class="view hidden">
+                <div class="page-header">
+                    <h1>About TheBFG.Team</h1>
+                    <p>A private commercial network connecting socially conscious consumers with empathetic businesses.</p>
+                </div>
+                
+                <div class="glass-card detail-section">
+                    <h3>The Grading Paradigms</h3>
+                    <p style="margin-bottom: 1rem;">Businesses are scored across 5 core paradigms. Each paradigm receives a grade between A and D. Grade A highlights paradigm-defining leadership. If you do not see a business in this network, it could be that we are not aware of them, or they are embarassed for scoring a D for exploitative practices.</p>
+                    <ul style="color: var(--text-secondary); margin-left: 1.5rem; line-height: 1.6;">
+                        <li><strong>Shareholder:</strong> Balances short term survival and achieving the vision.</li>
+                        <li><strong>Employee:</strong> Treating employees like co-owners, just in a different capacity.</li>
+                        <li><strong>Customer:</strong> Treats customers like co-partners, driving the same vision.</li>
+                        <li><strong>Society:</strong> Treats society like co-collaborators. Balanced giving and taking.</li>
+                        <li><strong>Natural Environment:</strong> Nurtures the Earth and everything non-human, just like how they nurtured humans.</li>
+                    </ul>
+                </div>
+
+                <div class="glass-card detail-section mt-4">
+                    <h3>How checking-in works</h3>
+                    <p>By scanning a QR code at a partner business, you record your support for their humanistic practices. If you made a purchase, you can log it to further help the network quantify the impact of empathetic commerce.</p>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Modals -->
+        <div id="action-modal" class="modal hidden">
+            <div class="modal-content glass-card" id="modal-default-content">
+                <div class="modal-header">
+                    <h2 id="modal-business-name">Business Name</h2>
+                    <button class="close-btn" onclick="app.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p>You have successfully scanned the QR code. What would you like to do?</p>
+                    <div class="modal-buttons">
+                        <button class="btn btn-primary btn-block" onclick="app.submitCheckin()">
+                            <i class="fa-solid fa-location-dot"></i> Check-in Here
+                        </button>
+                        <button class="btn btn-secondary btn-block" onclick="app.showPurchaseForm()">
+                            <i class="fa-solid fa-receipt"></i> Log a Purchase
+                        </button>
+                    </div>
+                    
+                    <div class="purchase-form hidden" id="purchase-form">
+                        <div class="form-group">
+                            <label>Receipt Number</label>
+                            <input type="text" id="receipt-input" class="input-modern" placeholder="e.g. REC-1234">
+                        </div>
+                        <div class="form-group">
+                            <label>Amount ($)</label>
+                            <input type="number" id="amount-input" class="input-modern" placeholder="0.00">
+                        </div>
+                        <button class="btn btn-success btn-block" onclick="app.submitPurchase()">
+                            Submit Purchase
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-content glass-card hidden" id="modal-success-content" style="text-align: center; padding: 2rem;">
+                <div class="success-animation">
+                    <i class="fa-solid fa-circle-check" style="font-size: 4rem; color: var(--accent-success); margin-bottom: 1rem;"></i>
+                </div>
+                <h2>Success!</h2>
+                <p id="success-message" style="margin-top: 0.5rem; margin-bottom: 1.5rem;">Your transaction was recorded.</p>
+            </div>
+        </div>
+
+        <div id="action-modal-verify" class="modal hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-header">
+                    <h2>Verify Email</h2>
+                    <button class="close-btn" onclick="document.getElementById('action-modal-verify').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p>We've sent a 6-digit code to your email. Please enter it below to verify your account for newsletters.</p>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <input type="text" id="verify-code-input" class="input-modern" placeholder="e.g. 123456" style="text-align: center; letter-spacing: 0.5rem; font-size: 1.2rem;">
+                    </div>
+                    <button class="btn btn-primary btn-block mt-4" onclick="app.simulateEmailVerification()">
+                        Confirm Code
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast-container" class="toast-container"></div>
+
+        <!-- Bottom Navigation -->
+        <nav id="bottom-nav" class="glass-nav">
+            <button class="nav-item active" data-target="dashboard" onclick="app.navigate('dashboard')">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-target="directory" onclick="app.navigate('directory')">
+                <i class="fa-solid fa-store"></i>
+                <span>Directory</span>
+            </button>
+            <button class="nav-item scan-btn" data-target="scanner" onclick="app.navigate('scanner')">
+                <div class="scan-btn-inner">
+                    <i class="fa-solid fa-qrcode"></i>
+                </div>
+            </button>
+        </nav>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
