@@ -11,13 +11,11 @@ const firebaseConfig = {
 
 let db = null;
 let auth = null;
-let storage = null;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         auth = firebase.auth();
-        storage = firebase.storage();
         console.log("Firebase Connected Successfully.");
     } catch(e) {
         console.warn("Firebase initialization skipped or failed:", e);
@@ -323,6 +321,22 @@ const app = {
 
         const founderImgHTML = biz.founderImg ? `<img src="${biz.founderImg}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; float:left; margin-right:1rem; border:2px solid var(--accent-primary);">` : '';
 
+        // Embedded video Logic
+        let videoHTML = '';
+        if (biz.videoUrl) {
+            let embedUrl = biz.videoUrl;
+            if (embedUrl.includes('youtube.com/watch?v=')) {
+                embedUrl = embedUrl.replace('youtube.com/watch?v=', 'youtube.com/embed/').split('&')[0];
+            } else if (embedUrl.includes('youtu.be/')) {
+                const id = embedUrl.split('youtu.be/')[1].split('?')[0];
+                embedUrl = `https://www.youtube.com/embed/${id}`;
+            } else if (embedUrl.includes('vimeo.com/')) {
+                const id = embedUrl.split('vimeo.com/')[1].split('?')[0];
+                embedUrl = `https://player.vimeo.com/video/${id}`;
+            }
+            videoHTML = `<div style="margin-top: 1.5rem;"><h3 style="margin-bottom:0.8rem">Founder's Video</h3><iframe width="100%" height="250" src="${embedUrl}" title="Video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: var(--radius-md);"></iframe></div>`;
+        }
+
         // Address iframe logic
         const encodedAddress = encodeURIComponent(biz.location);
         const mapIframe = `<iframe 
@@ -365,7 +379,7 @@ const app = {
                 <p style="margin-top: 0.5rem;"><i class="fa-solid fa-location-dot" style="width: 20px;"></i> ${biz.location}</p>
                 ${mapIframe}
             </div>
-            ${biz.videoUrl ? `<div style="margin-top: 1.5rem;"><h3 style="margin-bottom:0.8rem">Founder's Message</h3><video controls style="width:100%; border-radius: var(--radius-md);"><source src="${biz.videoUrl}" type="video/mp4">Your browser doesn't support video.</video></div>` : ''}
+            ${videoHTML}
             ${qrContainer}
         `;
         
@@ -888,24 +902,9 @@ const app = {
         document.getElementById('edit-biz-story').value = biz.story || '';
         document.getElementById('edit-biz-contact').value = biz.contact || '';
         document.getElementById('edit-biz-location').value = biz.location || '';
+        document.getElementById('edit-biz-video').value = biz.videoUrl || '';
         
         this.navigate('business-profile-edit');
-    },
-
-    async uploadMediaToStorage(fileInputElementId, pathPrefix) {
-        const input = document.getElementById(fileInputElementId);
-        if (!input.files || !input.files[0]) return null;
-        const file = input.files[0];
-        
-        if (!storage) {
-            this.showToast('Storage module not loaded! Cannot upload media.');
-            throw new Error('No storage');
-        }
-
-        const ext = file.name.split('.').pop();
-        const ref = storage.ref().child(`businesses/${pathPrefix}_${Date.now()}.${ext}`);
-        await ref.put(file);
-        return await ref.getDownloadURL();
     },
 
     async saveBusinessProfile() {
@@ -918,6 +917,7 @@ const app = {
         const story = document.getElementById('edit-biz-story').value.trim();
         const contact = document.getElementById('edit-biz-contact').value.trim();
         const location = document.getElementById('edit-biz-location').value.trim();
+        const videoInputVal = document.getElementById('edit-biz-video').value.trim();
 
         if (!name || !founder) {
             this.showToast("Business name & founder name are required.");
@@ -931,15 +931,11 @@ const app = {
 
         try {
             let shopfrontUrl = MOCK_BUSINESSES[bizIndex].shopfrontImg;
-            let videoUrl = MOCK_BUSINESSES[bizIndex].videoUrl || '';
+            let videoUrl = videoInputVal;
 
             // Handle Photo
-            const newPhotoUrl = await this.uploadMediaToStorage('edit-biz-shopfront', `shopfront_${MOCK_USER.businessId}`).catch(e=>null);
+            const newPhotoUrl = await this.getBase64Image('edit-biz-shopfront');
             if(newPhotoUrl) shopfrontUrl = newPhotoUrl;
-
-            // Handle Video
-            const newVideoUrl = await this.uploadMediaToStorage('edit-biz-video', `video_${MOCK_USER.businessId}`).catch(e=>null);
-            if(newVideoUrl) videoUrl = newVideoUrl;
 
             MOCK_BUSINESSES[bizIndex].name = name;
             MOCK_BUSINESSES[bizIndex].founder = founder;
@@ -958,7 +954,7 @@ const app = {
             this.openBusinessDashboard(); // refresh
         } catch(e) {
             console.error(e);
-            this.showToast("An error occurred during save.");
+            this.showToast("An error occurred during save. Re-try with a smaller image.");
         } finally {
             btn.style.display = 'block';
             loader.classList.add('hidden');

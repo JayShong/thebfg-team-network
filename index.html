@@ -18,7 +18,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 </head>
 <body>
     <!-- App Shell -->
@@ -432,18 +431,18 @@
                         <div class="form-group">
                             <label>Update Shopfront Image</label>
                             <input type="file" id="edit-biz-shopfront" class="input-modern" accept="image/*">
-                            <small style="color:var(--text-secondary)">Overrides current image if selected.</small>
+                            <small style="color:var(--text-secondary)">Overrides current image if selected. Stored as compressed text.</small>
                         </div>
                         <div class="form-group">
-                            <label>Update Intro Video</label>
-                            <input type="file" id="edit-biz-video" class="input-modern" accept="video/mp4,video/x-m4v,video/*">
-                            <small style="color:var(--text-secondary)">Max 5MB. Will be uploaded to secure cloud storage.</small>
+                            <label>Intro Video URL (YouTube/Vimeo)</label>
+                            <input type="text" id="edit-biz-video" class="input-modern" placeholder="e.g. https://www.youtube.com/watch?v=...">
+                            <small style="color:var(--text-secondary)">Paste a link to your public video.</small>
                         </div>
                     </div>
                     <button id="btn-save-biz-profile" class="btn btn-primary btn-block mt-4" onclick="app.saveBusinessProfile()">
                         <i class="fa-solid fa-floppy-disk"></i> Save Profile
                     </button>
-                    <p id="edit-biz-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Uploading media to cloud. Please wait...</p>
+                    <p id="edit-biz-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Processing image & saving profile...</p>
                 </div>
             </section>
 
