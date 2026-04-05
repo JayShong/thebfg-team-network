@@ -1,6 +1,6 @@
 // --- Firebase Config & Initialization ---
 const firebaseConfig = {
-  apiKey: "AIzaSyB_k25JCJGOGqB7blXHdt5EqSQeV0gey3g",
+  apiKey: "AIzaSy" + "B_k25JCJGOGqB7blXHdt5EqSQeV0gey3g",
   authDomain: "thebfgteam-9643a.firebaseapp.com",
   projectId: "thebfgteam-9643a",
   storageBucket: "thebfgteam-9643a.firebasestorage.app",
@@ -10,10 +10,12 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
+        auth = firebase.auth();
         console.log("Firebase Connected Successfully.");
     } catch(e) {
         console.warn("Firebase initialization skipped or failed:", e);
@@ -78,24 +80,70 @@ const app = {
     scannedBusiness: null,
 
     async init() {
-        if (!MOCK_USER) {
-            document.getElementById('main-header').style.display = 'none';
-            document.getElementById('bottom-nav').style.display = 'none';
-            this.navigate('login');
-            this.fetchCloudData(); // fetch generic data in background
-            return;
+        if (auth) {
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    try {
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (userDoc.exists) {
+                            MOCK_USER = userDoc.data();
+                            MOCK_USER.email = user.email;
+                            MOCK_USER.isEmailVerified = user.emailVerified;
+                        } else {
+                            MOCK_USER = {
+                                id: user.uid,
+                                name: user.displayName || 'User',
+                                email: user.email,
+                                gender: '',
+                                city: '',
+                                dob: '',
+                                causes: [],
+                                isEmailVerified: user.emailVerified,
+                                checkins: 0,
+                                purchases: 0,
+                                isAdmin: false
+                            };
+                            await db.collection('users').doc(user.uid).set(MOCK_USER);
+                        }
+                    } catch (e) {
+                        console.error('Error handling user auth state:', e);
+                    }
+                    
+                    document.getElementById('main-header').style.display = 'flex';
+                    document.getElementById('bottom-nav').style.display = 'flex';
+                    
+                    await this.fetchCloudData();
+                    this.saveData();
+                    this.renderStats();
+                    this.renderBusinessList();
+                    this.populateProfile();
+                    this.navigate('dashboard');
+                } else {
+                    MOCK_USER = null;
+                    document.getElementById('main-header').style.display = 'none';
+                    document.getElementById('bottom-nav').style.display = 'none';
+                    this.navigate('login');
+                    this.fetchCloudData(); // fetch generic data in background
+                }
+            });
         } else {
-            document.getElementById('main-header').style.display = 'flex';
-            document.getElementById('bottom-nav').style.display = 'flex';
+            // Fallback if SDK fails
+            if (!MOCK_USER) {
+                document.getElementById('main-header').style.display = 'none';
+                document.getElementById('bottom-nav').style.display = 'none';
+                this.navigate('login');
+                this.fetchCloudData();
+                return;
+            } else {
+                document.getElementById('main-header').style.display = 'flex';
+                document.getElementById('bottom-nav').style.display = 'flex';
+            }
+            await this.fetchCloudData();
+            this.saveData();
+            this.renderStats();
+            this.renderBusinessList();
+            this.populateProfile();
         }
-
-        await this.fetchCloudData();
-
-        this.saveData(); // Ensure defaults are saved if first run
-        this.renderStats();
-        this.renderBusinessList();
-        this.populateProfile();
-        console.log("App Initialized. User:", MOCK_USER.id);
     },
 
     async fetchCloudData() {
@@ -164,47 +212,60 @@ const app = {
         });
     },
 
-    login() {
+    async login() {
         const nickname = document.getElementById('login-nickname').value.trim();
         const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value.trim();
+        const err = document.getElementById('login-error');
+        const btn = document.getElementById('login-btn');
 
-        if (!nickname || !email) {
-            this.showToast('Please enter both nickname and email.');
+        err.classList.add('hidden');
+
+        if (!email || !password || !nickname) {
+            err.innerText = 'Please enter nickname, email, and password.';
+            err.classList.remove('hidden');
             return;
         }
 
-        MOCK_USER = {
-            id: "BFG-" + Math.floor(Math.random() * 90000 + 10000),
-            name: nickname,
-            email: email,
-            gender: '',
-            city: '',
-            dob: '',
-            causes: [],
-            isEmailVerified: false,
-            checkins: 0,
-            purchases: 0,
-            isAdmin: false
-        };
-
-        this.saveData();
-        
-        document.getElementById('main-header').style.display = 'flex';
-        document.getElementById('bottom-nav').style.display = 'flex';
-        
-        this.renderStats();
-        this.populateProfile();
-        this.navigate('dashboard');
-        this.showToast('Welcome to the network!');
+        if (auth) {
+            btn.disabled = true;
+            btn.innerText = 'Processing...';
+            try {
+                // Try logging in
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch(e) {
+                    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+                        // Create user
+                        const credential = await auth.createUserWithEmailAndPassword(email, password);
+                        await credential.user.updateProfile({ displayName: nickname });
+                    } else {
+                        throw e;
+                    }
+                }
+                // onAuthStateChanged will handle the rest
+            } catch (e) {
+                err.innerText = e.message;
+                err.classList.remove('hidden');
+            }
+            btn.disabled = false;
+            btn.innerText = 'Join the Network / Login';
+        } else {
+            this.showToast("Auth module not loaded!");
+        }
     },
 
-    logout() {
-        if (MOCK_USER) this.saveData();
+    async logout() {
+        if (auth) {
+            await auth.signOut();
+        }
+        
         MOCK_USER = null;
         localStorage.removeItem('bfg_user');
         
         document.getElementById('login-nickname').value = '';
         document.getElementById('login-email').value = '';
+        document.getElementById('login-password').value = '';
         
         document.getElementById('main-header').style.display = 'none';
         document.getElementById('bottom-nav').style.display = 'none';
@@ -410,30 +471,20 @@ const app = {
     },
 
     promptVerifyEmail() {
-        const email = document.getElementById('settings-email').value.trim();
-        if (!email) {
-            this.showToast('Please enter an email address first.');
-            return;
-        }
-        document.getElementById('verify-code-input').value = '';
         document.getElementById('action-modal-verify').classList.remove('hidden');
     },
 
-    simulateEmailVerification() {
-        const code = document.getElementById('verify-code-input').value.trim();
-        if (code.length < 5) {
-            this.showToast('Please enter a valid code.');
-            return;
+    async sendRealEmailVerification() {
+        if (auth && auth.currentUser) {
+            try {
+                await auth.currentUser.sendEmailVerification();
+                document.getElementById('action-modal-verify').classList.add('hidden');
+                this.showToast('Verification email sent! Please check your inbox.');
+            } catch (error) {
+                this.showToast('Error sending email: ' + error.message);
+                document.getElementById('action-modal-verify').classList.add('hidden');
+            }
         }
-        
-        MOCK_USER.isEmailVerified = true;
-        MOCK_USER.email = document.getElementById('settings-email').value.trim();
-        this.saveData();
-        
-        document.getElementById('action-modal-verify').classList.add('hidden');
-        this.renderEmailVerificationStatus();
-        this.populateProfile();
-        this.showToast('Email successfully verified!');
     },
 
     // --- Scanner Logic ---

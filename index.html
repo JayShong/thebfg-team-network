@@ -17,6 +17,7 @@
     <!-- Firebase SDK (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
     <!-- App Shell -->
@@ -57,9 +58,14 @@
                             <label>Email Address</label>
                             <input type="email" id="login-email" class="input-modern" placeholder="hello@example.com">
                         </div>
-                        <button class="btn btn-primary btn-block mt-4" onclick="app.login()">
-                            Join the Network
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="login-password" class="input-modern" placeholder="At least 6 characters">
+                        </div>
+                        <button class="btn btn-primary btn-block mt-4" id="login-btn" onclick="app.login()">
+                            Join the Network / Login
                         </button>
+                        <p id="login-error" class="hidden" style="color: var(--text-warning); margin-top: 1rem; text-align: center; font-size: 0.85rem;"></p>
                     </div>
                 </div>
             </section>
@@ -410,16 +416,14 @@
         <div id="action-modal-verify" class="modal hidden">
             <div class="modal-content glass-card">
                 <div class="modal-header">
-                    <h2>Verify Email</h2>
+                    <h2>Verify Your Email</h2>
                     <button class="close-btn" onclick="document.getElementById('action-modal-verify').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div class="modal-body">
-                    <p>We've sent a 6-digit code to your email. Please enter it below to verify your account for newsletters.</p>
-                    <div class="form-group" style="margin-top: 1rem;">
-                        <input type="text" id="verify-code-input" class="input-modern" placeholder="e.g. 123456" style="text-align: center; letter-spacing: 0.5rem; font-size: 1.2rem;">
-                    </div>
-                    <button class="btn btn-primary btn-block mt-4" onclick="app.simulateEmailVerification()">
-                        Confirm Code
+                <div class="modal-body" style="text-align: center;">
+                    <i class="fa-solid fa-envelope-open-text" style="font-size: 3rem; color: var(--accent-primary); margin: 1rem 0;"></i>
+                    <p>We'll send a secure verification link to your inbox.</p>
+                    <button class="btn btn-primary btn-block mt-4" onclick="app.sendRealEmailVerification()">
+                        Send Verification Link
                     </button>
                 </div>
             </div>
