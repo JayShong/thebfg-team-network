@@ -72,6 +72,7 @@ const INITIAL_BUSINESSES = [
 let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
 let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
 let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
+let MOCK_ADMINS = ['jayshong@gmail.com'];
 
 // --- App State & Logic ---
 
@@ -149,6 +150,11 @@ const app = {
     async fetchCloudData() {
         if(db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
             try {
+                // Fetch roles
+                const rolesDoc = await db.collection('system').doc('roles').get();
+                if(rolesDoc.exists) MOCK_ADMINS = rolesDoc.data().adminEmails || ['jayshong@gmail.com'];
+                else await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS });
+
                 // Fetch stats
                 const statsDoc = await db.collection('system').doc('stats').get();
                 if(statsDoc.exists) MOCK_STATS = statsDoc.data();
@@ -165,6 +171,11 @@ const app = {
                         await db.collection('businesses').doc(biz.id).set(biz);
                     });
                 }
+
+                if(MOCK_USER && MOCK_USER.email) {
+                    MOCK_USER.isAdmin = MOCK_ADMINS.includes(MOCK_USER.email);
+                }
+                if (this.currentView === 'admin') this.renderAdminList();
             } catch (e) {
                 console.error("Firestore read error:", e);
                 this.showToast("Failed to connect to cloud database.");
@@ -201,6 +212,8 @@ const app = {
             target.classList.add('active');
             this.currentView = viewId;
         }
+        
+        if (viewId === 'admin') this.renderAdminList();
 
         // Update Nav
         document.querySelectorAll('.nav-item').forEach(el => {
@@ -426,16 +439,64 @@ const app = {
         }
     },
 
-    adminClickCount: 0,
-    handleAdminClick() {
-        this.adminClickCount++;
-        if(this.adminClickCount >= 5) {
-            MOCK_USER.isAdmin = !MOCK_USER.isAdmin;
-            this.saveData();
-            this.populateProfile();
-            this.showToast(MOCK_USER.isAdmin ? "Admin mode Enabled" : "Admin mode Disabled");
-            this.adminClickCount = 0;
+    async addAdmin() {
+        if (!MOCK_USER.isAdmin) return;
+        const email = document.getElementById('admin-new-email').value.trim();
+        if (!email) {
+            this.showToast("Please enter an email address.");
+            return;
         }
+        if (MOCK_ADMINS.includes(email)) {
+            this.showToast("This email is already an admin.");
+            return;
+        }
+        
+        MOCK_ADMINS.push(email);
+        if (db) {
+            await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS }, { merge: true });
+        }
+        document.getElementById('admin-new-email').value = '';
+        this.renderAdminList();
+        this.showToast(`${email} has been added as an Admin.`);
+    },
+
+    async removeAdmin(email) {
+        if (!MOCK_USER.isAdmin) return;
+        if (email === 'jayshong@gmail.com') {
+            this.showToast('Access Denied: The Master Admin cannot be removed.', true);
+            return;
+        }
+        if (email === MOCK_USER.email) {
+            this.showToast('You cannot remove yourself. Ask another admin to remove you.', true);
+            return;
+        }
+
+        const index = MOCK_ADMINS.indexOf(email);
+        if (index > -1) {
+            MOCK_ADMINS.splice(index, 1);
+            if (db) {
+                await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS }, { merge: true });
+            }
+            this.renderAdminList();
+            this.showToast(`${email} removed from Admins.`);
+        }
+    },
+
+    renderAdminList() {
+        const container = document.getElementById('admin-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+        MOCK_ADMINS.forEach(email => {
+            const isMaster = email === 'jayshong@gmail.com';
+            container.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                    <div style="display:flex; align-items:center; gap:0.5rem; word-break: break-all;">
+                        <i class="fa-solid ${isMaster ? 'fa-crown text-gradient' : 'fa-user-shield'}" style="color:var(--accent-primary)"></i> ${email}
+                    </div>
+                    ${!isMaster ? `<button class="icon-btn" style="color:var(--text-warning); padding:0.4rem; height:auto; width:auto;" onclick="app.removeAdmin('${email}')"><i class="fa-solid fa-trash"></i></button>` : '<span style="font-size:0.8rem; color:var(--text-secondary)">Master</span>'}
+                </div>
+            `;
+        });
     },
 
     // --- Settings & Demographics Logic ---
