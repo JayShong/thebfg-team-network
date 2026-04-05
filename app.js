@@ -789,8 +789,8 @@ const app = {
         document.getElementById('btn-add-biz').style.display = 'none';
         document.getElementById('admin-loading').classList.remove('hidden');
 
-        const shopfrontImg = await this.getBase64Image('admin-biz-shopfront');
-        const founderImg = await this.getBase64Image('admin-biz-founder-img');
+        const shopfrontImg = document.getElementById('admin-biz-shopfront').value.trim();
+        const founderImg = document.getElementById('admin-biz-founder-img').value.trim();
 
         const newBiz = {
             id: 'biz_' + Date.now(),
@@ -902,6 +902,7 @@ const app = {
         document.getElementById('edit-biz-story').value = biz.story || '';
         document.getElementById('edit-biz-contact').value = biz.contact || '';
         document.getElementById('edit-biz-location').value = biz.location || '';
+        document.getElementById('edit-biz-shopfront').value = biz.shopfrontImg || '';
         document.getElementById('edit-biz-video').value = biz.videoUrl || '';
         
         this.navigate('business-profile-edit');
@@ -933,9 +934,9 @@ const app = {
             let shopfrontUrl = MOCK_BUSINESSES[bizIndex].shopfrontImg;
             let videoUrl = videoInputVal;
 
-            // Handle Photo
-            const newPhotoUrl = await this.getBase64Image('edit-biz-shopfront');
-            if(newPhotoUrl) shopfrontUrl = newPhotoUrl;
+            // Handle Photo URL
+            const editShopUrl = document.getElementById('edit-biz-shopfront').value.trim();
+            if(editShopUrl) shopfrontUrl = editShopUrl;
 
             MOCK_BUSINESSES[bizIndex].name = name;
             MOCK_BUSINESSES[bizIndex].founder = founder;
