@@ -18,6 +18,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 </head>
 <body>
     <!-- App Shell -->
@@ -200,13 +201,18 @@
                         <p class="user-id" onclick="app.handleAdminClick()" style="cursor:pointer; margin-top: 0.5rem;" title="Tap 5 times to toggle admin status">ID: <span id="profile-id">---</span></p>
                     </div>
                     <div class="badge-footer" style="margin-top: 1.5rem;">
-                        <div id="admin-portal-container" style="display: none; margin-bottom: 1rem;">
+                        <div id="admin-portal-container" style="display: none; margin-bottom: 0.5rem;">
                             <button class="btn btn-secondary btn-block" onclick="app.navigate('admin')">
                                 <i class="fa-solid fa-shield-halved"></i> Admin Portal
                             </button>
                         </div>
+                        <div id="business-portal-container" style="display: none; margin-bottom: 1rem;">
+                            <button class="btn btn-primary btn-block feature-gradient" onclick="app.openBusinessDashboard()" style="color:white; border:none;">
+                                <i class="fa-solid fa-store"></i> My Business Portal
+                            </button>
+                        </div>
                         <button class="btn btn-secondary btn-block" style="border: 1px solid var(--text-warning); color: var(--text-warning);" onclick="app.logout()">
-                            <i class="fa-solid fa-right-from-bracket"></i> Save & Sign Out
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
                         </button>
                     </div>
                 </div>
@@ -305,6 +311,10 @@
                             <label>Founder Name</label>
                             <input type="text" id="admin-biz-founder" class="input-modern" placeholder="e.g. Jane Doe">
                         </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Owner Email Address (For Portal Access)</label>
+                            <input type="email" id="admin-biz-owner-email" class="input-modern" placeholder="owner@business.com">
+                        </div>
                         <div class="form-group">
                             <label>Contact Email</label>
                             <input type="email" id="admin-biz-contact" class="input-modern" placeholder="hello@business.com">
@@ -340,6 +350,100 @@
                         <i class="fa-solid fa-plus"></i> Add Business
                     </button>
                     <p id="admin-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Processing images, please wait...</p>
+                </div>
+            </section>
+
+            <!-- Business Dashboard View -->
+            <section id="view-business-dashboard" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('profile')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Profile
+                </button>
+                <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h1 id="biz-dash-name">My Business</h1>
+                        <p>Merchant Portal</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="app.openBusinessProfileEdit()" title="Edit Profile">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card glass-card feature-gradient">
+                        <i class="fa-solid fa-location-dot stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Total Check-ins</h3>
+                            <p id="biz-dash-checkins" class="stat-value">...</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card success-gradient">
+                        <i class="fa-solid fa-receipt stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Total Purchases</h3>
+                            <p id="biz-dash-purchases" class="stat-value">...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card mt-4">
+                    <h3>Recent Purchase Transactions</h3>
+                    <div id="biz-transaction-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
+                        <!-- Populate via JS -->
+                        <p style="color: var(--text-secondary); text-align: center;">Loading transactions...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Business Edit Profile View -->
+            <section id="view-business-profile-edit" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('business-dashboard')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+                </button>
+                <div class="page-header">
+                    <h1>Edit Profile</h1>
+                    <p>Update your public network presence</p>
+                </div>
+                
+                <div class="glass-card">
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Business Name</label>
+                            <input type="text" id="edit-biz-name" class="input-modern">
+                        </div>
+                        <div class="form-group">
+                            <label>Founder Name</label>
+                            <input type="text" id="edit-biz-founder" class="input-modern">
+                        </div>
+                        <div class="form-group">
+                            <label>Founder's Story</label>
+                            <textarea id="edit-biz-story" class="input-modern" rows="4"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Public Contact Email</label>
+                            <input type="email" id="edit-biz-contact" class="input-modern">
+                        </div>
+                        <div class="form-group">
+                            <label>Location (Address)</label>
+                            <input type="text" id="edit-biz-location" class="input-modern">
+                        </div>
+                        
+                        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
+                        
+                        <div class="form-group">
+                            <label>Update Shopfront Image</label>
+                            <input type="file" id="edit-biz-shopfront" class="input-modern" accept="image/*">
+                            <small style="color:var(--text-secondary)">Overrides current image if selected.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Update Intro Video</label>
+                            <input type="file" id="edit-biz-video" class="input-modern" accept="video/mp4,video/x-m4v,video/*">
+                            <small style="color:var(--text-secondary)">Max 5MB. Will be uploaded to secure cloud storage.</small>
+                        </div>
+                    </div>
+                    <button id="btn-save-biz-profile" class="btn btn-primary btn-block mt-4" onclick="app.saveBusinessProfile()">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Profile
+                    </button>
+                    <p id="edit-biz-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Uploading media to cloud. Please wait...</p>
                 </div>
             </section>
 

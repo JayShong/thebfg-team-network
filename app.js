@@ -11,11 +11,13 @@ const firebaseConfig = {
 
 let db = null;
 let auth = null;
+let storage = null;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         auth = firebase.auth();
+        storage = firebase.storage();
         console.log("Firebase Connected Successfully.");
     } catch(e) {
         console.warn("Firebase initialization skipped or failed:", e);
@@ -363,6 +365,7 @@ const app = {
                 <p style="margin-top: 0.5rem;"><i class="fa-solid fa-location-dot" style="width: 20px;"></i> ${biz.location}</p>
                 ${mapIframe}
             </div>
+            ${biz.videoUrl ? `<div style="margin-top: 1.5rem;"><h3 style="margin-bottom:0.8rem">Founder's Message</h3><video controls style="width:100%; border-radius: var(--radius-md);"><source src="${biz.videoUrl}" type="video/mp4">Your browser doesn't support video.</video></div>` : ''}
             ${qrContainer}
         `;
         
@@ -385,6 +388,13 @@ const app = {
 
     populateProfile() {
         if (!MOCK_USER) return;
+
+        // Auto-link business to user if email matches ownerEmail
+        if (MOCK_USER.email) {
+            const biz = MOCK_BUSINESSES.find(b => b.ownerEmail && b.ownerEmail.toLowerCase() === MOCK_USER.email.toLowerCase());
+            MOCK_USER.businessId = biz ? biz.id : null;
+        }
+
         document.getElementById('profile-name').innerText = MOCK_USER.name;
         document.getElementById('profile-email').innerHTML = MOCK_USER.email ? (MOCK_USER.email + (MOCK_USER.isEmailVerified ? ` <i class="fa-solid fa-circle-check" style="color: var(--accent-success);" title="Verified"></i>` : '')) : '';
         document.getElementById('profile-id').innerText = MOCK_USER.id;
@@ -393,6 +403,12 @@ const app = {
         const adminPortal = document.getElementById('admin-portal-container');
         if (adminPortal) {
             adminPortal.style.display = MOCK_USER.isAdmin ? 'block' : 'none';
+        }
+
+        // Show business portal if businessId exists
+        const bizPortal = document.getElementById('business-portal-container');
+        if (bizPortal) {
+            bizPortal.style.display = MOCK_USER.businessId ? 'block' : 'none';
         }
     },
 
@@ -558,10 +574,27 @@ const app = {
         }, 2500);
     },
 
-    submitCheckin() {
+    async submitCheckin() {
         // Update stats
         MOCK_STATS.checkins++;
         MOCK_USER.checkins++;
+
+        if (this.scannedBusiness) {
+            this.scannedBusiness.checkinsCount = (this.scannedBusiness.checkinsCount || 0) + 1;
+            if (db) {
+                try {
+                    await db.collection('transactions').add({
+                        type: 'checkin',
+                        bizId: this.scannedBusiness.id,
+                        userId: MOCK_USER.id,
+                        userNickname: MOCK_USER.name,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await db.collection('businesses').doc(this.scannedBusiness.id).set({ checkinsCount: this.scannedBusiness.checkinsCount }, {merge:true});
+                } catch(e) { console.warn("Checkin Log failed", e); }
+            }
+        }
+
         this.saveData();
         this.renderStats();
         
@@ -572,9 +605,9 @@ const app = {
         document.getElementById('purchase-form').classList.remove('hidden');
     },
 
-    submitPurchase() {
-        const receipt = document.getElementById('receipt-input').value;
-        const amount = document.getElementById('amount-input').value;
+    async submitPurchase() {
+        const receipt = document.getElementById('receipt-input').value.trim();
+        const amount = document.getElementById('amount-input').value.trim();
         
         if(!receipt || !amount) {
             alert('Please enter both receipt number and amount.');
@@ -584,6 +617,25 @@ const app = {
         // Update stats
         MOCK_STATS.purchases++;
         MOCK_USER.purchases++;
+
+        if (this.scannedBusiness) {
+            this.scannedBusiness.purchasesCount = (this.scannedBusiness.purchasesCount || 0) + 1;
+            if (db) {
+                try {
+                    await db.collection('transactions').add({
+                        type: 'purchase',
+                        bizId: this.scannedBusiness.id,
+                        userId: MOCK_USER.id,
+                        userNickname: MOCK_USER.name,
+                        receipt: receipt,
+                        amount: parseFloat(amount),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await db.collection('businesses').doc(this.scannedBusiness.id).set({ purchasesCount: this.scannedBusiness.purchasesCount }, {merge:true});
+                } catch(e) { console.warn("Purchase Log failed", e); }
+            }
+        }
+
         this.saveData();
         this.renderStats();
         
@@ -700,11 +752,12 @@ const app = {
     },
 
     async addBusiness() {
-        const name = document.getElementById('admin-biz-name').value;
-        const founder = document.getElementById('admin-biz-founder').value;
-        const story = document.getElementById('admin-biz-story').value;
-        const location = document.getElementById('admin-biz-location').value;
-        const contact = document.getElementById('admin-biz-contact').value;
+        const name = document.getElementById('admin-biz-name').value.trim();
+        const founder = document.getElementById('admin-biz-founder').value.trim();
+        const ownerEmail = document.getElementById('admin-biz-owner-email').value.trim();
+        const story = document.getElementById('admin-biz-story').value.trim();
+        const location = document.getElementById('admin-biz-location').value.trim();
+        const contact = document.getElementById('admin-biz-contact').value.trim();
         
         const score = {
             s: document.getElementById('score-shareholder').value,
@@ -729,12 +782,15 @@ const app = {
             id: 'biz_' + Date.now(),
             name,
             founder,
+            ownerEmail,
             story,
             location,
             contact,
             score,
             shopfrontImg,
-            founderImg
+            founderImg,
+            checkinsCount: 0,
+            purchasesCount: 0
         };
 
         // Update mock state
@@ -769,6 +825,144 @@ const app = {
         document.getElementById('admin-loading').classList.add('hidden');
         
         this.navigate('directory');
+    },
+
+    // --- Business Portal Logic ---
+    async openBusinessDashboard() {
+        if (!MOCK_USER.businessId) return;
+        const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+        if (!biz) return;
+
+        document.getElementById('biz-dash-name').innerText = biz.name;
+        document.getElementById('biz-dash-checkins').innerText = (biz.checkinsCount || 0).toLocaleString();
+        document.getElementById('biz-dash-purchases').innerText = (biz.purchasesCount || 0).toLocaleString();
+
+        const list = document.getElementById('biz-transaction-list');
+        list.innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Fetching transactions...</p>';
+
+        this.navigate('business-dashboard');
+
+        if (db) {
+            try {
+                const querySnapshot = await db.collection('transactions')
+                    .where('bizId', '==', biz.id)
+                    .where('type', '==', 'purchase')
+                    .orderBy('timestamp', 'desc')
+                    .limit(20)
+                    .get();
+
+                if (querySnapshot.empty) {
+                    list.innerHTML = '<p style="color: var(--text-secondary); padding:1rem;">No recent purchases recorded.</p>';
+                } else {
+                    list.innerHTML = '';
+                    querySnapshot.forEach(doc => {
+                        const t = doc.data();
+                        const dt = t.timestamp ? t.timestamp.toDate().toLocaleString() : 'Just now';
+                        list.innerHTML += `
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0.8rem 0;">
+                                <div>
+                                    <strong>${t.userNickname}</strong><br>
+                                    <small style="color:var(--text-secondary)">Receipt: ${t.receipt} &bull; ${dt}</small>
+                                </div>
+                                <div style="color:var(--accent-success); font-weight:bold;">
+                                    $${parseFloat(t.amount).toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            } catch(e) {
+                console.error(e);
+                list.innerHTML = '<p style="color: var(--text-warning); padding:1rem;">Error loading transactions. Make sure Firestore indexes are built.</p>';
+            }
+        }
+    },
+
+    openBusinessProfileEdit() {
+        if (!MOCK_USER.businessId) return;
+        const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+        if (!biz) return;
+
+        document.getElementById('edit-biz-name').value = biz.name || '';
+        document.getElementById('edit-biz-founder').value = biz.founder || '';
+        document.getElementById('edit-biz-story').value = biz.story || '';
+        document.getElementById('edit-biz-contact').value = biz.contact || '';
+        document.getElementById('edit-biz-location').value = biz.location || '';
+        
+        this.navigate('business-profile-edit');
+    },
+
+    async uploadMediaToStorage(fileInputElementId, pathPrefix) {
+        const input = document.getElementById(fileInputElementId);
+        if (!input.files || !input.files[0]) return null;
+        const file = input.files[0];
+        
+        if (!storage) {
+            this.showToast('Storage module not loaded! Cannot upload media.');
+            throw new Error('No storage');
+        }
+
+        const ext = file.name.split('.').pop();
+        const ref = storage.ref().child(`businesses/${pathPrefix}_${Date.now()}.${ext}`);
+        await ref.put(file);
+        return await ref.getDownloadURL();
+    },
+
+    async saveBusinessProfile() {
+        if (!MOCK_USER.businessId) return;
+        const bizIndex = MOCK_BUSINESSES.findIndex(b => b.id === MOCK_USER.businessId);
+        if (bizIndex === -1) return;
+
+        const name = document.getElementById('edit-biz-name').value.trim();
+        const founder = document.getElementById('edit-biz-founder').value.trim();
+        const story = document.getElementById('edit-biz-story').value.trim();
+        const contact = document.getElementById('edit-biz-contact').value.trim();
+        const location = document.getElementById('edit-biz-location').value.trim();
+
+        if (!name || !founder) {
+            this.showToast("Business name & founder name are required.");
+            return;
+        }
+
+        const btn = document.getElementById('btn-save-biz-profile');
+        const loader = document.getElementById('edit-biz-loading');
+        btn.style.display = 'none';
+        loader.classList.remove('hidden');
+
+        try {
+            let shopfrontUrl = MOCK_BUSINESSES[bizIndex].shopfrontImg;
+            let videoUrl = MOCK_BUSINESSES[bizIndex].videoUrl || '';
+
+            // Handle Photo
+            const newPhotoUrl = await this.uploadMediaToStorage('edit-biz-shopfront', `shopfront_${MOCK_USER.businessId}`).catch(e=>null);
+            if(newPhotoUrl) shopfrontUrl = newPhotoUrl;
+
+            // Handle Video
+            const newVideoUrl = await this.uploadMediaToStorage('edit-biz-video', `video_${MOCK_USER.businessId}`).catch(e=>null);
+            if(newVideoUrl) videoUrl = newVideoUrl;
+
+            MOCK_BUSINESSES[bizIndex].name = name;
+            MOCK_BUSINESSES[bizIndex].founder = founder;
+            MOCK_BUSINESSES[bizIndex].story = story;
+            MOCK_BUSINESSES[bizIndex].contact = contact;
+            MOCK_BUSINESSES[bizIndex].location = location;
+            MOCK_BUSINESSES[bizIndex].shopfrontImg = shopfrontUrl;
+            MOCK_BUSINESSES[bizIndex].videoUrl = videoUrl;
+
+            if (db) {
+                await db.collection('businesses').doc(MOCK_USER.businessId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
+            }
+            this.saveData();
+            this.showToast("Business Profile Updated!");
+            
+            this.openBusinessDashboard(); // refresh
+        } catch(e) {
+            console.error(e);
+            this.showToast("An error occurred during save.");
+        } finally {
+            btn.style.display = 'block';
+            loader.classList.add('hidden');
+        }
     }
 };
 
