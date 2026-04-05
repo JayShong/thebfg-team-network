@@ -61,6 +61,9 @@
                         <div class="form-group">
                             <label>Password</label>
                             <input type="password" id="login-password" class="input-modern" placeholder="At least 6 characters">
+                            <div style="text-align: right; margin-top: 0.5rem;">
+                                <a href="#" onclick="app.sendPasswordResetFromLogin(); return false;" style="color: var(--accent-primary); font-size: 0.85rem; text-decoration: none;">Forgot password?</a>
+                            </div>
                         </div>
                         <button class="btn btn-primary btn-block mt-4" id="login-btn" onclick="app.login()">
                             Join the Network / Login
@@ -259,6 +262,14 @@
                             <input type="date" id="settings-dob" class="input-modern">
                         </div>
                     </div>
+                </div>
+
+                <div class="glass-card mt-4">
+                    <h3>Security</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Keep your account safe.</p>
+                    <button class="btn btn-secondary" onclick="app.sendPasswordResetFromSettings()">
+                        <i class="fa-solid fa-key"></i> Send Password Reset Email
+                    </button>
                 </div>
 
                 <div class="glass-card mt-4">

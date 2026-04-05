@@ -517,6 +517,39 @@ const app = {
         }
     },
 
+    async sendPasswordResetFromLogin() {
+        const emailInput = document.getElementById('login-email').value.trim();
+        if (!emailInput) {
+            this.showToast('Please enter your email address in the field above first.');
+            return;
+        }
+        if (auth) {
+            try {
+                await auth.sendPasswordResetEmail(emailInput);
+                this.showToast('Password reset email sent! Check your inbox.');
+            } catch (error) {
+                console.error("Error sending password reset:", error);
+                this.showToast('Failed to send reset email. Ensure email is valid.');
+            }
+        } else {
+            this.showToast('Authentication module not initialized.');
+        }
+    },
+
+    async sendPasswordResetFromSettings() {
+        if (!auth || !auth.currentUser) return;
+        const email = auth.currentUser.email;
+        if (confirm(`Send a password reset email to ${email}?`)) {
+            try {
+                await auth.sendPasswordResetEmail(email);
+                this.showToast(`Password reset email sent to ${email}!`);
+            } catch (error) {
+                console.error("Error sending password reset:", error);
+                this.showToast("Failed to send reset email.");
+            }
+        }
+    },
+
     // --- Scanner Logic ---
     html5Qrcode: null,
     
