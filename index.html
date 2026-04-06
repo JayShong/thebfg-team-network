@@ -121,19 +121,36 @@
                 
                 <!-- Personal Stats -->
                 <div class="stats-grid personal">
-                    <div class="stat-card glass-card highlight-border">
+                    <div class="stat-card glass-card highlight-border" style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('checkin')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="View Check-in History">
                         <i class="fa-solid fa-location-dot stat-icon" style="color:var(--accent-primary)"></i>
                         <div class="stat-info">
                             <h3>Your Check-ins</h3>
                             <p id="stat-personal-checkins" class="stat-value">0</p>
                         </div>
                     </div>
-                    <div class="stat-card glass-card highlight-border">
+                    <div class="stat-card glass-card highlight-border" style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('purchase')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="View Purchase History">
                         <i class="fa-solid fa-receipt stat-icon" style="color:var(--accent-success)"></i>
                         <div class="stat-info">
                             <h3>Your Purchases</h3>
                             <p id="stat-personal-purchases" class="stat-value">0</p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- User History View -->
+            <section id="view-user-history" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('dashboard')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+                </button>
+                <div class="page-header" style="margin-bottom:1rem;">
+                    <h1 id="user-history-title">History</h1>
+                    <p id="user-history-subtitle">Review your past activities</p>
+                </div>
+                
+                <div class="glass-card">
+                    <div id="user-history-list" style="max-height: 400px; overflow-y: auto; display:flex; flex-direction:column; gap:0.5rem;">
+                        <!-- JS injected -->
                     </div>
                 </div>
             </section>
@@ -445,6 +462,20 @@
                     <div id="biz-transaction-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
                         <!-- Populate via JS -->
                         <p style="color: var(--text-secondary); text-align: center;">Loading transactions...</p>
+                    </div>
+                </div>
+                <div class="glass-card mt-4">
+                    <h3>Reconcile End-of-Day CSV</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Upload your POS export to verify pending transactions. Transactions will only be credited once approved.</p>
+                    <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="file" id="reconcile-csv-upload" accept=".csv, .txt" class="input-modern" style="flex:1;">
+                        <button class="btn btn-primary" onclick="app.processReconciliationCSV()"><i class="fa-solid fa-file-csv"></i> Analyze</button>
+                    </div>
+                    <div id="reconcile-results" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
+                        <!-- Results injected here -->
+                    </div>
+                    <div id="reconcile-actions" class="hidden mt-3" style="text-align: right;">
+                        <button class="btn btn-secondary" onclick="app.finalizeReconciliation()">Finalize Approved Matches</button>
                     </div>
                 </div>
             </section>

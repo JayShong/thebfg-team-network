@@ -764,13 +764,8 @@ const app = {
             return;
         }
 
-        // Update stats
-        MOCK_STATS.purchases++;
-        MOCK_USER.purchases++;
-
         if (this.scannedBusiness) {
-            this.scannedBusiness.purchasesCount = (this.scannedBusiness.purchasesCount || 0) + 1;
-            if (db) {
+            if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
                 try {
                     await db.collection('transactions').add({
                         type: 'purchase',
@@ -779,9 +774,9 @@ const app = {
                         userNickname: MOCK_USER.name,
                         receipt: receipt,
                         amount: parseFloat(amount),
+                        status: 'pending',
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    await db.collection('businesses').doc(this.scannedBusiness.id).set({ purchasesCount: this.scannedBusiness.purchasesCount }, {merge:true});
                 } catch(e) { console.warn("Purchase Log failed", e); }
             }
         }
@@ -1151,13 +1146,17 @@ const app = {
                     querySnapshot.forEach(doc => {
                         const t = doc.data();
                         const dt = t.timestamp ? t.timestamp.toDate().toLocaleString() : 'Just now';
+                        const status = t.status || 'verified';
+                        const statusColor = status === 'pending' ? 'var(--text-warning)' : 'var(--accent-success)';
+                        const statusIcon = status === 'pending' ? '<i class="fa-solid fa-clock"></i> Pending' : '<i class="fa-solid fa-check"></i> Verified';
+                        
                         list.innerHTML += `
                             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0.8rem 0;">
                                 <div>
-                                    <strong>${t.userNickname}</strong><br>
+                                    <strong>${t.userNickname}</strong> <span style="font-size:0.8rem; color:${statusColor}; margin-left:0.5rem;">${statusIcon}</span><br>
                                     <small style="color:var(--text-secondary)">Receipt: ${t.receipt} &bull; ${dt}</small>
                                 </div>
-                                <div style="color:var(--accent-success); font-weight:bold;">
+                                <div style="color:${statusColor}; font-weight:bold;">
                                     $${parseFloat(t.amount).toFixed(2)}
                                 </div>
                             </div>
@@ -1186,6 +1185,163 @@ const app = {
         document.getElementById('edit-biz-video').value = biz.videoUrl || '';
         
         this.navigate('business-profile-edit');
+    },
+
+    approvedReconciliationMatches: [],
+
+    async processReconciliationCSV() {
+        const fileInput = document.getElementById('reconcile-csv-upload');
+        const resultsDiv = document.getElementById('reconcile-results');
+        const actionsDiv = document.getElementById('reconcile-actions');
+        
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a CSV file first.');
+            return;
+        }
+
+        if (!db) {
+            resultsDiv.innerHTML = '<p class="text-warning">Firestore not connected. Cloud data required for this function.</p>';
+            return;
+        }
+
+        resultsDiv.innerHTML = '<p><i class="fa-solid fa-spinner fa-spin"></i> Analyzing...</p>';
+        actionsDiv.classList.add('hidden');
+        this.approvedReconciliationMatches = [];
+
+        try {
+            // 1. Fetch pending transactions
+            const pendingQuery = await db.collection('transactions')
+                .where('bizId', '==', MOCK_USER.businessId)
+                .where('type', '==', 'purchase')
+                .get();
+                
+            const pendingTxns = [];
+            pendingQuery.forEach(doc => {
+                const data = doc.data();
+                if (data.status === 'pending') {
+                    pendingTxns.push({ id: doc.id, ...data });
+                }
+            });
+
+            if (pendingTxns.length === 0) {
+                resultsDiv.innerHTML = '<p style="color:var(--accent-success)">No pending transactions require reconciliation!</p>';
+                return;
+            }
+
+            // 2. Read CSV File
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const csvText = e.target.result;
+                let html = '<div style="display:flex; flex-direction:column; gap:0.5rem;">';
+                let matchCount = 0;
+
+                pendingTxns.forEach(t => {
+                    const amountStr = t.amount.toString();
+                    const hasReceipt = csvText.includes(t.receipt);
+                    const hasAmount = csvText.includes(amountStr);
+                    
+                    let bg = 'rgba(255,255,255,0.05)';
+                    let icon = '';
+                    let action = '';
+
+                    if (hasReceipt && hasAmount) {
+                        bg = 'rgba(0,200,83,0.1)';
+                        icon = '<i class="fa-solid fa-check text-success"></i> Strong Match';
+                        action = `<input type="checkbox" checked disabled>`;
+                        this.approvedReconciliationMatches.push(t.id);
+                        matchCount++;
+                    } else if (hasAmount) {
+                        bg = 'rgba(255,171,0,0.1)';
+                        icon = '<i class="fa-solid fa-exclamation-triangle text-warning"></i> Weak Match (Amount Only)';
+                        action = `<input type="checkbox" onchange="app.toggleReconciliationMatch('${t.id}', this.checked)">`;
+                    } else {
+                        bg = 'rgba(213,0,0,0.1)';
+                        icon = '<i class="fa-solid fa-xmark" style="color:red;"></i> No Match';
+                        action = `<input type="checkbox" onchange="app.toggleReconciliationMatch('${t.id}', this.checked)">`;
+                    }
+
+                    html += `
+                        <div style="background:${bg}; padding: 0.8rem; border-radius: var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong>${t.userNickname}</strong> - $${t.amount.toFixed(2)}<br>
+                                <small>Receipt: ${t.receipt}</small><br>
+                                <small>${icon}</small>
+                            </div>
+                            <div>${action}</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+                
+                if (pendingTxns.length > 0) {
+                    actionsDiv.classList.remove('hidden');
+                }
+            };
+            reader.readAsText(fileInput.files[0]);
+
+        } catch (err) {
+            console.error(err);
+            resultsDiv.innerHTML = '<p class="text-warning">Error processing file or database.</p>';
+        }
+    },
+
+    toggleReconciliationMatch(txnId, isChecked) {
+        if (isChecked) {
+            if (!this.approvedReconciliationMatches.includes(txnId)) {
+                this.approvedReconciliationMatches.push(txnId);
+            }
+        } else {
+            this.approvedReconciliationMatches = this.approvedReconciliationMatches.filter(id => id !== txnId);
+        }
+    },
+
+    async finalizeReconciliation() {
+        if (this.approvedReconciliationMatches.length === 0) {
+            this.showToast("No matches selected to finalize.");
+            return;
+        }
+
+        const btn = document.querySelector('#reconcile-actions button');
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.disabled = true;
+
+        try {
+            const batch = db.batch();
+            let addedPurchases = 0;
+            
+            for (const txnId of this.approvedReconciliationMatches) {
+                const docRef = db.collection('transactions').doc(txnId);
+                batch.update(docRef, { status: 'verified' });
+                addedPurchases++;
+            }
+            
+            await batch.commit();
+            
+            // Increment Mock Business Score
+            const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+            if (biz) {
+                biz.purchasesCount = (biz.purchasesCount || 0) + addedPurchases;
+                await db.collection('businesses').doc(biz.id).set({ purchasesCount: biz.purchasesCount }, {merge:true});
+            }
+            
+            // To be technically accurate, the user who bought should get the points. 
+            // In a real backend, a Cloud Function watches `status: verified` and increments the user's document.
+            // For this frontend-mock MVP, we visually update global mock stats:
+            MOCK_STATS.purchases += addedPurchases;
+            this.saveData();
+
+            this.showToast(`Successfully verified ${addedPurchases} transactions!`);
+            this.openBusinessDashboard(); // refresh
+        } catch (e) {
+            console.error("Batch update failed:", e);
+            this.showToast("Failed to sync approvals to cloud.");
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     },
 
     async saveBusinessProfile() {
@@ -1241,6 +1397,68 @@ const app = {
         } finally {
             btn.style.display = 'block';
             loader.classList.add('hidden');
+        }
+    },
+
+    async openUserHistory(type = 'checkin') {
+        const title = document.getElementById('user-history-title');
+        const list = document.getElementById('user-history-list');
+        if (!title || !list) return;
+
+        title.innerText = type === 'checkin' ? 'Check-in History' : 'Purchase History';
+        list.innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Fetching records...</p>';
+        this.navigate('user-history');
+
+        if (db) {
+            try {
+                const querySnapshot = await db.collection('transactions')
+                    .where('userId', '==', MOCK_USER.id)
+                    .where('type', '==', type)
+                    .orderBy('timestamp', 'desc')
+                    .limit(50)
+                    .get();
+
+                if (querySnapshot.empty) {
+                    list.innerHTML = `<p style="color: var(--text-secondary); padding:1rem; text-align: center;">No ${type} history found.</p>`;
+                } else {
+                    list.innerHTML = '';
+                    querySnapshot.forEach(doc => {
+                        const t = doc.data();
+                        const biz = MOCK_BUSINESSES.find(b => b.id === t.bizId) || { name: 'Unknown Business' };
+                        const dt = t.timestamp ? t.timestamp.toDate().toLocaleString() : 'Just now';
+                        
+                        let extraInfo = '';
+                        let valueBlock = '';
+
+                        if (type === 'purchase') {
+                            const status = t.status || 'verified';
+                            const statusColor = status === 'pending' ? 'var(--text-warning)' : 'var(--accent-success)';
+                            const statusIcon = status === 'pending' ? '<i class="fa-solid fa-clock"></i> Pending ' : '<i class="fa-solid fa-check"></i> Verified ';
+                            
+                            extraInfo = `<small style="color:${statusColor}">${statusIcon} &bull; </small><small style="color:var(--text-secondary)">Receipt: ${t.receipt} &bull; ${dt}</small>`;
+                            valueBlock = `<div style="color:${statusColor}; font-weight:bold;">$${parseFloat(t.amount).toFixed(2)}</div>`;
+                        } else {
+                            extraInfo = `<small style="color:var(--text-secondary)">${dt}</small>`;
+                            valueBlock = `<div style="color:var(--accent-primary);"><i class="fa-solid fa-location-dot"></i></div>`;
+                        }
+
+                        list.innerHTML += `
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0.8rem 0;">
+                                <div>
+                                    <strong>${biz.name}</strong><br>
+                                    ${extraInfo}
+                                </div>
+                                ${valueBlock}
+                            </div>
+                        `;
+                    });
+                }
+            } catch(e) {
+                console.error(e);
+                list.innerHTML = '<p style="color: var(--text-warning); padding:1rem;">Error loading history. Make sure Firestore indexes are built.</p>';
+            }
+        } else {
+            list.innerHTML = `<p style="color: var(--text-warning); padding:1rem; text-align:center;">Cloud history unavailable in local-only demo mode.</p>`;
         }
     }
 };
