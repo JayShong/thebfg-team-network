@@ -34,34 +34,40 @@ const INITIAL_STATS = {
 const INITIAL_BUSINESSES = [
     {
         id: "biz_1",
-        name: "GreenRoots Cafe",
-        founder: "Sarah Jenkins",
-        story: "Sarah started GreenRoots with a simple conviction: food should heal the body and the earth. We source 100% locally and employ at-risk youth.",
-        score: { s: 'A', e: 'A', c: 'B', soc: 'A', env: 'A' },
-        location: "123 Earth Way, Eco District",
-        contact: "hello@greenroots.com",
+        name: "Solaris Coffee Roasters",
+        founder: "Maria Lin",
+        story: "Maria believes every cup of coffee should power the future. Solaris roasts 100% fair-trade beans using only solar energy.",
+        type: "full",
+        score: { s: 'A', e: 'A', c: 'A', soc: 'B', env: 'A' },
+        location: "404 Sunshine Blvd, Eco District",
+        contact: "hello@solariscoffee.example.com",
+        website: "https://solariscoffee.example.com",
         shopfrontImg: "",
         founderImg: ""
     },
     {
         id: "biz_2",
-        name: "ThreadLightly Apparel",
-        founder: "Marcus Thorne",
-        story: "After seeing the waste of fast fashion, Marcus created a circular clothing brand where every piece is upcycled and every worker is a stakeholder.",
-        score: { s: 'B', e: 'A', c: 'A', soc: 'B', env: 'A' },
-        location: "45 Sustainable Ave",
-        contact: "info@threadlightly.com",
+        name: "Oceanic Surf Gear",
+        founder: "Kai Manu",
+        story: "Kai built Oceanic to protect the waves he loves. Every surfboard and rash guard is made from upcycled ocean plastics.",
+        type: "full",
+        score: { s: 'B', e: 'B', c: 'A', soc: 'A', env: 'A' },
+        location: "15 Coastline Way, Marina Bay",
+        contact: "ride@oceanicsurf.example.com",
+        website: "https://oceanicsurf.example.com",
         shopfrontImg: "",
         founderImg: ""
     },
     {
         id: "biz_3",
-        name: "The Empathetic Baker",
-        founder: "Elena Rodriguez",
-        story: "Elena believes in the power of bread to bring people together. For every loaf sold, one is donated to a local shelter.",
-        score: { s: 'A', e: 'B', c: 'A', soc: 'A', env: 'A' },
-        location: "800 Community Blvd",
-        contact: "baker@empatheticbaker.com",
+        name: "Urban Harvest Grove",
+        founder: "David Chen",
+        story: "David brought agriculture to the city center. Urban Harvest provides zero-mile, pesticide-free produce to local communities.",
+        type: "full",
+        score: { s: 'A', e: 'A', c: 'A', soc: 'A', env: 'A' },
+        location: "99 Metro Plaza, City Center",
+        contact: "info@urbanharvest.example.com",
+        website: "https://urbanharvest.example.com",
         shopfrontImg: "",
         founderImg: ""
     }
@@ -181,6 +187,24 @@ const app = {
                 this.showToast("Failed to connect to cloud database.");
             }
         }
+    },
+
+    async forceSync() {
+        const btn = document.querySelector('button[title="Sync Data"]');
+        if(btn) btn.querySelector('i').classList.add('fa-spin');
+        
+        await this.fetchCloudData();
+        this.saveData();
+        this.renderStats();
+        this.renderBusinessList();
+        this.populateProfile();
+        
+        if (this.currentView === 'business-dashboard') {
+            this.openBusinessDashboard();
+        }
+        
+        if(btn) btn.querySelector('i').classList.remove('fa-spin');
+        this.showToast('Data synchronized with server.');
     },
 
     async saveData() {
@@ -308,15 +332,19 @@ const app = {
             // Pseudo-random gradient for image placeholder
             const deg = Math.floor(Math.random() * 360);
             
-            const scoreStr = typeof biz.score === 'object' ? `${biz.score.s}${biz.score.e}${biz.score.c}${biz.score.soc}${biz.score.env}` : biz.score;
+            const scoreStr = typeof biz.score === 'object' && biz.score ? `${biz.score.s}${biz.score.e}${biz.score.c}${biz.score.soc}${biz.score.env}` : biz.score;
             const imgStyle = biz.shopfrontImg ? `background-image: url(${biz.shopfrontImg}); background-size: cover; background-position: center; border:none;` : `background: linear-gradient(${deg}deg, var(--accent-primary), var(--accent-secondary))`;
+
+            const badgeHTML = biz.type === 'affiliate' 
+                ? '<span class="business-score" style="color:var(--text-warning); border-color:var(--text-warning);"><i class="fa-solid fa-circle-info"></i> Affiliate Member (Not Audited)</span>' 
+                : `<span class="business-score"><i class="fa-solid fa-star"></i> BFG Score: ${scoreStr}</span>`;
 
             card.innerHTML = `
                 <div class="business-img" style="${imgStyle}"></div>
                 <div class="business-info">
                     <h3>${biz.name}</h3>
                     <p><i class="fa-solid fa-user-tie"></i> ${biz.founder}</p>
-                    <span class="business-score"><i class="fa-solid fa-star"></i> BFG Score: ${scoreStr}</span>
+                    ${badgeHTML}
                 </div>
             `;
             container.appendChild(card);
@@ -368,17 +396,29 @@ const app = {
             <div id="qrcode-${biz.id}" style="display:inline-block; padding: 1rem; background: white; border-radius: var(--radius-md);"></div>
         </div>`;
 
-        container.innerHTML = `
-            ${heroHTML}
-            <h2>${biz.name}</h2>
-            <div class="business-score" style="margin-bottom: 1.5rem; display:flex; flex-direction:column; align-items:flex-start; gap:0.5rem;">
-                <div><i class="fa-solid fa-star"></i> TheBFG.Team Score: <strong>${scoreStr}</strong></div>
-                <div style="font-size:0.75rem; color:var(--text-secondary); background:rgba(0,0,0,0.2); padding:0.5rem; border-radius:var(--radius-md); font-family:monospace;">
-                    Sh:${typeof biz.score === 'object' ? biz.score.s : '-'} | Em:${typeof biz.score === 'object' ? biz.score.e : '-'} | Cu:${typeof biz.score === 'object' ? biz.score.c : '-'} | So:${typeof biz.score === 'object' ? biz.score.soc : '-'} | Env:${typeof biz.score === 'object' ? biz.score.env : '-'}
-                </div>
-            </div>
-            
-            <div class="detail-section glass-card">
+            let scoreHTML = '';
+            if (biz.type === 'affiliate') {
+                scoreHTML = `<div class="business-score" style="margin-bottom: 1.5rem; display:flex; flex-direction:column; align-items:flex-start; gap:0.5rem; color: var(--text-warning); border-color: var(--text-warning);">
+                    <div><i class="fa-solid fa-circle-info"></i> Affiliate Member</div>
+                    <div style="font-size:0.85rem; color:var(--text-secondary); background:rgba(0,0,0,0.2); padding:0.5rem; border-radius:var(--radius-md);">
+                        This business is an affiliate. While they support our mission and have been basically vetted, they reserve the right to distance from the network and have <strong>not been audited or scored</strong> across the paradigms yet.
+                    </div>
+                </div>`;
+            } else {
+                scoreHTML = `<div class="business-score" style="margin-bottom: 1.5rem; display:flex; flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                    <div><i class="fa-solid fa-star"></i> TheBFG.Team Score: <strong>${scoreStr}</strong></div>
+                    <div style="font-size:0.75rem; color:var(--text-secondary); background:rgba(0,0,0,0.2); padding:0.5rem; border-radius:var(--radius-md); font-family:monospace;">
+                        Sh:${typeof biz.score === 'object' && biz.score ? biz.score.s : '-'} | Em:${typeof biz.score === 'object' && biz.score ? biz.score.e : '-'} | Cu:${typeof biz.score === 'object' && biz.score ? biz.score.c : '-'} | So:${typeof biz.score === 'object' && biz.score ? biz.score.soc : '-'} | Env:${typeof biz.score === 'object' && biz.score ? biz.score.env : '-'}
+                    </div>
+                </div>`;
+            }
+
+            container.innerHTML = `
+                ${heroHTML}
+                <h2>${biz.name}</h2>
+                ${scoreHTML}
+                
+                <div class="detail-section glass-card">
                 <h3>Founder's Conviction</h3>
                 ${founderImgHTML}
                 <p><strong>${biz.founder}</strong></p>
@@ -388,7 +428,7 @@ const app = {
             
             <div class="detail-section glass-card">
                 <h3>Contact & Location</h3>
-                <p><i class="fa-solid fa-envelope" style="width: 20px;"></i> ${biz.contact}</p>
+                ${biz.website ? `<p><i class="fa-solid fa-globe" style="width: 20px;"></i> <a href="${biz.website}" target="_blank" style="color: var(--accent-primary); text-decoration: none;">${biz.website}</a></p>` : ''}
                 <p style="margin-top: 0.5rem;"><i class="fa-solid fa-location-dot" style="width: 20px;"></i> ${biz.location}</p>
                 ${mapIframe}
             </div>
@@ -866,14 +906,20 @@ const app = {
         const story = document.getElementById('admin-biz-story').value.trim();
         const location = document.getElementById('admin-biz-location').value.trim();
         const contact = document.getElementById('admin-biz-contact').value.trim();
+        const website = document.getElementById('admin-biz-website').value.trim();
+        const typeSelectElem = document.getElementById('admin-biz-type');
+        const bizType = typeSelectElem ? typeSelectElem.value : 'full';
         
-        const score = {
-            s: document.getElementById('score-shareholder').value,
-            e: document.getElementById('score-employee').value,
-            c: document.getElementById('score-customer').value,
-            soc: document.getElementById('score-society').value,
-            env: document.getElementById('score-env').value
-        };
+        let score = null;
+        if (bizType !== 'affiliate') {
+            score = {
+                s: document.getElementById('score-shareholder').value,
+                e: document.getElementById('score-employee').value,
+                c: document.getElementById('score-customer').value,
+                soc: document.getElementById('score-society').value,
+                env: document.getElementById('score-env').value
+            };
+        }
 
         if (!name || !founder || !story || !location || !contact) {
             this.showToast("Please fill in basic business details.");
@@ -894,6 +940,8 @@ const app = {
             story,
             location,
             contact,
+            website,
+            type: bizType,
             score,
             shopfrontImg,
             founderImg,
@@ -924,8 +972,13 @@ const app = {
         document.getElementById('admin-biz-story').value = '';
         document.getElementById('admin-biz-location').value = '';
         document.getElementById('admin-biz-contact').value = '';
+        document.getElementById('admin-biz-website').value = '';
         document.getElementById('admin-biz-shopfront').value = '';
         document.getElementById('admin-biz-founder-img').value = '';
+        if(typeSelectElem) {
+            typeSelectElem.value = 'full';
+            document.getElementById('score-section').style.display = 'block';
+        }
 
         this.showToast(`Successfully added ${name}!`);
         
@@ -995,6 +1048,7 @@ const app = {
         document.getElementById('edit-biz-founder').value = biz.founder || '';
         document.getElementById('edit-biz-story').value = biz.story || '';
         document.getElementById('edit-biz-contact').value = biz.contact || '';
+        document.getElementById('edit-biz-website').value = biz.website || '';
         document.getElementById('edit-biz-location').value = biz.location || '';
         document.getElementById('edit-biz-shopfront').value = biz.shopfrontImg || '';
         document.getElementById('edit-biz-video').value = biz.videoUrl || '';
@@ -1011,6 +1065,7 @@ const app = {
         const founder = document.getElementById('edit-biz-founder').value.trim();
         const story = document.getElementById('edit-biz-story').value.trim();
         const contact = document.getElementById('edit-biz-contact').value.trim();
+        const website = document.getElementById('edit-biz-website').value.trim();
         const location = document.getElementById('edit-biz-location').value.trim();
         const videoInputVal = document.getElementById('edit-biz-video').value.trim();
 
@@ -1036,6 +1091,7 @@ const app = {
             MOCK_BUSINESSES[bizIndex].founder = founder;
             MOCK_BUSINESSES[bizIndex].story = story;
             MOCK_BUSINESSES[bizIndex].contact = contact;
+            MOCK_BUSINESSES[bizIndex].website = website;
             MOCK_BUSINESSES[bizIndex].location = location;
             MOCK_BUSINESSES[bizIndex].shopfrontImg = shopfrontUrl;
             MOCK_BUSINESSES[bizIndex].videoUrl = videoUrl;
