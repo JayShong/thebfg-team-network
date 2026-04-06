@@ -1419,7 +1419,7 @@ const app = {
                     .get();
 
                 if (querySnapshot.empty) {
-                    list.innerHTML = `<p style="color: var(--text-secondary); padding:1rem; text-align: center;">No ${type} history found.</p>`;
+                    list.innerHTML = `<p style="color: var(--text-secondary); padding:2rem 1rem; text-align: center;">Contribute to the growth of empathy economy by purchasing from one of the For-Good Businesses</p>`;
                 } else {
                     list.innerHTML = '';
                     querySnapshot.forEach(doc => {
@@ -1455,7 +1455,7 @@ const app = {
                 }
             } catch(e) {
                 console.error(e);
-                list.innerHTML = '<p style="color: var(--text-warning); padding:1rem;">Error loading history. Make sure Firestore indexes are built.</p>';
+                list.innerHTML = '<p style="color: var(--text-secondary); padding:2rem 1rem; text-align: center;">Contribute to the growth of empathy economy by purchasing from one of the For-Good Businesses</p>';
             }
         } else {
             list.innerHTML = `<p style="color: var(--text-warning); padding:1rem; text-align:center;">Cloud history unavailable in local-only demo mode.</p>`;
