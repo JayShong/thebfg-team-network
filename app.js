@@ -85,6 +85,7 @@ let MOCK_ADMINS = ['jayshong@gmail.com'];
 const app = {
     currentView: 'dashboard',
     scannedBusiness: null,
+    adminEditingBizId: null,
 
     async init() {
         if (auth) {
@@ -523,6 +524,7 @@ const app = {
     },
 
     renderAdminList() {
+        this.renderAdminBusinessList();
         const container = document.getElementById('admin-list-container');
         if (!container) return;
         container.innerHTML = '';
@@ -899,6 +901,108 @@ const app = {
         });
     },
 
+    renderAdminBusinessList() {
+        const container = document.getElementById('admin-biz-table-container');
+        if (!container) return;
+        
+        let searchTerm = '';
+        const searchInput = document.getElementById('admin-biz-search');
+        if (searchInput) searchTerm = searchInput.value.toLowerCase().trim();
+        
+        let filteredBiz = MOCK_BUSINESSES;
+        if (searchTerm) {
+            filteredBiz = MOCK_BUSINESSES.filter(b => 
+                (b.name && b.name.toLowerCase().includes(searchTerm)) || 
+                (b.founder && b.founder.toLowerCase().includes(searchTerm))
+            );
+        }
+        
+        if (filteredBiz.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding: 1rem;">No matching businesses found.</p>';
+            return;
+        }
+
+        let html = '';
+        filteredBiz.forEach(biz => {
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.1);">
+                <div>
+                    <strong>${biz.name}</strong> <span style="font-size:0.8rem; color:var(--text-secondary);">- ${biz.founder} ${biz.type==='affiliate' ? '<span style="color:var(--text-warning);">(Affiliate)</span>' : ''}</span>
+                </div>
+                <button class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;" onclick="app.loadAdminBizToEdit('${biz.id}')"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+            </div>`;
+        });
+        container.innerHTML = html;
+    },
+
+    loadAdminBizToEdit(bizId) {
+        this.adminEditingBizId = bizId || null;
+        
+        if (bizId) {
+            const formTitleElement = document.getElementById('admin-form-title');
+            if(formTitleElement) formTitleElement.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        const title = document.getElementById('admin-form-title');
+        const btnText = document.getElementById('btn-add-biz-text');
+        const btnIcon = document.getElementById('btn-add-biz-icon');
+        const btnCancel = document.getElementById('btn-admin-cancel-edit');
+        
+        if (!bizId) {
+            if(title) title.innerText = 'Add New Business';
+            if(btnText) btnText.innerText = 'Add Business';
+            if(btnIcon) btnIcon.className = 'fa-solid fa-plus';
+            if(btnCancel) btnCancel.classList.add('hidden');
+            
+            document.getElementById('admin-biz-name').value = '';
+            document.getElementById('admin-biz-founder').value = '';
+            document.getElementById('admin-biz-owner-email').value = '';
+            document.getElementById('admin-biz-story').value = '';
+            document.getElementById('admin-biz-location').value = '';
+            document.getElementById('admin-biz-contact').value = '';
+            document.getElementById('admin-biz-website').value = '';
+            document.getElementById('admin-biz-shopfront').value = '';
+            document.getElementById('admin-biz-founder-img').value = '';
+            
+            const typeSelect = document.getElementById('admin-biz-type');
+            if(typeSelect) {
+                typeSelect.value = 'full';
+                document.getElementById('score-section').style.display = 'block';
+            }
+        } else {
+            const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+            if (!biz) return;
+            
+            if(title) title.innerText = `Editing: ${biz.name}`;
+            if(btnText) btnText.innerText = 'Save Changes';
+            if(btnIcon) btnIcon.className = 'fa-solid fa-floppy-disk';
+            if(btnCancel) btnCancel.classList.remove('hidden');
+            
+            document.getElementById('admin-biz-name').value = biz.name || '';
+            document.getElementById('admin-biz-founder').value = biz.founder || '';
+            document.getElementById('admin-biz-owner-email').value = biz.ownerEmail || '';
+            document.getElementById('admin-biz-story').value = biz.story || '';
+            document.getElementById('admin-biz-location').value = biz.location || '';
+            document.getElementById('admin-biz-contact').value = biz.contact || '';
+            document.getElementById('admin-biz-website').value = biz.website || '';
+            document.getElementById('admin-biz-shopfront').value = biz.shopfrontImg || '';
+            document.getElementById('admin-biz-founder-img').value = biz.founderImg || '';
+            
+            const typeSelect = document.getElementById('admin-biz-type');
+            if (typeSelect) {
+                typeSelect.value = biz.type || 'full';
+                document.getElementById('score-section').style.display = typeSelect.value === 'affiliate' ? 'none' : 'block';
+            }
+            
+            if (biz.score && biz.type !== 'affiliate') {
+                document.getElementById('score-shareholder').value = biz.score.s || 'C';
+                document.getElementById('score-employee').value = biz.score.e || 'C';
+                document.getElementById('score-customer').value = biz.score.c || 'C';
+                document.getElementById('score-society').value = biz.score.soc || 'C';
+                document.getElementById('score-env').value = biz.score.env || 'C';
+            }
+        }
+    },
+
     async addBusiness() {
         const name = document.getElementById('admin-biz-name').value.trim();
         const founder = document.getElementById('admin-biz-founder').value.trim();
@@ -931,6 +1035,33 @@ const app = {
 
         const shopfrontImg = document.getElementById('admin-biz-shopfront').value.trim();
         const founderImg = document.getElementById('admin-biz-founder-img').value.trim();
+
+        if (this.adminEditingBizId) {
+            // Update mode
+            const bizIndex = MOCK_BUSINESSES.findIndex(b => b.id === this.adminEditingBizId);
+            if(bizIndex !== -1) {
+                MOCK_BUSINESSES[bizIndex] = {
+                    ...MOCK_BUSINESSES[bizIndex],
+                    name, founder, ownerEmail, story, location, contact, website, type: bizType, score, shopfrontImg, founderImg
+                };
+                if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                    try {
+                        await db.collection('businesses').doc(this.adminEditingBizId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
+                    } catch (e) {
+                        console.warn("Could not sync business update to cloud:", e);
+                    }
+                }
+                this.saveData();
+                this.renderBusinessList();
+                this.showToast(`Successfully updated ${name}!`);
+                this.renderAdminBusinessList();
+                this.loadAdminBizToEdit(''); // clear form to Create New state
+            }
+            
+            document.getElementById('btn-add-biz').style.display = 'block';
+            document.getElementById('admin-loading').classList.add('hidden');
+            return;
+        }
 
         const newBiz = {
             id: 'biz_' + Date.now(),
@@ -980,6 +1111,7 @@ const app = {
             document.getElementById('score-section').style.display = 'block';
         }
 
+        this.renderAdminBusinessList();
         this.showToast(`Successfully added ${name}!`);
         
         document.getElementById('btn-add-biz').style.display = 'block';
