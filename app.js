@@ -434,6 +434,33 @@ const app = {
                 ${mapIframe}
             </div>
             ${videoHTML}
+            
+            <!-- ISO53001 Audited Impact Section -->
+            ${(biz.impactStatement || biz.impactWaste || biz.impactJobs) ? `
+                <div class="detail-section glass-card" style="background: linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4));">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.8rem;">
+                        <h3 style="margin:0;">ISO53001 Audited Impact</h3>
+                        <span style="font-size:0.6rem; background:rgba(255,255,255,0.2); padding:0.2rem 0.5rem; border-radius:1rem;">AUDITED</span>
+                    </div>
+                    <p style="font-size:0.9rem; font-style:italic;">"${biz.impactStatement || 'The social and environmental commitments of this business are currently under audit.'}"</p>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        ${biz.impactWaste ? `
+                            <div style="flex:1; background:rgba(255,255,255,0.05); padding:0.6rem; border-radius:var(--radius-sm); text-align:center;">
+                                <div style="font-size:1.1rem; font-weight:bold; color:var(--accent-success);">${biz.impactWaste}kg</div>
+                                <div style="font-size:0.7rem; color:var(--text-secondary);">Waste Diverted</div>
+                            </div>
+                        ` : ''}
+                        ${biz.impactJobs ? `
+                            <div style="flex:1; background:rgba(255,255,255,0.05); padding:0.6rem; border-radius:var(--radius-sm); text-align:center;">
+                                <div style="font-size:1.1rem; font-weight:bold; color:var(--accent-primary);">${biz.impactJobs}</div>
+                                <div style="font-size:0.7rem; color:var(--text-secondary);">Ethical Jobs</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
             ${qrContainer}
         `;
         
@@ -1184,6 +1211,11 @@ const app = {
         document.getElementById('edit-biz-shopfront').value = biz.shopfrontImg || '';
         document.getElementById('edit-biz-video').value = biz.videoUrl || '';
         
+        // ISO53001 Impact Metrics
+        document.getElementById('edit-biz-impact').value = biz.impactStatement || '';
+        document.getElementById('edit-biz-impact-waste').value = biz.impactWaste || '';
+        document.getElementById('edit-biz-impact-jobs').value = biz.impactJobs || '';
+        
         this.navigate('business-profile-edit');
     },
 
@@ -1375,6 +1407,12 @@ const app = {
             const editShopUrl = document.getElementById('edit-biz-shopfront').value.trim();
             if(editShopUrl) shopfrontUrl = editShopUrl;
 
+            const location = document.getElementById('edit-biz-location').value.trim();
+            videoUrl = videoInputVal;
+            const impactStatement = document.getElementById('edit-biz-impact').value.trim();
+            const impactWaste = document.getElementById('edit-biz-impact-waste').value.trim();
+            const impactJobs = document.getElementById('edit-biz-impact-jobs').value.trim();
+
             MOCK_BUSINESSES[bizIndex].name = name;
             MOCK_BUSINESSES[bizIndex].founder = founder;
             MOCK_BUSINESSES[bizIndex].story = story;
@@ -1383,6 +1421,9 @@ const app = {
             MOCK_BUSINESSES[bizIndex].location = location;
             MOCK_BUSINESSES[bizIndex].shopfrontImg = shopfrontUrl;
             MOCK_BUSINESSES[bizIndex].videoUrl = videoUrl;
+            MOCK_BUSINESSES[bizIndex].impactStatement = impactStatement;
+            MOCK_BUSINESSES[bizIndex].impactWaste = impactWaste;
+            MOCK_BUSINESSES[bizIndex].impactJobs = impactJobs;
 
             if (db) {
                 await db.collection('businesses').doc(MOCK_USER.businessId).set(MOCK_BUSINESSES[bizIndex], {merge:true});

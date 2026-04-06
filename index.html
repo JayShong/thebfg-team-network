@@ -136,6 +136,33 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Quantified Impact Beta -->
+                <div class="glass-card mt-4" style="background: linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4));">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <h3>Your Quantified Impact</h3>
+                        <span style="font-size: 0.7rem; background: var(--accent-primary); padding: 0.2rem 0.6rem; border-radius:1rem; font-weight:bold;">BETA</span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Based on your verified spending, you have indirectly contributed to the following ISO53001-audited outcomes across our network.</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem;">
+                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-recycle" style="color:var(--accent-success); font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">12.5 <span style="font-size:0.8rem">kg</span></div>
+                            <div style="font-size:0.8rem; color:var(--text-secondary);">Waste Diverted</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-hand-holding-dollar" style="color:#FFA000; font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">150 <span style="font-size:0.8rem">RM</span></div>
+                            <div style="font-size:0.8rem; color:var(--text-secondary);">Given to Charity</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-users" style="color:var(--accent-primary); font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">2 <span style="font-size:0.8rem">Jobs</span></div>
+                            <div style="font-size:0.8rem; color:var(--text-secondary);">Ethical Careers</div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- User History View -->
@@ -515,6 +542,23 @@
                         <div class="form-group">
                             <label>Location (Address)</label>
                             <input type="text" id="edit-biz-location" class="input-modern">
+                        </div>
+
+                        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
+                        
+                        <div class="form-group">
+                            <label>ISO53001 Audited Social Impact</label>
+                            <textarea id="edit-biz-impact" class="input-modern" rows="3" placeholder="Briefly summarize the social/environmental impact verified offline."></textarea>
+                        </div>
+                        <div style="display:flex; gap:1rem;">
+                            <div class="form-group" style="flex:1;">
+                                <label>Waste Diverted (kg)</label>
+                                <input type="number" id="edit-biz-impact-waste" class="input-modern" placeholder="e.g. 150">
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Ethical Jobs</label>
+                                <input type="number" id="edit-biz-impact-jobs" class="input-modern" placeholder="e.g. 5">
+                            </div>
                         </div>
                         
                         <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
