@@ -2550,7 +2550,17 @@ const app = {
             return;
         }
 
-        MOCK_INITIATIVES.forEach(init => {
+        // Sort: Active first, then by recency (updatedAt)
+        const sortedList = [...MOCK_INITIATIVES].sort((a, b) => {
+            if (a.status === 'active' && b.status !== 'active') return -1;
+            if (a.status !== 'active' && b.status === 'active') return 1;
+            // secondary sort by date
+            const dateA = new Date(a.updatedAt || 0);
+            const dateB = new Date(b.updatedAt || 0);
+            return dateB - dateA;
+        });
+
+        sortedList.forEach(init => {
             const statusColor = init.status === 'active' ? 'var(--accent-success)' : (init.status === 'past' ? 'var(--accent-secondary)' : 'var(--text-secondary)');
             
             container.innerHTML += `
@@ -2577,9 +2587,14 @@ const app = {
         const activeList = MOCK_INITIATIVES
             .filter(i => i.status !== 'hidden')
             .sort((a, b) => {
+                // Priority 1: Active cards first
                 if (a.status === 'active' && b.status !== 'active') return -1;
                 if (a.status !== 'active' && b.status === 'active') return 1;
-                return 0;
+                
+                // Priority 2: Newest updates first within the same status
+                const dateA = new Date(a.updatedAt || 0);
+                const dateB = new Date(b.updatedAt || 0);
+                return dateB - dateA;
             });
 
         if (activeList.length === 0) {
