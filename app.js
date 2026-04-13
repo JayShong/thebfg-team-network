@@ -88,7 +88,7 @@ let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
 let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
 let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
 const SUPER_ADMIN_EMAIL = 'jayshong@gmail.com';
-let MOCK_INITIATIVES = [];
+let PLATFORM_INITIATIVES = [];
 let MOCK_ADMINS = ['jayshong@gmail.com'];
 let MOCK_AUDITORS = ['jayshong@gmail.com'];
 
@@ -216,11 +216,11 @@ const app = {
                 // Fetch initiatives
                 const initSnapshot = await db.collection('initiatives').get();
                 if (!initSnapshot.empty) {
-                    MOCK_INITIATIVES = [];
+                    PLATFORM_INITIATIVES = [];
                     initSnapshot.forEach(doc => {
                         let data = doc.data();
                         data.id = doc.id;
-                        MOCK_INITIATIVES.push(data);
+                        PLATFORM_INITIATIVES.push(data);
                     });
                 } else if (MOCK_USER && MOCK_USER.isSuperAdmin) {
                     // Seed Eat2Give Default Initiative if DB is completely empty.
@@ -234,7 +234,7 @@ const app = {
                     };
                     const docRef = await db.collection('initiatives').add(initial);
                     initial.id = docRef.id;
-                    MOCK_INITIATIVES.push(initial);
+                    PLATFORM_INITIATIVES.push(initial);
                 }
 
                 if(MOCK_USER && MOCK_USER.email) {
@@ -273,7 +273,7 @@ const app = {
         localStorage.setItem('bfg_user', JSON.stringify(MOCK_USER));
         localStorage.setItem('bfg_stats', JSON.stringify(MOCK_STATS));
         localStorage.setItem('bfg_businesses', JSON.stringify(MOCK_BUSINESSES));
-        localStorage.setItem('bfg_initiatives', JSON.stringify(MOCK_INITIATIVES));
+        localStorage.setItem('bfg_initiatives', JSON.stringify(PLATFORM_INITIATIVES));
 
         // Push user to cloud
         if(db && MOCK_USER && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -2422,6 +2422,8 @@ const app = {
         const mechanism = document.getElementById('admin-init-mechanism').value.trim();
         const url = document.getElementById('admin-init-url').value.trim();
         const status = document.getElementById('admin-init-status').value;
+        const startDate = document.getElementById('admin-init-start-date').value || null;
+        const endDate = document.getElementById('admin-init-end-date').value || null;
         const files = document.getElementById('admin-init-photos').files;
 
         if (!title) return this.showToast('Campaign Title is required', true);
@@ -2431,7 +2433,7 @@ const app = {
 
         try {
             let photos = [];
-            const existing = MOCK_INITIATIVES.find(i => i.id === idInput);
+            const existing = PLATFORM_INITIATIVES.find(i => i.id === idInput);
             
             if (files.length > 0) {
                 // Upload up to 5 photos as base64
@@ -2481,7 +2483,7 @@ const app = {
             }
 
             const data = {
-                title, narrative, mechanism, url, status, photos,
+                title, narrative, mechanism, url, status, startDate, endDate, photos,
                 updatedAt: new Date().toISOString()
             };
 
@@ -2493,10 +2495,10 @@ const app = {
                 }
             } else {
                  if(idInput) {
-                     const idx = MOCK_INITIATIVES.findIndex(i => i.id === idInput);
-                     if(idx>-1) MOCK_INITIATIVES[idx] = {...data, id: idInput};
+                     const idx = PLATFORM_INITIATIVES.findIndex(i => i.id === idInput);
+                     if(idx>-1) PLATFORM_INITIATIVES[idx] = {...data, id: idInput};
                  } else {
-                     MOCK_INITIATIVES.push({...data, id: 'init_'+Date.now()});
+                     PLATFORM_INITIATIVES.push({...data, id: 'init_'+Date.now()});
                  }
             }
 
@@ -2518,12 +2520,14 @@ const app = {
         const titleEl = document.getElementById('admin-initiative-form-title');
         if(titleEl) titleEl.innerText = id ? 'Edit Initiative' : 'Add New Initiative';
         
-        const init = MOCK_INITIATIVES.find(i => i.id === id) || {};
+        const init = PLATFORM_INITIATIVES.find(i => i.id === id) || {};
         document.getElementById('admin-init-title').value = init.title || '';
         document.getElementById('admin-init-narrative').value = init.narrative || '';
-        document.getElementById('admin-init-mechanism').value = init.mechanism || '';
+        document.getElementById('admin-init-mechanism').value = init. механизм || init.mechanism || ''; // typo safety
         document.getElementById('admin-init-url').value = init.url || '';
         document.getElementById('admin-init-status').value = init.status || 'active';
+        document.getElementById('admin-init-start-date').value = init.startDate || '';
+        document.getElementById('admin-init-end-date').value = init.endDate || '';
         document.getElementById('admin-init-photos').value = ''; 
     },
 
@@ -2533,8 +2537,8 @@ const app = {
         if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
              await db.collection('initiatives').doc(id).set({status: newStatus}, {merge:true});
         } else {
-             const idx = MOCK_INITIATIVES.findIndex(i => i.id === id);
-             if(idx>-1) MOCK_INITIATIVES[idx].status = newStatus;
+             const idx = PLATFORM_INITIATIVES.findIndex(i => i.id === id);
+             if(idx>-1) PLATFORM_INITIATIVES[idx].status = newStatus;
         }
         await this.forceSync();
         this.showToast(`Set to ${newStatus}`);
@@ -2545,13 +2549,13 @@ const app = {
         if (!container) return;
         container.innerHTML = '';
 
-        if (MOCK_INITIATIVES.length === 0) {
+        if (PLATFORM_INITIATIVES.length === 0) {
             container.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:1rem;">No initiatives found.</p>';
             return;
         }
 
         // Sort: Active first, then by recency (updatedAt)
-        const sortedList = [...MOCK_INITIATIVES].sort((a, b) => {
+        const sortedList = [...PLATFORM_INITIATIVES].sort((a, b) => {
             if (a.status === 'active' && b.status !== 'active') return -1;
             if (a.status !== 'active' && b.status === 'active') return 1;
             // secondary sort by date
@@ -2560,13 +2564,29 @@ const app = {
             return dateB - dateA;
         });
 
+        // Helper to format 'YYYY-MM' to 'Feb 2025'
+        const formatMonth = (val) => {
+            if (!val) return '';
+            const parts = val.split('-');
+            if (parts.length < 2) return val;
+            const d = new Date(parts[0], parts[1] - 1);
+            return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        };
+
         sortedList.forEach(init => {
             const statusColor = init.status === 'active' ? 'var(--accent-success)' : (init.status === 'past' ? 'var(--accent-secondary)' : 'var(--text-secondary)');
             
+            const sDate = formatMonth(init.startDate);
+            const eDate = formatMonth(init.endDate);
+            let dateStr = '';
+            if (sDate) {
+                 dateStr = `<span style="font-size:0.75rem; color:var(--text-secondary); margin-left:0.5rem; font-weight:normal;">(${sDate} - ${eDate || 'Present'})</span>`;
+            }
+
             container.innerHTML += `
                 <div style="background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <strong>${init.title}</strong><br>
+                        <strong>${init.title}</strong>${dateStr}<br>
                         <span style="font-size:0.75rem; color:${statusColor}; font-weight:bold; text-transform:uppercase;">${init.status}</span>
                         <span style="font-size:0.75rem; color:var(--text-secondary);"> &bull; ${init.photos ? init.photos.length : 0} photos</span>
                     </div>
@@ -2584,7 +2604,7 @@ const app = {
         if (!container) return;
         container.innerHTML = '';
 
-        const activeList = MOCK_INITIATIVES
+        const activeList = PLATFORM_INITIATIVES
             .filter(i => i.status !== 'hidden')
             .sort((a, b) => {
                 // Priority 1: Active cards first
@@ -2630,13 +2650,30 @@ const app = {
 
             const headerTag = init.status === 'past' ? `<span style="font-size: 0.7rem; background: var(--accent-secondary); padding: 0.3rem 0.6rem; border-radius:1rem; font-weight:bold; color:#fff; display:inline-block; margin-bottom:0.5rem;">PAST CAMPAIGN</span>` : `<span style="font-size: 0.7rem; background: var(--accent-success); padding: 0.3rem 0.6rem; border-radius:1rem; font-weight:bold; color:#fff; display:inline-block; margin-bottom:0.5rem;">ACTIVE INITIATIVE</span>`;
 
+            // Helper to format 'YYYY-MM' to 'Feb 2025'
+            const formatMonth = (val) => {
+                if (!val) return '';
+                const parts = val.split('-');
+                if (parts.length < 2) return val;
+                const d = new Date(parts[0], parts[1] - 1);
+                return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            };
+            
+            const sDate = formatMonth(init.startDate);
+            const eDate = formatMonth(init.endDate);
+            let dateStr = '';
+            if (sDate) {
+                 dateStr = `<span style="display:block; font-size:0.8rem; color:var(--text-secondary); margin-top:0.2rem;"><i class="fa-regular fa-calendar" style="margin-right:0.3rem;"></i> ${sDate} - ${eDate || 'Present'}</span>`;
+            }
+
             container.innerHTML += `
                 <div class="glass-card feature-gradient mt-2" style="position: relative; overflow: hidden; padding: 1.5rem;">
                     <div style="display: flex; flex-direction: column; gap: 1rem; position: relative; z-index: 2;">
                         <div>
                             ${headerTag}
-                            <h3 style="margin-top: 0.3rem; font-size: 1.4rem;">${init.title}</h3>
-                            <p style="color: rgba(255,255,255,0.9); font-size: 0.95rem; line-height: 1.5; margin-top: 0.5rem;">
+                            <h3 style="margin-top: 0.3rem; font-size: 1.4rem; margin-bottom:0px;">${init.title}</h3>
+                            ${dateStr}
+                            <p style="color: rgba(255,255,255,0.9); font-size: 0.95rem; line-height: 1.5; margin-top: 0.7rem;">
                                 ${init.narrative}
                             </p>
                         </div>
