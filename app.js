@@ -358,10 +358,26 @@ const app = {
         document.getElementById('stat-global-checkins').innerText = MOCK_STATS.checkins.toLocaleString();
         document.getElementById('stat-global-purchases').innerText = MOCK_STATS.purchases.toLocaleString();
 
-        // National business penetration baseline (1.2M businesses in Malaysia)
-        const TOTAL_MY_BUSINESSES = 1200000;
-        const penetration = (MOCK_STATS.businesses / TOTAL_MY_BUSINESSES) * 100;
-        document.getElementById('stat-global-penetration').innerText = penetration.toFixed(4) + '%';
+        // National business penetration baseline using GDP
+        // DOSM Nominal GDP for Malaysia 2023 (~RM 1.82 Trillion)
+        const NOMINAL_GDP_MY_RM = 1820000000000;
+        
+        let totalNetworkRevenue = 0;
+        MOCK_BUSINESSES.forEach(biz => {
+            if (biz.status !== 'expired' && biz.yearlyAssessments) {
+                let latestRev = 0;
+                Object.values(biz.yearlyAssessments).forEach(ya => {
+                    if (ya.revenue) {
+                        const rev = Number(ya.revenue.toString().replace(/,/g, ''));
+                        if (!isNaN(rev)) latestRev = Math.max(latestRev, rev);
+                    }
+                });
+                totalNetworkRevenue += latestRev;
+            }
+        });
+
+        const penetration = (totalNetworkRevenue / NOMINAL_GDP_MY_RM) * 100;
+        document.getElementById('stat-global-penetration').innerText = penetration.toFixed(10) + '%';
 
         if (MOCK_USER) {
             document.getElementById('stat-personal-checkins').innerText = MOCK_USER.checkins.toLocaleString();
