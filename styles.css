@@ -61,6 +61,7 @@ body {
 .text-gradient {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     display: inline-block;
 }
@@ -607,3 +608,164 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 }
 
 .hidden { display: none !important; }
+
+/* Column Toggle Checkboxes */
+.sheet-col-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: rgba(255,255,255,0.05);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: var(--transition);
+    user-select: none;
+}
+.sheet-col-toggle:has(input:checked) {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: var(--text-primary);
+}
+.sheet-col-toggle input { display: none; }
+
+/* Spreadsheet Table */
+.sheet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+.sheet-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.sheet-table th {
+    background: rgba(15, 23, 42, 0.95);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition);
+}
+.sheet-table th:hover {
+    color: var(--accent-primary);
+    background: rgba(30, 41, 59, 0.95);
+}
+.sheet-table th.sorted-asc::after { content: ' ▲'; color: var(--accent-primary); }
+.sheet-table th.sorted-desc::after { content: ' ▼'; color: var(--accent-primary); }
+
+.sheet-table td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-primary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sheet-table tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+}
+.sheet-table tr:hover td {
+    background: rgba(139, 92, 246, 0.08);
+}
+.sheet-table .cell-score {
+    font-weight: 700;
+    font-family: monospace;
+    letter-spacing: 1px;
+}
+.sheet-table .score-a { color: #4CAF50; }
+.sheet-table .score-b { color: #8BC34A; }
+.sheet-table .score-c { color: #FFC107; }
+.sheet-table .score-d { color: #FF5722; }
+.sheet-table .cell-type {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+.cell-type-full { background: rgba(76, 175, 80, 0.2); color: #81C784; }
+.cell-type-affiliate { background: rgba(255, 152, 0, 0.2); color: #FFB74D; }
+
+/* Spreadsheet view breaks out of mobile constraint */
+#view-spreadsheet {
+    max-width: none;
+}
+
+/* Override app container width for spreadsheet */
+@media (min-width: 768px) {
+    #app-container:has(#view-spreadsheet.active) {
+        max-width: 100%;
+    }
+}
+
+.radius-sm { --radius-sm: 8px; }
+
+/* Expired Business Styling */
+.business-card.biz-expired {
+    opacity: 0.5;
+    filter: grayscale(60%);
+    position: relative;
+}
+.business-card.biz-expired::after {
+    content: 'EXPIRED';
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    background: rgba(244, 67, 54, 0.8);
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-full);
+    letter-spacing: 1px;
+}
+.biz-expired-banner {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(0,0,0,0.3));
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+.biz-expired-banner .expired-icon {
+    font-size: 2rem;
+    color: #F44336;
+    margin-bottom: 0.5rem;
+}
+
+/* Audit Log */
+.audit-log-entry {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.8rem;
+}
+.audit-log-entry:last-child { border-bottom: none; }
+.audit-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 0.35rem;
+    flex-shrink: 0;
+}
+.audit-dot-create { background: #4CAF50; }
+.audit-dot-edit { background: #2196F3; }
+.audit-dot-expire { background: #F44336; }
+.audit-dot-reinstate { background: #FF9800; }
+.audit-dot-score { background: #9C27B0; }
+.audit-dot-ya { background: #00BCD4; }
+.audit-log-time {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}

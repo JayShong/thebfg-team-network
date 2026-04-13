@@ -43,7 +43,10 @@ const INITIAL_BUSINESSES = [
         contact: "hello@solariscoffee.example.com",
         website: "https://solariscoffee.example.com",
         shopfrontImg: "",
-        founderImg: ""
+        founderImg: "",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        validUntil: "2025-01-01T00:00:00.000Z",
+        createdBy: "jayshong@gmail.com"
     },
     {
         id: "biz_2",
@@ -56,7 +59,10 @@ const INITIAL_BUSINESSES = [
         contact: "ride@oceanicsurf.example.com",
         website: "https://oceanicsurf.example.com",
         shopfrontImg: "",
-        founderImg: ""
+        founderImg: "",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        validUntil: "2025-01-01T00:00:00.000Z",
+        createdBy: "jayshong@gmail.com"
     },
     {
         id: "biz_3",
@@ -69,7 +75,10 @@ const INITIAL_BUSINESSES = [
         contact: "info@urbanharvest.example.com",
         website: "https://urbanharvest.example.com",
         shopfrontImg: "",
-        founderImg: ""
+        founderImg: "",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        validUntil: "2025-01-01T00:00:00.000Z",
+        createdBy: "jayshong@gmail.com"
     }
 ];
 
@@ -78,7 +87,9 @@ const INITIAL_BUSINESSES = [
 let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
 let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
 let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
+const SUPER_ADMIN_EMAIL = 'jayshong@gmail.com';
 let MOCK_ADMINS = ['jayshong@gmail.com'];
+let MOCK_AUDITORS = ['jayshong@gmail.com'];
 
 // --- App State & Logic ---
 
@@ -152,6 +163,15 @@ const app = {
             this.renderBusinessList();
             this.populateProfile();
         }
+
+        // Pre-fill remembered email
+        const rememberedEmail = localStorage.getItem('bfg_remembered_email');
+        if (rememberedEmail) {
+            const emailInput = document.getElementById('login-email');
+            const rememberCheck = document.getElementById('login-remember');
+            if (emailInput) emailInput.value = rememberedEmail;
+            if (rememberCheck) rememberCheck.checked = true;
+        }
     },
 
     async fetchCloudData() {
@@ -159,8 +179,19 @@ const app = {
             try {
                 // Fetch roles
                 const rolesDoc = await db.collection('system').doc('roles').get();
-                if(rolesDoc.exists) MOCK_ADMINS = rolesDoc.data().adminEmails || ['jayshong@gmail.com'];
-                else await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS });
+                if(rolesDoc.exists) {
+                    const rolesData = rolesDoc.data();
+                    MOCK_ADMINS = rolesData.adminEmails || [SUPER_ADMIN_EMAIL];
+                    MOCK_AUDITORS = rolesData.auditorEmails || [SUPER_ADMIN_EMAIL];
+                    // Ensure super admin is always in all role lists
+                    if (!MOCK_ADMINS.includes(SUPER_ADMIN_EMAIL)) MOCK_ADMINS.unshift(SUPER_ADMIN_EMAIL);
+                    if (!MOCK_AUDITORS.includes(SUPER_ADMIN_EMAIL)) MOCK_AUDITORS.unshift(SUPER_ADMIN_EMAIL);
+                } else {
+                    await db.collection('system').doc('roles').set({
+                        adminEmails: MOCK_ADMINS,
+                        auditorEmails: MOCK_AUDITORS
+                    });
+                }
 
                 // Fetch stats
                 const statsDoc = await db.collection('system').doc('stats').get();
@@ -180,7 +211,9 @@ const app = {
                 }
 
                 if(MOCK_USER && MOCK_USER.email) {
+                    MOCK_USER.isSuperAdmin = MOCK_USER.email === SUPER_ADMIN_EMAIL;
                     MOCK_USER.isAdmin = MOCK_ADMINS.includes(MOCK_USER.email);
+                    MOCK_USER.isAuditor = MOCK_AUDITORS.includes(MOCK_USER.email);
                 }
                 if (this.currentView === 'admin') this.renderAdminList();
             } catch (e) {
@@ -266,6 +299,14 @@ const app = {
         }
 
         if (auth) {
+            // "Remember Me" logic
+            const remember = document.getElementById('login-remember').checked;
+            if (remember) {
+                localStorage.setItem('bfg_remembered_email', email);
+            } else {
+                localStorage.removeItem('bfg_remembered_email');
+            }
+
             btn.disabled = true;
             btn.innerText = 'Processing...';
             try {
@@ -325,9 +366,17 @@ const app = {
         const container = document.getElementById('business-list');
         container.innerHTML = '';
         
-        MOCK_BUSINESSES.forEach(biz => {
+        // Sort: active businesses first, expired at bottom
+        const sorted = [...MOCK_BUSINESSES].sort((a, b) => {
+            const aExp = a.status === 'expired' ? 1 : 0;
+            const bExp = b.status === 'expired' ? 1 : 0;
+            return aExp - bExp;
+        });
+
+        sorted.forEach(biz => {
+            const isExpired = biz.status === 'expired';
             const card = document.createElement('div');
-            card.className = 'glass-card business-card';
+            card.className = 'glass-card business-card' + (isExpired ? ' biz-expired' : '');
             card.onclick = () => this.openBusinessDetail(biz.id);
 
             // Pseudo-random gradient for image placeholder
@@ -336,9 +385,13 @@ const app = {
             const scoreStr = typeof biz.score === 'object' && biz.score ? `${biz.score.s}${biz.score.e}${biz.score.c}${biz.score.soc}${biz.score.env}` : biz.score;
             const imgStyle = biz.shopfrontImg ? `background-image: url(${biz.shopfrontImg}); background-size: cover; background-position: center; border:none;` : `background: linear-gradient(${deg}deg, var(--accent-primary), var(--accent-secondary))`;
 
-            const badgeHTML = biz.type === 'affiliate' 
+            let badgeHTML = biz.type === 'affiliate' 
                 ? '<span class="business-score" style="color:var(--text-warning); border-color:var(--text-warning);"><i class="fa-solid fa-circle-info"></i> Affiliate Member (Not Audited)</span>' 
                 : `<span class="business-score"><i class="fa-solid fa-star"></i> BFG Score: ${scoreStr}</span>`;
+
+            if (isExpired) {
+                badgeHTML = `<span class="business-score" style="color:#F44336; border-color:#F44336;"><i class="fa-solid fa-ban"></i> ${biz.expiryReason || 'Expired'}</span>`;
+            }
 
             card.innerHTML = `
                 <div class="business-img" style="${imgStyle}"></div>
@@ -357,7 +410,7 @@ const app = {
         if(!biz) return;
 
         const container = document.getElementById('business-detail-content');
-        const scoreStr = typeof biz.score === 'object' ? `${biz.score.s}${biz.score.e}${biz.score.c}${biz.score.soc}${biz.score.env}` : biz.score;
+        const scoreStr = typeof biz.score === 'object' && biz.score ? `${biz.score.s}${biz.score.e}${biz.score.c}${biz.score.soc}${biz.score.env}` : biz.score;
 
         const heroHTML = biz.shopfrontImg ? `<img src="${biz.shopfrontImg}" class="hero-image">` : `<div class="hero-image" style="background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))"></div>`;
 
@@ -391,18 +444,24 @@ const app = {
         </iframe>
         <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-warning);"><i class="fa-solid fa-triangle-exclamation"></i> Note: For production, replace 'YOUR_API_KEY_HERE' in app.js with a valid Google Maps API Key.</p>`;
 
+        const isOwnerOrAdmin = MOCK_USER && (MOCK_USER.isSuperAdmin || MOCK_USER.isAdmin || MOCK_USER.businessId === biz.id);
+        const downloadAction = isOwnerOrAdmin ? `<button class="btn btn-secondary mt-3" onclick="app.downloadQRStandee('${biz.id}')"><i class="fa-solid fa-download"></i> Download A5 Standee</button>` : '';
+
         const qrContainer = `<div class="detail-section glass-card" style="text-align: center;">
             <h3>Scan at Counter</h3>
             <p style="font-size: 0.8rem; margin-bottom: 1rem;">Use the Scanner tab to scan this code.</p>
             <div id="qrcode-${biz.id}" style="display:inline-block; padding: 1rem; background: white; border-radius: var(--radius-md);"></div>
+            <div>${downloadAction}</div>
         </div>`;
 
             let scoreHTML = '';
             if (biz.type === 'affiliate') {
-                scoreHTML = `<div class="business-score" style="margin-bottom: 1.5rem; display:flex; flex-direction:column; align-items:flex-start; gap:0.5rem; color: var(--text-warning); border-color: var(--text-warning);">
-                    <div><i class="fa-solid fa-circle-info"></i> Affiliate Member</div>
-                    <div style="font-size:0.85rem; color:var(--text-secondary); background:rgba(0,0,0,0.2); padding:0.5rem; border-radius:var(--radius-md);">
-                        This business is an affiliate. While they support our mission and have been basically vetted, they reserve the right to distance from the network and have <strong>not been audited or scored</strong> across the paradigms yet.
+                scoreHTML = `<div style="margin-bottom: 1.5rem; display:flex; flex-direction:column; align-items:flex-start; gap:0.75rem; background: rgba(139, 92, 246, 0.1); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid rgba(139, 92, 246, 0.2); width: 100%;">
+                    <div style="display:flex; align-items:center; gap:0.5rem; color: #c4b5fd; font-weight: 700; font-size: 1.1rem;">
+                        <i class="fa-solid fa-circle-info"></i> Affiliate Member
+                    </div>
+                    <div style="font-size:1rem; color:rgba(255,255,255,0.8); line-height: 1.5; font-style: italic;">
+                        "Affiliates support our Purpose and have been visited by the team. They have yet to apply to become a full member and receive their score."
                     </div>
                 </div>`;
             } else {
@@ -414,8 +473,60 @@ const app = {
                 </div>`;
             }
 
+            // Build YA Data display
+            let yaHTML = '';
+            const yaData = biz.yearlyAssessments || {};
+            const yaYears = Object.keys(yaData).sort();
+            if (yaYears.length > 0) {
+                let yaRows = '';
+                yaYears.forEach(year => {
+                    const ya = yaData[year];
+                    yaRows += `
+                        <div style="background:rgba(255,255,255,0.05); padding:0.8rem; border-radius:var(--radius-sm); margin-bottom:0.5rem;">
+                            <div style="font-weight:600; margin-bottom:0.5rem; color:var(--accent-primary);">
+                                <i class="fa-solid fa-calendar"></i> ${year}
+                            </div>
+                            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem;">
+                                <div style="text-align:center;">
+                                    <div style="font-size:1rem; font-weight:bold; color:var(--text-primary);">${ya.revenue ? 'RM ' + Number(ya.revenue).toLocaleString() : '-'}</div>
+                                    <div style="font-size:0.7rem; color:var(--text-secondary);">Revenue</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <div style="font-size:1rem; font-weight:bold; color:var(--accent-success);">${ya.wasteKg ? Number(ya.wasteKg).toLocaleString() + ' kg' : '-'}</div>
+                                    <div style="font-size:0.7rem; color:var(--text-secondary);">Waste Diverted</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <div style="font-size:1rem; font-weight:bold; color:#4CAF50;">${ya.treesPlanted ? Number(ya.treesPlanted).toLocaleString() : '-'}</div>
+                                    <div style="font-size:0.7rem; color:var(--text-secondary);">Trees Planted</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                yaHTML = `
+                    <div class="detail-section glass-card" style="background: linear-gradient(145deg, rgba(76, 175, 80, 0.1), rgba(0, 0, 0, 0.4));">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.8rem;">
+                            <h3 style="margin:0;"><i class="fa-solid fa-chart-line"></i> Yearly Assessments</h3>
+                            <span style="font-size:0.6rem; background:rgba(76,175,80,0.3); padding:0.2rem 0.5rem; border-radius:1rem; color:#81C784;">AUDITED</span>
+                        </div>
+                        ${yaRows}
+                    </div>
+                `;
+            }
+
+            // Expired banner
+            const expiredBannerHTML = biz.status === 'expired' ? `
+                <div class="biz-expired-banner">
+                    <div class="expired-icon"><i class="fa-solid fa-ban"></i></div>
+                    <h3 style="color:#F44336; margin-bottom:0.3rem;">This Business Has Expired</h3>
+                    <p style="font-size:0.85rem; color:var(--text-secondary);">${biz.expiryReason || 'No reason provided'}</p>
+                    ${biz.expiryDate ? `<p style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.3rem;">Expiry Date: ${new Date(biz.expiryDate).toLocaleDateString('en-MY', {year:'numeric', month:'long', day:'numeric'})}</p>` : ''}
+                </div>
+            ` : '';
+
             container.innerHTML = `
                 ${heroHTML}
+                ${expiredBannerHTML}
                 <h2>${biz.name}</h2>
                 ${scoreHTML}
                 
@@ -435,11 +546,11 @@ const app = {
             </div>
             ${videoHTML}
             
-            <!-- ISO53001 Audited Impact Section -->
+            <!-- ISO53001 Impact Section -->
             ${(biz.impactStatement || biz.impactWaste || biz.impactJobs) ? `
                 <div class="detail-section glass-card" style="background: linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4));">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.8rem;">
-                        <h3 style="margin:0;">ISO53001 Audited Impact</h3>
+                        <h3 style="margin:0;">ISO53001 Impact</h3>
                         <span style="font-size:0.6rem; background:rgba(255,255,255,0.2); padding:0.2rem 0.5rem; border-radius:1rem;">AUDITED</span>
                     </div>
                     <p style="font-size:0.9rem; font-style:italic;">"${biz.impactStatement || 'The social and environmental commitments of this business are currently under audit.'}"</p>
@@ -461,7 +572,11 @@ const app = {
                 </div>
             ` : ''}
 
+            ${yaHTML}
+
             ${qrContainer}
+
+            ${this._renderAuditLogHTML(biz)}
         `;
         
         this.navigate('business-detail');
@@ -493,8 +608,18 @@ const app = {
         document.getElementById('profile-name').innerText = MOCK_USER.name;
         document.getElementById('profile-email').innerHTML = MOCK_USER.email ? (MOCK_USER.email + (MOCK_USER.isEmailVerified ? ` <i class="fa-solid fa-circle-check" style="color: var(--accent-success);" title="Verified"></i>` : '')) : '';
         document.getElementById('profile-id').innerText = MOCK_USER.id;
+
+        // Role badges
+        const roleBadgesContainer = document.getElementById('profile-role-badges');
+        if (roleBadgesContainer) {
+            let badges = '';
+            if (MOCK_USER.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:linear-gradient(135deg, #FFD700, #FF8C00); color:#000; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:700;"><i class="fa-solid fa-crown"></i> Super Admin</span> ';
+            else if (MOCK_USER.isAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--accent-primary); color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-shield-halved"></i> Admin</span> ';
+            if (MOCK_USER.isAuditor && !MOCK_USER.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:#4CAF50; color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-clipboard-check"></i> Auditor</span> ';
+            roleBadgesContainer.innerHTML = badges;
+        }
         
-        // Show admin portal button only if isAdmin is true
+        // Show admin portal button if isAdmin OR isSuperAdmin
         const adminPortal = document.getElementById('admin-portal-container');
         if (adminPortal) {
             adminPortal.style.display = MOCK_USER.isAdmin ? 'block' : 'none';
@@ -507,65 +632,172 @@ const app = {
         }
     },
 
-    async addAdmin() {
-        if (!MOCK_USER.isAdmin) return;
-        const email = document.getElementById('admin-new-email').value.trim();
+    // --- Role Management (Super Admin only) ---
+    async _syncRolesToCloud() {
+        if (db) {
+            await db.collection('system').doc('roles').set({
+                adminEmails: MOCK_ADMINS,
+                auditorEmails: MOCK_AUDITORS
+            }, { merge: true });
+        }
+    },
+
+    async addRole(role) {
+        if (!MOCK_USER.isSuperAdmin) {
+            this.showToast('Access Denied: Only the Super Admin can manage roles.', true);
+            return;
+        }
+        const inputId = role === 'admin' ? 'admin-new-email' : 'auditor-new-email';
+        const email = document.getElementById(inputId).value.trim();
         if (!email) {
             this.showToast("Please enter an email address.");
             return;
         }
-        if (MOCK_ADMINS.includes(email)) {
-            this.showToast("This email is already an admin.");
+        const list = role === 'admin' ? MOCK_ADMINS : MOCK_AUDITORS;
+        const label = role === 'admin' ? 'Admin' : 'Auditor';
+        if (list.includes(email)) {
+            this.showToast(`This email is already an ${label}.`);
             return;
         }
-        
-        MOCK_ADMINS.push(email);
-        if (db) {
-            await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS }, { merge: true });
-        }
-        document.getElementById('admin-new-email').value = '';
+        list.push(email);
+        await this._syncRolesToCloud();
+        document.getElementById(inputId).value = '';
         this.renderAdminList();
-        this.showToast(`${email} has been added as an Admin.`);
+        this.showToast(`${email} has been added as ${label}.`);
     },
 
-    async removeAdmin(email) {
-        if (!MOCK_USER.isAdmin) return;
-        if (email === 'jayshong@gmail.com') {
-            this.showToast('Access Denied: The Master Admin cannot be removed.', true);
-            return;
-        }
-        if (email === MOCK_USER.email) {
-            this.showToast('You cannot remove yourself. Ask another admin to remove you.', true);
-            return;
-        }
+    // Keep legacy wrappers for backward compat
+    async addAdmin() { return this.addRole('admin'); },
+    async addAuditor() { return this.addRole('auditor'); },
 
-        const index = MOCK_ADMINS.indexOf(email);
+    async removeRole(email, role) {
+        if (!MOCK_USER.isSuperAdmin) {
+            this.showToast('Access Denied: Only the Super Admin can manage roles.', true);
+            return;
+        }
+        if (email === SUPER_ADMIN_EMAIL) {
+            this.showToast('Access Denied: The Super Admin cannot be removed from any role.', true);
+            return;
+        }
+        const list = role === 'admin' ? MOCK_ADMINS : MOCK_AUDITORS;
+        const label = role === 'admin' ? 'Admin' : 'Auditor';
+        const index = list.indexOf(email);
         if (index > -1) {
-            MOCK_ADMINS.splice(index, 1);
-            if (db) {
-                await db.collection('system').doc('roles').set({ adminEmails: MOCK_ADMINS }, { merge: true });
-            }
+            list.splice(index, 1);
+            await this._syncRolesToCloud();
             this.renderAdminList();
-            this.showToast(`${email} removed from Admins.`);
+            this.showToast(`${email} removed from ${label}s.`);
         }
     },
+
+    // Legacy compat
+    async removeAdmin(email) { return this.removeRole(email, 'admin'); },
 
     renderAdminList() {
         this.renderAdminBusinessList();
+        const isSuperAdmin = MOCK_USER && MOCK_USER.isSuperAdmin;
+
+        // --- Admin list ---
         const container = document.getElementById('admin-list-container');
         if (!container) return;
         container.innerHTML = '';
         MOCK_ADMINS.forEach(email => {
-            const isMaster = email === 'jayshong@gmail.com';
+            const isSA = email === SUPER_ADMIN_EMAIL;
             container.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
                     <div style="display:flex; align-items:center; gap:0.5rem; word-break: break-all;">
-                        <i class="fa-solid ${isMaster ? 'fa-crown text-gradient' : 'fa-user-shield'}" style="color:var(--accent-primary)"></i> ${email}
+                        <i class="fa-solid ${isSA ? 'fa-crown text-gradient' : 'fa-user-shield'}" style="color:var(--accent-primary)"></i> ${email}
                     </div>
-                    ${!isMaster ? `<button class="icon-btn" style="color:var(--text-warning); padding:0.4rem; height:auto; width:auto;" onclick="app.removeAdmin('${email}')"><i class="fa-solid fa-trash"></i></button>` : '<span style="font-size:0.8rem; color:var(--text-secondary)">Master</span>'}
+                    ${isSA ? '<span style="font-size:0.8rem; color:var(--text-secondary)">Super Admin</span>' : (isSuperAdmin ? `<button class="icon-btn" style="color:var(--text-warning); padding:0.4rem; height:auto; width:auto;" onclick="app.removeRole('${email}','admin')"><i class="fa-solid fa-trash"></i></button>` : '')}
                 </div>
             `;
         });
+
+        // --- Auditor list ---
+        const auditorContainer = document.getElementById('auditor-list-container');
+        if (!auditorContainer) return;
+        auditorContainer.innerHTML = '';
+        MOCK_AUDITORS.forEach(email => {
+            const isSA = email === SUPER_ADMIN_EMAIL;
+            auditorContainer.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                    <div style="display:flex; align-items:center; gap:0.5rem; word-break: break-all;">
+                        <i class="fa-solid ${isSA ? 'fa-crown text-gradient' : 'fa-clipboard-check'}" style="color:#4CAF50"></i> ${email}
+                    </div>
+                    ${isSA ? '<span style="font-size:0.8rem; color:var(--text-secondary)">Super Admin</span>' : (isSuperAdmin ? `<button class="icon-btn" style="color:var(--text-warning); padding:0.4rem; height:auto; width:auto;" onclick="app.removeRole('${email}','auditor')"><i class="fa-solid fa-trash"></i></button>` : '')}
+                </div>
+            `;
+        });
+
+        // Show/hide role management controls based on Super Admin status
+        const roleManageControls = document.querySelectorAll('.superadmin-only');
+        roleManageControls.forEach(el => {
+            el.style.display = isSuperAdmin ? '' : 'none';
+        });
+
+        // Show/hide auditor-gated sections based on role
+        const isAuditor = MOCK_USER && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin);
+        const adminYASection = document.getElementById('admin-ya-section');
+        if (adminYASection) {
+            adminYASection.style.display = isAuditor ? 'block' : 'none';
+        }
+        const scoreSection = document.getElementById('score-section');
+        if (scoreSection) {
+            const typeSelect = document.getElementById('admin-biz-type');
+            const isFull = !typeSelect || typeSelect.value !== 'affiliate';
+            scoreSection.style.display = (isAuditor && isFull) ? 'block' : 'none';
+        }
+        
+        this._checkRenewals();
+    },
+
+    _checkRenewals() {
+        if (!MOCK_USER) return;
+        const alertContainer = document.getElementById('admin-renewal-alert');
+        if (alertContainer) alertContainer.remove();
+
+        const now = new Date();
+        const sixMonthsAhead = new Date();
+        sixMonthsAhead.setMonth(now.getMonth() + 6);
+
+        const dueForRenewal = MOCK_BUSINESSES.filter(biz => {
+            if (biz.status === 'expired') return false;
+            if (!biz.validUntil) {
+                const legacyDate = new Date();
+                legacyDate.setFullYear(now.getFullYear() + 1);
+                biz.validUntil = legacyDate.toISOString();
+            }
+            const validUntilDate = new Date(biz.validUntil);
+            return validUntilDate <= sixMonthsAhead && validUntilDate > now;
+        });
+
+        const actionableRenewals = dueForRenewal.filter(biz => {
+            if (MOCK_USER.isSuperAdmin) return true;
+            return biz.createdBy === MOCK_USER.email;
+        });
+
+        if (actionableRenewals.length > 0) {
+            let listHTML = actionableRenewals.map(b => `<li><strong>${b.name}</strong> - valid until ${new Date(b.validUntil).toLocaleDateString()}</li>`).join('');
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'admin-renewal-alert';
+            alertDiv.className = 'glass-card';
+            alertDiv.style.borderLeft = '4px solid var(--text-warning)';
+            alertDiv.style.marginBottom = '1.5rem';
+            alertDiv.innerHTML = `
+                <div style="display:flex; align-items:center; gap: 0.5rem; color: var(--text-warning); margin-bottom:0.5rem;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <strong style="font-size:1.1rem;">Renewals Due</strong>
+                </div>
+                <p style="font-size: 0.85rem; margin-bottom: 0.8rem;">The following businesses are approaching their membership expiry within the next 6 months:</p>
+                <ul style="font-size: 0.85rem; padding-left: 1.5rem; margin-bottom: 0;">
+                    ${listHTML}
+                </ul>
+            `;
+            const header = document.querySelector('#view-admin .page-header');
+            if (header && header.nextSibling) {
+                header.parentNode.insertBefore(alertDiv, header.nextSibling);
+            }
+        }
     },
 
     // --- Settings & Demographics Logic ---
@@ -946,14 +1178,263 @@ const app = {
 
         let html = '';
         filteredBiz.forEach(biz => {
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.1);">
+            const isExpired = biz.status === 'expired';
+            const statusBadge = isExpired ? `<span style="font-size:0.65rem; background:rgba(244,67,54,0.3); color:#F44336; padding:0.1rem 0.4rem; border-radius:1rem; margin-left:0.3rem;">⛔ Expired</span>` : '';
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid ${isExpired ? 'rgba(244,67,54,0.2)' : 'rgba(255,255,255,0.1)'}; ${isExpired ? 'opacity:0.7;' : ''}">
                 <div>
-                    <strong>${biz.name}</strong> <span style="font-size:0.8rem; color:var(--text-secondary);">- ${biz.founder} ${biz.type==='affiliate' ? '<span style="color:var(--text-warning);">(Affiliate)</span>' : ''}</span>
+                    <strong>${biz.name}</strong>${statusBadge} <span style="font-size:0.8rem; color:var(--text-secondary);">- ${biz.founder} ${biz.type==='affiliate' ? '<span style="color:var(--text-warning);">(Affiliate)</span>' : ''}</span>
                 </div>
                 <button class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;" onclick="app.loadAdminBizToEdit('${biz.id}')"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
             </div>`;
         });
         container.innerHTML = html;
+    },
+
+    // --- Audit Log Helper ---
+    _addAuditEntry(bizIndex, action, details) {
+        if (bizIndex < 0 || bizIndex >= MOCK_BUSINESSES.length) return;
+        if (!MOCK_BUSINESSES[bizIndex].auditLog) MOCK_BUSINESSES[bizIndex].auditLog = [];
+        MOCK_BUSINESSES[bizIndex].auditLog.push({
+            timestamp: new Date().toISOString(),
+            action: action,
+            details: details || '',
+            user: MOCK_USER ? MOCK_USER.email : 'system',
+            userNickname: MOCK_USER ? (MOCK_USER.name || 'Admin') : 'System'
+        });
+    },
+
+    _renderAuditLogHTML(biz) {
+        if (!biz.auditLog || biz.auditLog.length === 0) return '';
+        let logRows = '';
+        const sortedLog = [...biz.auditLog].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        sortedLog.forEach(entry => {
+            const date = new Date(entry.timestamp).toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            logRows += `
+                <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.2rem;">
+                        <strong style="color:var(--accent-primary)">${entry.action}</strong>
+                        <span style="color:var(--text-secondary)">${date}</span>
+                    </div>
+                    <div>${entry.details}</div>
+                    <div style="color:var(--text-secondary); font-size:0.7rem; margin-top:0.2rem;">By: ${entry.userNickname || entry.user}</div>
+                </div>
+            `;
+        });
+        return `
+            <div class="detail-section glass-card" style="margin-top: 1rem;">
+                <h3 style="margin-bottom:0.8rem"><i class="fa-solid fa-list-check"></i> Audit Log</h3>
+                <div style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: var(--radius-sm);">
+                    ${logRows}
+                </div>
+            </div>
+        `;
+    },
+
+    downloadQRStandee(bizId) {
+        const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+        if(!biz) return;
+        
+        if (typeof QRCode === 'undefined') {
+            alert('QR generation library not loaded.');
+            return;
+        }
+
+        const tempDiv = document.createElement('div');
+        new QRCode(tempDiv, {
+            text: biz.id,
+            width: 500,
+            height: 500,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        setTimeout(() => {
+            const qrCanvas = tempDiv.querySelector('canvas');
+            if(!qrCanvas) return;
+
+            const continueDraw = (leftLogoImg = null) => {
+                const cWidth = 1118;
+                const cHeight = 1588;
+                const canvas = document.createElement('canvas');
+                canvas.width = cWidth;
+                canvas.height = cHeight;
+                const ctx = canvas.getContext('2d');
+
+                // Adjust to the deep blue tone of the reference BFG logo
+                ctx.fillStyle = '#011536';
+                ctx.fillRect(0, 0, cWidth, cHeight);
+
+                // Top Left: Business Logo
+                if (leftLogoImg) {
+                    try {
+                        ctx.drawImage(leftLogoImg, 60, 60, 100, 100);
+                    } catch(e) { }
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(110, 110, 50, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.fillStyle = '#011536';
+                    ctx.font = 'bold 50px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(biz.name.charAt(0).toUpperCase(), 110, 110);
+                }
+
+                // Top Right: thebfg.team Logo implementation
+                const rightX = cWidth - 60;
+                const rightY = 110;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillStyle = '#ffcc00';
+                ctx.font = 'bold 60px "Font Awesome 6 Free", sans-serif';
+                ctx.fillText('\uf0ac', rightX, rightY);
+                
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 45px sans-serif';
+                ctx.fillText('theBFG.team', rightX - 70, rightY - 5);
+                ctx.font = 'bold 28px sans-serif';
+                ctx.fillStyle = '#ffcc00';
+                ctx.fillText('Conviction Network', rightX - 70, rightY + 30);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 85px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Support', cWidth / 2, 330);
+                ctx.fillText('For-Good Businesses', cWidth / 2, 450);
+
+                const cardSize = 600;
+                const cardX = (cWidth - cardSize) / 2;
+                const cardY = 530;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(cardX, cardY, cardSize, cardSize, 30);
+                } else {
+                    ctx.rect(cardX, cardY, cardSize, cardSize);
+                }
+                ctx.fill();
+
+                const qrPadding = 30;
+                const qrDrawSize = cardSize - (qrPadding*2);
+                ctx.drawImage(qrCanvas, cardX + qrPadding, cardY + qrPadding, qrDrawSize, qrDrawSize);
+
+                const iconY = 1250;
+                ctx.beginPath();
+                ctx.arc(cWidth / 2, iconY, 60, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.fillStyle = '#011536';
+                ctx.font = 'bold 60px "Font Awesome 6 Free", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('\uf118', cWidth/2, iconY);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 70px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillText(biz.name.toUpperCase(), cWidth / 2, 1420);
+
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `QR_Standee_${biz.name.replace(/\s+/g,'_')}.png`;
+                link.href = dataUrl;
+                link.click();
+            };
+
+            const logoSrc = biz.shopfrontImg || biz.founderImg;
+            if (logoSrc) {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.onload = () => continueDraw(img);
+                img.onerror = () => continueDraw(null);
+                img.src = logoSrc;
+            } else {
+                continueDraw(null);
+            }
+        }, 300);
+    },
+
+    // --- Yearly Assessment (YA) Helper Functions ---
+    _renderYARow(containerId, year = 'YA2025', revenue = '', wasteKg = '', treesPlanted = '') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const rowId = 'ya-row-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+        const row = document.createElement('div');
+        row.id = rowId;
+        row.style.cssText = 'background:rgba(255,255,255,0.05); padding:0.8rem; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.1);';
+        row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <input type="text" class="input-modern ya-year" value="${year}" placeholder="e.g. YA2025" style="width:120px; padding:0.3rem 0.5rem; font-weight:600;">
+                <button type="button" class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; color:var(--text-warning); border-color:var(--text-warning);" onclick="document.getElementById('${rowId}').remove()">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem;">
+                <div>
+                    <label style="font-size:0.7rem; color:var(--text-secondary);">Revenue (RM)</label>
+                    <input type="number" class="input-modern ya-revenue" value="${revenue}" placeholder="0" style="padding:0.3rem 0.5rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.7rem; color:var(--text-secondary);">Waste Diverted (kg)</label>
+                    <input type="number" class="input-modern ya-waste" value="${wasteKg}" placeholder="0" style="padding:0.3rem 0.5rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.7rem; color:var(--text-secondary);">Trees Planted</label>
+                    <input type="number" class="input-modern ya-trees" value="${treesPlanted}" placeholder="0" style="padding:0.3rem 0.5rem;">
+                </div>
+            </div>
+        `;
+        container.appendChild(row);
+    },
+
+    _collectYAData(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return {};
+        const data = {};
+        const rows = container.children;
+        for (let i = 0; i < rows.length; i++) {
+            const yearInput = rows[i].querySelector('.ya-year');
+            const revenueInput = rows[i].querySelector('.ya-revenue');
+            const wasteInput = rows[i].querySelector('.ya-waste');
+            const treesInput = rows[i].querySelector('.ya-trees');
+            if (yearInput && yearInput.value.trim()) {
+                const yearKey = yearInput.value.trim();
+                data[yearKey] = {
+                    revenue: revenueInput ? revenueInput.value.trim() : '',
+                    wasteKg: wasteInput ? wasteInput.value.trim() : '',
+                    treesPlanted: treesInput ? treesInput.value.trim() : ''
+                };
+            }
+        }
+        return data;
+    },
+
+    _populateYARows(containerId, yaData) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (yaData && typeof yaData === 'object') {
+            const years = Object.keys(yaData).sort();
+            years.forEach(year => {
+                const ya = yaData[year];
+                this._renderYARow(containerId, year, ya.revenue || '', ya.wasteKg || '', ya.treesPlanted || '');
+            });
+        }
+    },
+
+    addAdminYARow() {
+        const currentYear = new Date().getFullYear();
+        this._renderYARow('admin-ya-rows', `YA${currentYear}`);
+    },
+
+    addEditYARow() {
+        const currentYear = new Date().getFullYear();
+        this._renderYARow('edit-ya-rows', `YA${currentYear}`);
     },
 
     loadAdminBizToEdit(bizId) {
@@ -988,8 +1469,15 @@ const app = {
             const typeSelect = document.getElementById('admin-biz-type');
             if(typeSelect) {
                 typeSelect.value = 'full';
-                document.getElementById('score-section').style.display = 'block';
             }
+
+            // Clear YA rows
+            const yaContainer = document.getElementById('admin-ya-rows');
+            if (yaContainer) yaContainer.innerHTML = '';
+
+            // Hide expiry section for new businesses
+            const expirySection = document.getElementById('admin-expiry-section');
+            if (expirySection) expirySection.style.display = 'none';
         } else {
             const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
             if (!biz) return;
@@ -1012,7 +1500,6 @@ const app = {
             const typeSelect = document.getElementById('admin-biz-type');
             if (typeSelect) {
                 typeSelect.value = biz.type || 'full';
-                document.getElementById('score-section').style.display = typeSelect.value === 'affiliate' ? 'none' : 'block';
             }
             
             if (biz.score && biz.type !== 'affiliate') {
@@ -1022,7 +1509,27 @@ const app = {
                 document.getElementById('score-society').value = biz.score.soc || 'C';
                 document.getElementById('score-env').value = biz.score.env || 'C';
             }
+
+            // Populate YA rows
+            this._populateYARows('admin-ya-rows', biz.yearlyAssessments);
+
+            // Populate expiry fields (show in edit mode)
+            const expirySection = document.getElementById('admin-expiry-section');
+            if (expirySection) expirySection.style.display = 'block';
+            const statusSelect = document.getElementById('admin-biz-status');
+            if (statusSelect) {
+                statusSelect.value = biz.status || 'active';
+                document.getElementById('admin-expiry-fields').style.display = biz.status === 'expired' ? 'block' : 'none';
+                document.getElementById('admin-expiry-reason-container').style.display = biz.status === 'expired' ? 'block' : 'none';
+            }
+            const expiryDateInput = document.getElementById('admin-biz-expiry-date');
+            if (expiryDateInput) expiryDateInput.value = biz.expiryDate || '';
+            const expiryReasonSelect = document.getElementById('admin-biz-expiry-reason');
+            if (expiryReasonSelect) expiryReasonSelect.value = biz.expiryReason || '';
         }
+
+        // Refresh auditor-gated sections
+        this.renderAdminList();
     },
 
     async addBusiness() {
@@ -1037,7 +1544,7 @@ const app = {
         const bizType = typeSelectElem ? typeSelectElem.value : 'full';
         
         let score = null;
-        if (bizType !== 'affiliate') {
+        if (bizType !== 'affiliate' && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin)) {
             score = {
                 s: document.getElementById('score-shareholder').value,
                 e: document.getElementById('score-employee').value,
@@ -1045,6 +1552,10 @@ const app = {
                 soc: document.getElementById('score-society').value,
                 env: document.getElementById('score-env').value
             };
+        } else if (bizType !== 'affiliate') {
+            // Preserve existing score if not auditor
+            const existingBiz = this.adminEditingBizId ? MOCK_BUSINESSES.find(b => b.id === this.adminEditingBizId) : null;
+            score = existingBiz ? existingBiz.score : null;
         }
 
         if (!name || !founder || !story || !location || !contact) {
@@ -1058,14 +1569,45 @@ const app = {
         const shopfrontImg = document.getElementById('admin-biz-shopfront').value.trim();
         const founderImg = document.getElementById('admin-biz-founder-img').value.trim();
 
+        // Collect YA data from admin form (Auditor-gated)
+        const yearlyAssessments = (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin) ? this._collectYAData('admin-ya-rows') : undefined;
+
         if (this.adminEditingBizId) {
             // Update mode
             const bizIndex = MOCK_BUSINESSES.findIndex(b => b.id === this.adminEditingBizId);
             if(bizIndex !== -1) {
+                const oldBiz = { ...MOCK_BUSINESSES[bizIndex] };
+
+                // Collect expiry data
+                const statusSelect = document.getElementById('admin-biz-status');
+                const newStatus = statusSelect ? statusSelect.value : (oldBiz.status || 'active');
+                const expiryDate = document.getElementById('admin-biz-expiry-date')?.value || '';
+                const expiryReason = document.getElementById('admin-biz-expiry-reason')?.value || '';
+
                 MOCK_BUSINESSES[bizIndex] = {
                     ...MOCK_BUSINESSES[bizIndex],
-                    name, founder, ownerEmail, story, location, contact, website, type: bizType, score, shopfrontImg, founderImg
+                    name, founder, ownerEmail, story, location, contact, website, type: bizType, score, shopfrontImg, founderImg,
+                    ...(yearlyAssessments !== undefined ? { yearlyAssessments } : {}),
+                    status: newStatus,
+                    ...(newStatus === 'expired' ? { expiryDate, expiryReason } : { expiryDate: '', expiryReason: '' })
                 };
+
+                // Audit: detect changes
+                if ((oldBiz.status || 'active') !== newStatus) {
+                    if (newStatus === 'expired') {
+                        this._addAuditEntry(bizIndex, 'Expired', `Reason: ${expiryReason}. Expiry date: ${expiryDate}`);
+                    } else {
+                        this._addAuditEntry(bizIndex, 'Reinstated', 'Business reinstated to active status.');
+                    }
+                }
+                if (score && oldBiz.score && JSON.stringify(score) !== JSON.stringify(oldBiz.score)) {
+                    this._addAuditEntry(bizIndex, 'Score Updated', `New score: ${score.s}${score.e}${score.c}${score.soc}${score.env}`);
+                }
+                if (yearlyAssessments !== undefined && JSON.stringify(yearlyAssessments) !== JSON.stringify(oldBiz.yearlyAssessments || {})) {
+                    this._addAuditEntry(bizIndex, 'YA Data Updated', `Years updated: ${Object.keys(yearlyAssessments).join(', ')}`);
+                }
+                this._addAuditEntry(bizIndex, 'Edited', `Business details updated by ${MOCK_USER.email}`);
+
                 if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
                     try {
                         await db.collection('businesses').doc(this.adminEditingBizId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
@@ -1085,6 +1627,10 @@ const app = {
             return;
         }
 
+        const activeDate = new Date();
+        const validUntilDate = new Date(activeDate);
+        validUntilDate.setFullYear(validUntilDate.getFullYear() + 1);
+
         const newBiz = {
             id: 'biz_' + Date.now(),
             name,
@@ -1098,12 +1644,20 @@ const app = {
             score,
             shopfrontImg,
             founderImg,
+            yearlyAssessments: yearlyAssessments || {},
+            status: 'active',
+            auditLog: [],
             checkinsCount: 0,
-            purchasesCount: 0
+            purchasesCount: 0,
+            createdAt: activeDate.toISOString(),
+            validUntil: validUntilDate.toISOString(),
+            createdBy: MOCK_USER.email
         };
 
         // Update mock state
         MOCK_BUSINESSES.push(newBiz);
+        const newBizIndex = MOCK_BUSINESSES.length - 1;
+        this._addAuditEntry(newBizIndex, 'Created', `Business created by ${MOCK_USER.email}`);
         MOCK_STATS.businesses++;
         
         try {
@@ -1130,7 +1684,6 @@ const app = {
         document.getElementById('admin-biz-founder-img').value = '';
         if(typeSelectElem) {
             typeSelectElem.value = 'full';
-            document.getElementById('score-section').style.display = 'block';
         }
 
         this.renderAdminBusinessList();
@@ -1184,7 +1737,7 @@ const app = {
                                     <small style="color:var(--text-secondary)">Receipt: ${t.receipt} &bull; ${dt}</small>
                                 </div>
                                 <div style="color:${statusColor}; font-weight:bold;">
-                                    $${parseFloat(t.amount).toFixed(2)}
+                                    RM ${parseFloat(t.amount).toFixed(2)}
                                 </div>
                             </div>
                         `;
@@ -1215,6 +1768,16 @@ const app = {
         document.getElementById('edit-biz-impact').value = biz.impactStatement || '';
         document.getElementById('edit-biz-impact-waste').value = biz.impactWaste || '';
         document.getElementById('edit-biz-impact-jobs').value = biz.impactJobs || '';
+        
+        // Populate YA rows in business portal edit (Auditor-gated)
+        const editYASection = document.getElementById('edit-ya-section');
+        const isAuditor = MOCK_USER && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin);
+        if (editYASection) {
+            editYASection.style.display = isAuditor ? 'block' : 'none';
+        }
+        if (isAuditor) {
+            this._populateYARows('edit-ya-rows', biz.yearlyAssessments);
+        }
         
         this.navigate('business-profile-edit');
     },
@@ -1295,7 +1858,7 @@ const app = {
                     html += `
                         <div style="background:${bg}; padding: 0.8rem; border-radius: var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <strong>${t.userNickname}</strong> - $${t.amount.toFixed(2)}<br>
+                                <strong>${t.userNickname}</strong> - RM ${t.amount.toFixed(2)}<br>
                                 <small>Receipt: ${t.receipt}</small><br>
                                 <small>${icon}</small>
                             </div>
@@ -1425,6 +1988,11 @@ const app = {
             MOCK_BUSINESSES[bizIndex].impactWaste = impactWaste;
             MOCK_BUSINESSES[bizIndex].impactJobs = impactJobs;
 
+            // Collect YA data from business portal edit (Auditor-gated)
+            if (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin) {
+                MOCK_BUSINESSES[bizIndex].yearlyAssessments = this._collectYAData('edit-ya-rows');
+            }
+
             if (db) {
                 await db.collection('businesses').doc(MOCK_USER.businessId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
             }
@@ -1477,7 +2045,7 @@ const app = {
                             const statusIcon = status === 'pending' ? '<i class="fa-solid fa-clock"></i> Pending ' : '<i class="fa-solid fa-check"></i> Verified ';
                             
                             extraInfo = `<small style="color:${statusColor}">${statusIcon} &bull; </small><small style="color:var(--text-secondary)">Receipt: ${t.receipt} &bull; ${dt}</small>`;
-                            valueBlock = `<div style="color:${statusColor}; font-weight:bold;">$${parseFloat(t.amount).toFixed(2)}</div>`;
+                            valueBlock = `<div style="color:${statusColor}; font-weight:bold;">RM ${parseFloat(t.amount).toFixed(2)}</div>`;
                         } else {
                             extraInfo = `<small style="color:var(--text-secondary)">${dt}</small>`;
                             valueBlock = `<div style="color:var(--accent-primary);"><i class="fa-solid fa-location-dot"></i></div>`;
@@ -1501,6 +2069,214 @@ const app = {
         } else {
             list.innerHTML = `<p style="color: var(--text-warning); padding:1rem; text-align:center;">Cloud history unavailable in local-only demo mode.</p>`;
         }
+    },
+
+    // --- Super Admin Spreadsheet ---
+    sheetSortCol: null,
+    sheetSortDir: 'asc',
+
+    openSpreadsheet() {
+        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) {
+            this.showToast('Access Denied: Super Admin only.', true);
+            return;
+        }
+        this.sheetSortCol = null;
+        this.sheetSortDir = 'asc';
+        this.navigate('spreadsheet');
+        this.renderSpreadsheet();
+    },
+
+    _getVisibleCols() {
+        const toggles = document.querySelectorAll('.sheet-col-toggle input');
+        const cols = {};
+        toggles.forEach(t => cols[t.value] = t.checked);
+        return cols;
+    },
+
+    _getAllYAYears() {
+        const years = new Set();
+        MOCK_BUSINESSES.forEach(biz => {
+            const ya = biz.yearlyAssessments || {};
+            Object.keys(ya).forEach(y => years.add(y));
+        });
+        return Array.from(years).sort();
+    },
+
+    _getScoreStr(biz) {
+        if (!biz.score || typeof biz.score !== 'object') return '-';
+        return `${biz.score.s || '-'}${biz.score.e || '-'}${biz.score.c || '-'}${biz.score.soc || '-'}${biz.score.env || '-'}`;
+    },
+
+    _colorScore(grade) {
+        if (!grade || grade === '-') return '';
+        const cls = { 'A': 'score-a', 'B': 'score-b', 'C': 'score-c', 'D': 'score-d' }[grade] || '';
+        return `<span class="${cls}">${grade}</span>`;
+    },
+
+    renderSpreadsheet() {
+        const container = document.getElementById('sheet-table-container');
+        if (!container) return;
+
+        const search = (document.getElementById('sheet-search')?.value || '').toLowerCase().trim();
+        const typeFilter = document.getElementById('sheet-type-filter')?.value || 'all';
+        const scoreFilter = document.getElementById('sheet-score-filter')?.value || 'all';
+        const cols = this._getVisibleCols();
+        const yaYears = this._getAllYAYears();
+
+        // Filter
+        let filtered = MOCK_BUSINESSES.filter(biz => {
+            // Type filter
+            if (typeFilter !== 'all' && biz.type !== typeFilter) return false;
+
+            // Score filter
+            if (scoreFilter !== 'all' && biz.score && typeof biz.score === 'object') {
+                const scoreVals = Object.values(biz.score);
+                if (!scoreVals.includes(scoreFilter)) return false;
+            } else if (scoreFilter !== 'all' && (!biz.score || biz.type === 'affiliate')) {
+                return false;
+            }
+
+            // Search
+            if (search) {
+                const haystack = [biz.name, biz.founder, biz.ownerEmail, biz.contact, biz.location, biz.website, biz.story, biz.id].filter(Boolean).join(' ').toLowerCase();
+                if (!haystack.includes(search)) return false;
+            }
+            return true;
+        });
+
+        // Sort
+        if (this.sheetSortCol) {
+            filtered.sort((a, b) => {
+                let va = '', vb = '';
+                const col = this.sheetSortCol;
+                if (col === 'name') { va = a.name || ''; vb = b.name || ''; }
+                else if (col === 'founder') { va = a.founder || ''; vb = b.founder || ''; }
+                else if (col === 'type') { va = a.type || ''; vb = b.type || ''; }
+                else if (col === 'score') { va = this._getScoreStr(a); vb = this._getScoreStr(b); }
+                else if (col === 'owner') { va = a.ownerEmail || ''; vb = b.ownerEmail || ''; }
+                else if (col === 'contact') { va = a.contact || ''; vb = b.contact || ''; }
+                else if (col === 'location') { va = a.location || ''; vb = b.location || ''; }
+                else if (col === 'checkins') { va = a.checkinsCount || 0; vb = b.checkinsCount || 0; }
+                else if (col === 'purchases') { va = a.purchasesCount || 0; vb = b.purchasesCount || 0; }
+                if (typeof va === 'number') return this.sheetSortDir === 'asc' ? va - vb : vb - va;
+                return this.sheetSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+            });
+        }
+
+        // Update count
+        const countEl = document.getElementById('sheet-count');
+        if (countEl) countEl.innerText = `Showing ${filtered.length} of ${MOCK_BUSINESSES.length} businesses`;
+
+        // Build table header
+        let thead = '<tr>';
+        thead += '<th onclick="app.sortSheet(\'name\')" class="' + (this.sheetSortCol === 'name' ? 'sorted-' + this.sheetSortDir : '') + '">#</th>';
+        thead += '<th onclick="app.sortSheet(\'name\')" class="' + (this.sheetSortCol === 'name' ? 'sorted-' + this.sheetSortDir : '') + '">Name</th>';
+        thead += '<th onclick="app.sortSheet(\'founder\')" class="' + (this.sheetSortCol === 'founder' ? 'sorted-' + this.sheetSortDir : '') + '">Founder</th>';
+        thead += '<th onclick="app.sortSheet(\'owner\')" class="' + (this.sheetSortCol === 'owner' ? 'sorted-' + this.sheetSortDir : '') + '">Owner Email</th>';
+        thead += '<th onclick="app.sortSheet(\'type\')" class="' + (this.sheetSortCol === 'type' ? 'sorted-' + this.sheetSortDir : '') + '">Type</th>';
+        thead += '<th onclick="app.sortSheet(\'score\')" class="' + (this.sheetSortCol === 'score' ? 'sorted-' + this.sheetSortDir : '') + '">Sh</th>';
+        thead += '<th>Em</th><th>Cu</th><th>So</th><th>Env</th>';
+        if (cols.contact) thead += '<th onclick="app.sortSheet(\'contact\')" class="' + (this.sheetSortCol === 'contact' ? 'sorted-' + this.sheetSortDir : '') + '">Contact</th>';
+        if (cols.location) thead += '<th onclick="app.sortSheet(\'location\')" class="' + (this.sheetSortCol === 'location' ? 'sorted-' + this.sheetSortDir : '') + '">Location</th>';
+        if (cols.website) thead += '<th>Website</th>';
+        if (cols.impact) thead += '<th>Impact Statement</th><th>Waste (kg)</th><th>Jobs</th>';
+        if (cols.ya) {
+            yaYears.forEach(y => {
+                thead += `<th>${y} Rev</th><th>${y} Waste</th><th>${y} Trees</th>`;
+            });
+        }
+        if (cols.activity) {
+            thead += '<th onclick="app.sortSheet(\'checkins\')" class="' + (this.sheetSortCol === 'checkins' ? 'sorted-' + this.sheetSortDir : '') + '">Check-ins</th>';
+            thead += '<th onclick="app.sortSheet(\'purchases\')" class="' + (this.sheetSortCol === 'purchases' ? 'sorted-' + this.sheetSortDir : '') + '">Purchases</th>';
+        }
+        thead += '</tr>';
+
+        // Build table rows
+        let tbody = '';
+        filtered.forEach((biz, idx) => {
+            const score = (biz.score && typeof biz.score === 'object') ? biz.score : {};
+            tbody += '<tr>';
+            tbody += `<td style="color:var(--text-secondary);">${idx + 1}</td>`;
+            tbody += `<td style="font-weight:600;">${biz.name || '-'}</td>`;
+            tbody += `<td>${biz.founder || '-'}</td>`;
+            tbody += `<td style="font-size:0.7rem;">${biz.ownerEmail || '-'}</td>`;
+            tbody += `<td><span class="cell-type ${biz.type === 'affiliate' ? 'cell-type-affiliate' : 'cell-type-full'}">${biz.type || 'full'}</span></td>`;
+            tbody += `<td class="cell-score">${this._colorScore(score.s)}</td>`;
+            tbody += `<td class="cell-score">${this._colorScore(score.e)}</td>`;
+            tbody += `<td class="cell-score">${this._colorScore(score.c)}</td>`;
+            tbody += `<td class="cell-score">${this._colorScore(score.soc)}</td>`;
+            tbody += `<td class="cell-score">${this._colorScore(score.env)}</td>`;
+            if (cols.contact) tbody += `<td style="font-size:0.7rem;">${biz.contact || '-'}</td>`;
+            if (cols.location) tbody += `<td title="${biz.location || ''}" style="max-width:150px;">${biz.location || '-'}</td>`;
+            if (cols.website) tbody += `<td>${biz.website ? '<a href="' + biz.website + '" target="_blank" style="color:var(--accent-primary); text-decoration:none; font-size:0.7rem;">' + biz.website.replace(/https?:\/\//, '') + '</a>' : '-'}</td>`;
+            if (cols.impact) {
+                tbody += `<td title="${biz.impactStatement || ''}" style="max-width:150px;">${biz.impactStatement || '-'}</td>`;
+                tbody += `<td>${biz.impactWaste || '-'}</td>`;
+                tbody += `<td>${biz.impactJobs || '-'}</td>`;
+            }
+            if (cols.ya) {
+                const ya = biz.yearlyAssessments || {};
+                yaYears.forEach(y => {
+                    const d = ya[y] || {};
+                    tbody += `<td>${d.revenue ? 'RM ' + Number(d.revenue).toLocaleString() : '-'}</td>`;
+                    tbody += `<td>${d.wasteKg ? Number(d.wasteKg).toLocaleString() + 'kg' : '-'}</td>`;
+                    tbody += `<td>${d.treesPlanted ? Number(d.treesPlanted).toLocaleString() : '-'}</td>`;
+                });
+            }
+            if (cols.activity) {
+                tbody += `<td style="font-weight:600;">${(biz.checkinsCount || 0).toLocaleString()}</td>`;
+                tbody += `<td style="font-weight:600;">${(biz.purchasesCount || 0).toLocaleString()}</td>`;
+            }
+            tbody += '</tr>';
+        });
+
+        container.innerHTML = `<table class="sheet-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    },
+
+    sortSheet(col) {
+        if (this.sheetSortCol === col) {
+            this.sheetSortDir = this.sheetSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sheetSortCol = col;
+            this.sheetSortDir = 'asc';
+        }
+        this.renderSpreadsheet();
+    },
+
+    exportSpreadsheetCSV() {
+        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        const yaYears = this._getAllYAYears();
+        let csv = 'Name,Founder,Owner Email,Type,Sh,Em,Cu,So,Env,Contact,Location,Website,Impact Statement,Waste (kg),Jobs';
+        yaYears.forEach(y => { csv += `,${y} Revenue,${y} Waste (kg),${y} Trees`; });
+        csv += ',Check-ins,Purchases\n';
+
+        MOCK_BUSINESSES.forEach(biz => {
+            const score = (biz.score && typeof biz.score === 'object') ? biz.score : {};
+            const ya = biz.yearlyAssessments || {};
+            const esc = (v) => '"' + String(v || '').replace(/"/g, '""') + '"';
+            csv += [
+                esc(biz.name), esc(biz.founder), esc(biz.ownerEmail), esc(biz.type),
+                esc(score.s), esc(score.e), esc(score.c), esc(score.soc), esc(score.env),
+                esc(biz.contact), esc(biz.location), esc(biz.website),
+                esc(biz.impactStatement), esc(biz.impactWaste), esc(biz.impactJobs)
+            ].join(',');
+            yaYears.forEach(y => {
+                const d = ya[y] || {};
+                csv += `,${esc(d.revenue)},${esc(d.wasteKg)},${esc(d.treesPlanted)}`;
+            });
+            csv += `,${biz.checkinsCount || 0},${biz.purchasesCount || 0}\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bfg_businesses_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        this.showToast('CSV exported successfully!');
     }
 };
 

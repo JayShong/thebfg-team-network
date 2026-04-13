@@ -1,0 +1,56 @@
+[debug] [2026-04-07T04:34:27.389Z] ----------------------------------------------------------------------
+[debug] [2026-04-07T04:34:27.391Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\jaysh\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js serve
+[debug] [2026-04-07T04:34:27.391Z] CLI Version:   15.13.0
+[debug] [2026-04-07T04:34:27.391Z] Platform:      win32
+[debug] [2026-04-07T04:34:27.391Z] Node Version:  v24.14.1
+[debug] [2026-04-07T04:34:27.392Z] Time:          Tue Apr 07 2026 12:34:27 GMT+0800 (Malaysia Time)
+[debug] [2026-04-07T04:34:27.392Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-07T04:34:29.490Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-07T04:34:29.490Z] > authorizing via signed-in user (jayshong@gmail.com)
+[debug] [2026-04-07T04:34:29.490Z] [iam] checking project thebfgteam-9643a for permissions ["firebase.projects.get"]
+[debug] [2026-04-07T04:34:29.491Z] Checked if tokens are valid: false, expires at: 1775533430692
+[debug] [2026-04-07T04:34:29.491Z] Checked if tokens are valid: false, expires at: 1775533430692
+[debug] [2026-04-07T04:34:29.491Z] > refreshing access token with scopes: []
+[debug] [2026-04-07T04:34:29.492Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-04-07T04:34:29.493Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-07T04:34:29.636Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-04-07T04:34:29.636Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-07T04:34:29.643Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a:testIamPermissions [none]
+[debug] [2026-04-07T04:34:29.643Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a:testIamPermissions  x-goog-user-project=thebfgteam-9643a
+[debug] [2026-04-07T04:34:29.644Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2026-04-07T04:34:30.771Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a:testIamPermissions 200
+[debug] [2026-04-07T04:34:30.771Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2026-04-07T04:34:30.772Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:30.772Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:30.772Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/thebfgteam-9643a/services/cloudresourcemanager.googleapis.com [none]
+[debug] [2026-04-07T04:34:30.772Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/thebfgteam-9643a/services/cloudresourcemanager.googleapis.com  x-goog-user-project=thebfgteam-9643a
+[debug] [2026-04-07T04:34:32.499Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/thebfgteam-9643a/services/cloudresourcemanager.googleapis.com 200
+[debug] [2026-04-07T04:34:32.499Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/thebfgteam-9643a/services/cloudresourcemanager.googleapis.com [omitted]
+[debug] [2026-04-07T04:34:32.503Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:32.503Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:32.503Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a [none]
+[debug] [2026-04-07T04:34:32.774Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a 200
+[debug] [2026-04-07T04:34:32.775Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/thebfgteam-9643a {"projectNumber":"155869642900","projectId":"thebfgteam-9643a","lifecycleState":"ACTIVE","name":"TheBFG-Team","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-04-04T13:00:22.905Z"}
+[info] 
+[info] === Serving from 'C:\Users\jaysh\.gemini\antigravity\scratch\thebfg-team'...
+[info] 
+[debug] [2026-04-07T04:34:32.777Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:32.777Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:32.777Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/thebfgteam-9643a/sites 
+[debug] [2026-04-07T04:34:33.779Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/thebfgteam-9643a/sites 200
+[debug] [2026-04-07T04:34:33.779Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/thebfgteam-9643a/sites {"sites":[{"name":"projects/thebfgteam-9643a/sites/thebfgteam-9643a","defaultUrl":"https://thebfgteam-9643a.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2026-04-07T04:34:33.779Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:33.779Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:33.779Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a/webApps/-/config [none]
+[debug] [2026-04-07T04:34:34.368Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a/webApps/-/config 200
+[debug] [2026-04-07T04:34:34.368Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a/webApps/-/config {"projectId":"thebfgteam-9643a","appId":"1:155869642900:web:208498b7f5dd3ef2adf481","storageBucket":"thebfgteam-9643a.firebasestorage.app","apiKey":"AIzaSyB_k25JCJGOGqB7blXHdt5EqSQeV0gey3g","authDomain":"thebfgteam-9643a.firebaseapp.com","messagingSenderId":"155869642900","measurementId":"G-NJSLNYN6Z7","projectNumber":"155869642900","version":"2"}
+[debug] [2026-04-07T04:34:34.373Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:34.373Z] Checked if tokens are valid: true, expires at: 1775540068636
+[debug] [2026-04-07T04:34:34.373Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a [none]
+[debug] [2026-04-07T04:34:35.157Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a 200
+[debug] [2026-04-07T04:34:35.157Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/thebfgteam-9643a {"projectId":"thebfgteam-9643a","projectNumber":"155869642900","displayName":"TheBFG-Team","name":"projects/thebfgteam-9643a","resources":{"hostingSite":"thebfgteam-9643a"},"state":"ACTIVE","etag":"1_fd66d8a7-3d5c-423c-8a72-0a2f1842bafb"}
+[info] +  hosting[thebfgteam-9643a]: Local server: http://localhost:5000 {"metadata":{"emulator":{"name":"hosting"},"message":"Local server: \u001b[4m\u001b[1mhttp://localhost:5000\u001b[22m\u001b[24m"}}
+[info] i  hosting: ::1 - - [07/Apr/2026:04:34:56 +0000] "GET / HTTP/1.1" 200 - "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" {"metadata":{"emulator":{"name":"hosting"},"message":"::1 - - [07/Apr/2026:04:34:56 +0000] \"GET / HTTP/1.1\" 200 - \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\""}}
+[info] i  hosting: ::1 - - [07/Apr/2026:04:34:56 +0000] "GET /style.css HTTP/1.1" 200 - "http://localhost:5000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" {"metadata":{"emulator":{"name":"hosting"},"message":"::1 - - [07/Apr/2026:04:34:56 +0000] \"GET /style.css HTTP/1.1\" 200 - \"http://localhost:5000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\""}}
+[info] i  hosting: ::1 - - [07/Apr/2026:04:34:56 +0000] "GET /app.js HTTP/1.1" 200 - "http://localhost:5000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" {"metadata":{"emulator":{"name":"hosting"},"message":"::1 - - [07/Apr/2026:04:34:56 +0000] \"GET /app.js HTTP/1.1\" 200 - \"http://localhost:5000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\""}}
