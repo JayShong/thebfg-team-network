@@ -653,7 +653,90 @@ const app = {
         if (bizPortal) {
             bizPortal.style.display = MOCK_USER.businessId ? 'block' : 'none';
         }
+        
+        // Update Impact Panel based on dynamic purchases
+        this._calculatePersonalImpact();
     },
+
+    async _calculatePersonalImpact() {
+        if (!MOCK_USER) return;
+        
+        let wasteDivertedAmount = 0;
+        let treesPlantedAmount = 0;
+        let familiesSupportedCount = 0;
+
+        try {
+            if (db) {
+                const querySnapshot = await db.collection('transactions')
+                    .where('userId', '==', MOCK_USER.id)
+                    .where('type', '==', 'purchase')
+                    .get();
+
+                const bizPurchases = {};
+
+                querySnapshot.forEach(doc => {
+                    const t = doc.data();
+                    if (t.status === 'verified') {
+                        if (!bizPurchases[t.bizId]) {
+                            bizPurchases[t.bizId] = 0;
+                        }
+                        bizPurchases[t.bizId] += parseFloat(t.amount) || 0;
+                    }
+                });
+
+                const uniqueBizIds = Object.keys(bizPurchases);
+                
+                uniqueBizIds.forEach(bizId => {
+                    const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+                    if (biz && biz.status !== 'expired') {
+                        // 1 employee / job = 1 family supported. Counted once per unique business purchased from.
+                        const impactJobs = parseInt(biz.impactJobs) || 0;
+                        familiesSupportedCount += impactJobs;
+
+                        // Identify latest revenue and relevant impact metrics
+                        let latestRev = 0;
+                        let latestWaste = 0;
+                        let latestTrees = 0;
+                        
+                        if (biz.yearlyAssessments) {
+                            Object.values(biz.yearlyAssessments).forEach(ya => {
+                                if (ya.revenue) {
+                                    const revStr = ya.revenue.toString().replace(/,/g, '');
+                                    const rev = Number(revStr);
+                                    if (!isNaN(rev) && rev > latestRev) {
+                                        latestRev = rev;
+                                        latestWaste = Number(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                                        latestTrees = Number(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                                    }
+                                }
+                            });
+                        }
+
+                        if (latestRev > 0) {
+                            const proportion = bizPurchases[bizId] / latestRev;
+                            wasteDivertedAmount += (proportion * latestWaste);
+                            treesPlantedAmount += (proportion * latestTrees);
+                        }
+                    }
+                });
+            }
+
+            // Update UI
+            const elWaste = document.getElementById('impact-waste-diverted');
+            const elTrees = document.getElementById('impact-trees-planted');
+            const elFamilies = document.getElementById('impact-families-supported');
+
+            if (elWaste) {
+                elWaste.innerText = wasteDivertedAmount % 1 !== 0 ? wasteDivertedAmount.toFixed(2) : wasteDivertedAmount;
+            }
+            if (elTrees) elTrees.innerText = Math.round(treesPlantedAmount);
+            if (elFamilies) elFamilies.innerText = familiesSupportedCount.toLocaleString();
+
+        } catch (e) {
+            console.error("Error calculating personal impact:", e);
+        }
+    },
+
 
     // --- Role Management (Super Admin only) ---
     async _syncRolesToCloud() {
