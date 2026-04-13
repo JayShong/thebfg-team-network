@@ -2574,7 +2574,13 @@ const app = {
         if (!container) return;
         container.innerHTML = '';
 
-        const activeList = MOCK_INITIATIVES.filter(i => i.status !== 'hidden');
+        const activeList = MOCK_INITIATIVES
+            .filter(i => i.status !== 'hidden')
+            .sort((a, b) => {
+                if (a.status === 'active' && b.status !== 'active') return -1;
+                if (a.status !== 'active' && b.status === 'active') return 1;
+                return 0;
+            });
 
         if (activeList.length === 0) {
             container.innerHTML = '<p style="color:var(--text-secondary); padding:2rem; text-align:center;">No active campaigns at the moment. Check back soon!</p>';
