@@ -209,50 +209,7 @@
                     </div>
                 </div>
 
-                <!-- Initiatives Section -->
-                <div class="page-header mt-4">
-                    <h2>Initiatives</h2>
-                </div>
-
-                <div class="glass-card feature-gradient mt-2" style="position: relative; overflow: hidden; padding: 1.5rem;">
-                    <div style="display: flex; flex-direction: column; gap: 1rem; position: relative; z-index: 2;">
-                        <div>
-                            <span style="font-size: 0.7rem; background: var(--accent-secondary); padding: 0.3rem 0.6rem; border-radius:1rem; font-weight:bold; color:#fff">PAST CAMPAIGN</span>
-                            <h3 style="margin-top: 0.8rem; font-size: 1.4rem;">Eat2Give</h3>
-                            <p style="color: rgba(255,255,255,0.9); font-size: 0.95rem; line-height: 1.5; margin-top: 0.5rem;">
-                                Eat2Give partnered with local restaurants to donate RM5 per meal directly to The Society for the Severely Mentally Handicapped (SSMH) in Malaysia, allowing our network to effortlessly support great causes.
-                            </p>
-                        </div>
-                        
-                        <div style="background: rgba(0,0,0,0.3); border-radius: var(--radius-md); padding: 1rem; border: 1px solid rgba(255,255,255,0.1);">
-                            <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--accent-primary);">How It Worked:</h4>
-                            <ul style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 1.2rem; line-height: 1.6;">
-                                <li><strong>Order</strong> participating items from partnered menus.</li>
-                                <li><strong>Prove it</strong> by scanning the Eat2Give badge in the CheckD Wallet.</li>
-                                <li><strong>The Merchant Donates RM5</strong> directly to charity without costing the user extra!</li>
-                            </ul>
-                        </div>
-
-                        <!-- Gallery placeholders -->
-                        <div style="display: flex; gap: 0.8rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: thin; -ms-overflow-style: none;">
-                            <div style="min-width: 140px; height: 100px; background: rgba(255,255,255,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;">
-                                <i class="fa-solid fa-image" style="color:var(--text-secondary); font-size: 1.5rem;"></i>
-                            </div>
-                            <div style="min-width: 140px; height: 100px; background: rgba(255,255,255,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;">
-                                <i class="fa-solid fa-image" style="color:var(--text-secondary); font-size: 1.5rem;"></i>
-                            </div>
-                            <div style="min-width: 140px; height: 100px; background: rgba(255,255,255,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;">
-                                <i class="fa-solid fa-image" style="color:var(--text-secondary); font-size: 1.5rem;"></i>
-                            </div>
-                        </div>
-
-                        <a href="https://www.checkd.io/eat2give" target="_blank" style="text-decoration: none;">
-                            <button class="btn btn-outline" style="width: 100%; border-color: rgba(255,255,255,0.3); margin-top: 0.5rem;">
-                                Learn More about Eat2Give <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.8rem; margin-left: 0.3rem;"></i>
-                            </button>
-                        </a>
-                    </div>
-                </div>
+                <!-- The Initiatives Section has been moved to its own tab -->
             </section>
 
             <!-- User History View -->
@@ -271,6 +228,16 @@
                         <!-- JS injected -->
                     </div>
                 </div>
+            </section>
+
+            <!-- Initiatives View -->
+            <section id="view-initiatives" class="view hidden">
+                <div class="page-header" style="margin-bottom:1rem;">
+                    <h1>Initiatives</h1>
+                    <p>Discover platform-wide impact campaigns</p>
+                </div>
+                <!-- Automatically injected by JS app.renderInitiatives() -->
+                <div id="initiatives-list-container" style="display:flex; flex-direction:column; gap:1.5rem;"></div>
             </section>
 
             <!-- Directory View -->
@@ -709,7 +676,64 @@
                     </button>
                     <p id="admin-loading" class="hidden"
                         style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i
-                            class="fa-solid fa-spinner fa-spin"></i> Processing images, please wait...</p>
+                            class="fa-solid fa-spinner fa-spin"></i> Processing forms, please wait...</p>
+                </div>
+
+                <!-- Initiatives Management -->
+                <div class="glass-card mt-4" style="margin-bottom: 1.5rem;">
+                    <h3><i class="fa-solid fa-hand-holding-heart" style="color:var(--accent-primary)"></i> Initiatives Management</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Manage active campaigns on the platform.</p>
+                    
+                    <div id="admin-initiatives-list-container"
+                        style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 1rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+                        <!-- Injected by JS -->
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.05); padding: 1.5rem; border-radius: var(--radius-sm);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+                            <h4 id="admin-initiative-form-title" style="margin:0;">Add New Initiative</h4>
+                            <button id="btn-admin-cancel-initiative" class="btn btn-secondary hidden" onclick="app.loadAdminInitiativeToEdit('')" title="Clear form">Clear Form</button>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+                            <input type="hidden" id="admin-init-id">
+                            <div class="form-group">
+                                <label>Campaign Title</label>
+                                <input type="text" id="admin-init-title" class="input-modern" placeholder="e.g. Eat2Give">
+                            </div>
+                            <div class="form-group">
+                                <label>Campaign Narrative</label>
+                                <textarea id="admin-init-narrative" class="input-modern" rows="3" placeholder="Brief description..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Mechanism (Bullet points, separate by new line)</label>
+                                <textarea id="admin-init-mechanism" class="input-modern" rows="4" placeholder="Order participating items...\nProve it by scanning..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Learn More URL</label>
+                                <input type="url" id="admin-init-url" class="input-modern" placeholder="https://example.com/campaign">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="admin-init-status" class="input-modern">
+                                    <option value="active">Active</option>
+                                    <option value="past">Past Campaign</option>
+                                    <option value="hidden">Hidden</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Gallery Photos (Optional, max 5)</label>
+                                <input type="file" id="admin-init-photos" accept="image/*" class="input-modern" multiple>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.3rem;">Current photos will be overwritten if you select new ones.</p>
+                            </div>
+                        </div>
+                        <button id="btn-save-initiative" class="btn btn-primary btn-block mt-4" onclick="app.saveInitiative()">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Initiative
+                        </button>
+                        <p id="admin-init-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Processing...
+                        </p>
+                    </div>
                 </div>
             </section>
 
@@ -1065,6 +1089,10 @@
             <button class="nav-item" data-target="directory" onclick="app.navigate('directory')">
                 <i class="fa-solid fa-store"></i>
                 <span>Directory</span>
+            </button>
+            <button class="nav-item" data-target="initiatives" onclick="app.navigate('initiatives')">
+                <i class="fa-solid fa-hand-holding-heart"></i>
+                <span>Initiatives</span>
             </button>
             <button class="nav-item scan-btn" data-target="scanner" onclick="app.navigate('scanner')">
                 <div class="scan-btn-inner">

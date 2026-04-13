@@ -88,6 +88,7 @@ let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
 let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
 let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
 const SUPER_ADMIN_EMAIL = 'jayshong@gmail.com';
+let MOCK_INITIATIVES = [];
 let MOCK_ADMINS = ['jayshong@gmail.com'];
 let MOCK_AUDITORS = ['jayshong@gmail.com'];
 
@@ -135,6 +136,7 @@ const app = {
                     this.saveData();
                     this.renderStats();
                     this.renderBusinessList();
+                    this.renderInitiatives();
                     this.populateProfile();
                     this.navigate('dashboard');
                 } else {
@@ -161,6 +163,7 @@ const app = {
             this.saveData();
             this.renderStats();
             this.renderBusinessList();
+            this.renderInitiatives();
             this.populateProfile();
         }
 
@@ -209,6 +212,30 @@ const app = {
                         await db.collection('businesses').doc(biz.id).set(biz);
                     });
                 }
+                
+                // Fetch initiatives
+                const initSnapshot = await db.collection('initiatives').get();
+                if (!initSnapshot.empty) {
+                    MOCK_INITIATIVES = [];
+                    initSnapshot.forEach(doc => {
+                        let data = doc.data();
+                        data.id = doc.id;
+                        MOCK_INITIATIVES.push(data);
+                    });
+                } else if (MOCK_USER && MOCK_USER.isSuperAdmin) {
+                    // Seed Eat2Give Default Initiative if DB is completely empty.
+                    const initial = {
+                        title: 'Eat2Give',
+                        narrative: 'Eat2Give partnered with local restaurants to donate RM5 per meal directly to The Society for the Severely Mentally Handicapped (SSMH) in Malaysia, allowing our network to effortlessly support great causes.',
+                        mechanism: 'Order participating items from partnered menus.\nProve it by scanning the Eat2Give badge in the CheckD Wallet.\nThe Merchant Donates RM5 directly to charity without costing the user extra!',
+                        url: 'https://www.checkd.io/eat2give',
+                        status: 'past',
+                        photos: []
+                    };
+                    const docRef = await db.collection('initiatives').add(initial);
+                    initial.id = docRef.id;
+                    MOCK_INITIATIVES.push(initial);
+                }
 
                 if(MOCK_USER && MOCK_USER.email) {
                     MOCK_USER.isSuperAdmin = MOCK_USER.email === SUPER_ADMIN_EMAIL;
@@ -231,6 +258,7 @@ const app = {
         this.saveData();
         this.renderStats();
         this.renderBusinessList();
+        this.renderInitiatives();
         this.populateProfile();
         
         if (this.currentView === 'business-dashboard') {
@@ -245,6 +273,7 @@ const app = {
         localStorage.setItem('bfg_user', JSON.stringify(MOCK_USER));
         localStorage.setItem('bfg_stats', JSON.stringify(MOCK_STATS));
         localStorage.setItem('bfg_businesses', JSON.stringify(MOCK_BUSINESSES));
+        localStorage.setItem('bfg_initiatives', JSON.stringify(MOCK_INITIATIVES));
 
         // Push user to cloud
         if(db && MOCK_USER && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -854,6 +883,7 @@ const app = {
             scoreSection.style.display = (isAuditor && isFull) ? 'block' : 'none';
         }
         
+        this.renderAdminInitiatives();
         this._checkRenewals();
     },
 
@@ -2383,6 +2413,202 @@ const app = {
         a.remove();
         URL.revokeObjectURL(url);
         this.showToast('CSV exported successfully!');
+    },
+
+    async saveInitiative() {
+        const idInput = document.getElementById('admin-init-id').value;
+        const title = document.getElementById('admin-init-title').value.trim();
+        const narrative = document.getElementById('admin-init-narrative').value.trim();
+        const mechanism = document.getElementById('admin-init-mechanism').value.trim();
+        const url = document.getElementById('admin-init-url').value.trim();
+        const status = document.getElementById('admin-init-status').value;
+        const files = document.getElementById('admin-init-photos').files;
+
+        if (!title) return this.showToast('Campaign Title is required', true);
+
+        const loading = document.getElementById('admin-init-loading');
+        loading.classList.remove('hidden');
+
+        try {
+            let photos = [];
+            const existing = MOCK_INITIATIVES.find(i => i.id === idInput);
+            
+            if (files.length > 0) {
+                // Upload up to 5 photos as base64
+                for (let i = 0; i < files.length; i++) {
+                    if (i >= 5) break; 
+                    const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.onerror = () => resolve('');
+                        reader.readAsDataURL(files[i]);
+                    });
+                    if (base64) photos.push(base64);
+                }
+            } else if (existing && existing.photos) {
+                photos = existing.photos; // retain old
+            }
+
+            const data = {
+                title, narrative, mechanism, url, status, photos,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                if (idInput) {
+                    await db.collection('initiatives').doc(idInput).set(data, {merge:true});
+                } else {
+                    await db.collection('initiatives').add(data);
+                }
+            } else {
+                 if(idInput) {
+                     const idx = MOCK_INITIATIVES.findIndex(i => i.id === idInput);
+                     if(idx>-1) MOCK_INITIATIVES[idx] = {...data, id: idInput};
+                 } else {
+                     MOCK_INITIATIVES.push({...data, id: 'init_'+Date.now()});
+                 }
+            }
+
+            this.showToast('Initiative saved successfully!');
+            this.loadAdminInitiativeToEdit(''); 
+            await this.forceSync();
+            
+        } catch (e) {
+            console.error("Error saving initiative:", e);
+            this.showToast('Failed to save initiative', true);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    },
+
+    loadAdminInitiativeToEdit(id) {
+        document.getElementById('admin-init-id').value = id || '';
+        document.getElementById('btn-admin-cancel-initiative').classList.toggle('hidden', !id);
+        const titleEl = document.getElementById('admin-initiative-form-title');
+        if(titleEl) titleEl.innerText = id ? 'Edit Initiative' : 'Add New Initiative';
+        
+        const init = MOCK_INITIATIVES.find(i => i.id === id) || {};
+        document.getElementById('admin-init-title').value = init.title || '';
+        document.getElementById('admin-init-narrative').value = init.narrative || '';
+        document.getElementById('admin-init-mechanism').value = init.mechanism || '';
+        document.getElementById('admin-init-url').value = init.url || '';
+        document.getElementById('admin-init-status').value = init.status || 'active';
+        document.getElementById('admin-init-photos').value = ''; 
+    },
+
+    async _toggleInitiativeStatus(id, currentStatus) {
+        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        const newStatus = currentStatus === 'active' ? 'past' : 'active';
+        if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+             await db.collection('initiatives').doc(id).set({status: newStatus}, {merge:true});
+        } else {
+             const idx = MOCK_INITIATIVES.findIndex(i => i.id === id);
+             if(idx>-1) MOCK_INITIATIVES[idx].status = newStatus;
+        }
+        await this.forceSync();
+        this.showToast(`Set to ${newStatus}`);
+    },
+
+    renderAdminInitiatives() {
+        const container = document.getElementById('admin-initiatives-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (MOCK_INITIATIVES.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:1rem;">No initiatives found.</p>';
+            return;
+        }
+
+        MOCK_INITIATIVES.forEach(init => {
+            const statusColor = init.status === 'active' ? 'var(--accent-success)' : (init.status === 'past' ? 'var(--accent-secondary)' : 'var(--text-secondary)');
+            
+            container.innerHTML += `
+                <div style="background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${init.title}</strong><br>
+                        <span style="font-size:0.75rem; color:${statusColor}; font-weight:bold; text-transform:uppercase;">${init.status}</span>
+                        <span style="font-size:0.75rem; color:var(--text-secondary);"> &bull; ${init.photos ? init.photos.length : 0} photos</span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="icon-btn" onclick="app.loadAdminInitiativeToEdit('${init.id}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="icon-btn" style="color:var(--text-warning);" onclick="app._toggleInitiativeStatus('${init.id}', '${init.status}')"><i class="fa-solid fa-power-off"></i></button>
+                    </div>
+                </div>
+            `;
+        });
+    },
+
+    renderInitiatives() {
+        const container = document.getElementById('initiatives-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const activeList = MOCK_INITIATIVES.filter(i => i.status !== 'hidden');
+
+        if (activeList.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary); padding:2rem; text-align:center;">No active campaigns at the moment. Check back soon!</p>';
+            return;
+        }
+
+        activeList.forEach(init => {
+            // Render mechanism bullets
+            let bulletsHTML = '';
+            if (init.mechanism) {
+                const parts = init.mechanism.split('\\n').filter(p => p.trim() !== '');
+                parts.forEach(p => {
+                    bulletsHTML += `<li>${p.trim()}</li>`;
+                });
+            }
+
+            // Render gallery
+            let galleryHTML = '';
+            if (init.photos && init.photos.length > 0) {
+                const imagesHTML = init.photos.map(p => `
+                    <div style="min-width: 140px; height: 100px; background: rgba(255,255,255,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; overflow:hidden;">
+                        <img src="${p}" style="height:100%; min-width:100%; object-fit:cover;">
+                    </div>
+                `).join('');
+
+                galleryHTML = `
+                    <div style="display: flex; gap: 0.8rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: thin; -ms-overflow-style: none;">
+                        ${imagesHTML}
+                    </div>
+                `;
+            }
+
+            const headerTag = init.status === 'past' ? `<span style="font-size: 0.7rem; background: var(--accent-secondary); padding: 0.3rem 0.6rem; border-radius:1rem; font-weight:bold; color:#fff; display:inline-block; margin-bottom:0.5rem;">PAST CAMPAIGN</span>` : `<span style="font-size: 0.7rem; background: var(--accent-success); padding: 0.3rem 0.6rem; border-radius:1rem; font-weight:bold; color:#fff; display:inline-block; margin-bottom:0.5rem;">ACTIVE INITIATIVE</span>`;
+
+            container.innerHTML += `
+                <div class="glass-card feature-gradient mt-2" style="position: relative; overflow: hidden; padding: 1.5rem;">
+                    <div style="display: flex; flex-direction: column; gap: 1rem; position: relative; z-index: 2;">
+                        <div>
+                            ${headerTag}
+                            <h3 style="margin-top: 0.3rem; font-size: 1.4rem;">${init.title}</h3>
+                            <p style="color: rgba(255,255,255,0.9); font-size: 0.95rem; line-height: 1.5; margin-top: 0.5rem;">
+                                ${init.narrative}
+                            </p>
+                        </div>
+                        
+                        ${bulletsHTML ? `
+                        <div style="background: rgba(0,0,0,0.3); border-radius: var(--radius-md); padding: 1rem; border: 1px solid rgba(255,255,255,0.1);">
+                            <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--accent-primary);">How It Works:</h4>
+                            <ul style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 1.2rem; line-height: 1.6;">
+                                ${bulletsHTML}
+                            </ul>
+                        </div>` : ''}
+
+                        ${galleryHTML}
+
+                        ${init.url ? `
+                        <a href="${init.url}" target="_blank" style="text-decoration: none;">
+                            <button class="btn btn-outline" style="width: 100%; border-color: rgba(255,255,255,0.3); margin-top: 0.5rem;">
+                                Learn More <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.8rem; margin-left: 0.3rem;"></i>
+                            </button>
+                        </a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
     }
 };
 
