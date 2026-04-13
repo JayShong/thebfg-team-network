@@ -1098,6 +1098,12 @@ const app = {
             document.getElementById('modal-default-content').classList.remove('hidden');
             document.getElementById('modal-success-content').classList.add('hidden');
             document.getElementById('action-modal').classList.remove('hidden');
+
+            // Restriction: Only full members can have purchases tracked
+            const btnLogPurchase = document.getElementById('btn-log-purchase');
+            if (btnLogPurchase) {
+                btnLogPurchase.style.display = biz.type === 'affiliate' ? 'none' : 'flex';
+            }
         } else {
             this.showToast("Invalid QR code scanned.");
         }
@@ -1156,6 +1162,11 @@ const app = {
         
         if(!receipt || !amount) {
             alert('Please enter both receipt number and amount.');
+            return;
+        }
+
+        if (this.scannedBusiness && this.scannedBusiness.type === 'affiliate') {
+            alert('Purchases can only be recorded for full members. Please encourage them to apply!');
             return;
         }
 
