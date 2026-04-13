@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,14 +20,15 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
+
 <body>
     <!-- App Shell -->
     <div id="app-container">
-        
+
         <!-- Header -->
         <header id="main-header" class="glass-header">
             <div class="logo">
-                <i class="fa-solid fa-leaf text-gradient"></i> 
+                <i class="fa-solid fa-leaf text-gradient"></i>
                 <span>TheBFG.Team</span>
             </div>
             <div class="header-actions" style="display:flex; gap: 0.5rem;">
@@ -44,18 +46,21 @@
 
         <!-- Main Content Area -->
         <main id="main-content">
-            
+
             <!-- Login View -->
             <section id="view-login" class="view hidden">
-                <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem;">
+                <div
+                    style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem;">
                     <i class="fa-solid fa-leaf text-gradient" style="font-size: 4rem; margin-bottom: 1rem;"></i>
                     <h1 style="margin-bottom: 0.5rem; text-align: center;">Welcome to TheBFG.Team</h1>
-                    <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">A private commercial network connecting socially conscious consumers with empathetic businesses.</p>
-                    
+                    <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">A private
+                        commercial network connecting socially conscious consumers with empathetic businesses.</p>
+
                     <div class="glass-card" style="width: 100%; max-width: 400px;">
                         <div class="form-group">
                             <label>Nickname (Your Introduction Marker)</label>
-                            <input type="text" id="login-nickname" class="input-modern" placeholder="e.g. EarthFriend99">
+                            <input type="text" id="login-nickname" class="input-modern"
+                                placeholder="e.g. EarthFriend99">
                         </div>
                         <div class="form-group">
                             <label>Email Address</label>
@@ -63,19 +68,27 @@
                         </div>
                         <div class="form-group">
                             <label>Password</label>
-                            <input type="password" id="login-password" class="input-modern" placeholder="At least 6 characters">
+                            <input type="password" id="login-password" class="input-modern"
+                                placeholder="At least 6 characters">
                             <div style="text-align: right; margin-top: 0.5rem;">
-                                <a href="#" onclick="app.sendPasswordResetFromLogin(); return false;" style="color: var(--accent-primary); font-size: 0.85rem; text-decoration: none;">Forgot password?</a>
+                                <a href="#" onclick="app.sendPasswordResetFromLogin(); return false;"
+                                    style="color: var(--accent-primary); font-size: 0.85rem; text-decoration: none;">Forgot
+                                    password?</a>
                             </div>
                         </div>
-                        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-                            <input type="checkbox" id="login-remember" style="width: 18px; height: 18px; cursor: pointer;">
-                            <label for="login-remember" style="margin-bottom: 0; cursor: pointer;">Remember email Address</label>
+                        <div class="form-group"
+                            style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                            <input type="checkbox" id="login-remember"
+                                style="width: 18px; height: 18px; cursor: pointer;">
+                            <label for="login-remember" style="margin-bottom: 0; cursor: pointer;">Remember email
+                                Address</label>
                         </div>
                         <button class="btn btn-primary btn-block mt-4" id="login-btn" onclick="app.login()">
                             Join the Network / Login
                         </button>
-                        <p id="login-error" class="hidden" style="color: var(--text-warning); margin-top: 1rem; text-align: center; font-size: 0.85rem;"></p>
+                        <p id="login-error" class="hidden"
+                            style="color: var(--text-warning); margin-top: 1rem; text-align: center; font-size: 0.85rem;">
+                        </p>
                     </div>
                 </div>
             </section>
@@ -86,9 +99,11 @@
                     <h1>Dashboard</h1>
                     <p>Network impact overview</p>
                 </div>
-                
-                <div class="glass-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1)); border-color: rgba(139, 92, 246, 0.3);">
-                    <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;"><i class="fa-solid fa-bullseye" style="color: var(--accent-primary);"></i> Our Purpose</h3>
+
+                <div class="glass-card"
+                    style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1)); border-color: rgba(139, 92, 246, 0.3);">
+                    <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;"><i class="fa-solid fa-bullseye"
+                            style="color: var(--accent-primary);"></i> Our Purpose</h3>
                     <p style="font-size: 1.05rem; line-height: 1.6; color: rgba(255,255,255,0.9);">
                         Make for-good and conviction-driven businesses be seen, verified, and valued.
                     </p>
@@ -124,13 +139,15 @@
                             <p id="stat-global-purchases" class="stat-value">...</p>
                         </div>
                     </div>
-                    <div class="stat-card glass-card" style="grid-column: span 2; background: linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3)); border-color: rgba(255, 160, 0, 0.2);">
+                    <div class="stat-card glass-card"
+                        style="grid-column: span 2; background: linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3)); border-color: rgba(255, 160, 0, 0.2);">
                         <i class="fa-solid fa-chart-pie stat-icon" style="color: #FFA000;"></i>
                         <div class="stat-info">
                             <h3>National Transformation</h3>
                             <p id="stat-global-penetration" class="stat-value" style="color: #FFA000;">...</p>
-                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.75rem; font-style: italic;">
-                                The goal is convert 30% of Malaysian businesses into empathetic businesses.
+                            <p
+                                style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.75rem; font-style: italic;">
+                                The goal is have 30% of Malaysia's GDP to be part of the humane empathy economy.
                             </p>
                         </div>
                     </div>
@@ -139,17 +156,23 @@
                 <div class="page-header mt-4">
                     <h2>Your Impact</h2>
                 </div>
-                
+
                 <!-- Personal Stats -->
                 <div class="stats-grid personal">
-                    <div class="stat-card glass-card highlight-border" style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('checkin')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="View Check-in History">
+                    <div class="stat-card glass-card highlight-border"
+                        style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('checkin')"
+                        onmouseover="this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.transform='translateY(0)'" title="View Check-in History">
                         <i class="fa-solid fa-location-dot stat-icon" style="color:var(--accent-primary)"></i>
                         <div class="stat-info">
                             <h3>Your Check-ins</h3>
                             <p id="stat-personal-checkins" class="stat-value">0</p>
                         </div>
                     </div>
-                    <div class="stat-card glass-card highlight-border" style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('purchase')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="View Purchase History">
+                    <div class="stat-card glass-card highlight-border"
+                        style="cursor:pointer; transition: transform 0.2s;" onclick="app.openUserHistory('purchase')"
+                        onmouseover="this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.transform='translateY(0)'" title="View Purchase History">
                         <i class="fa-solid fa-receipt stat-icon" style="color:var(--accent-success)"></i>
                         <div class="stat-info">
                             <h3>Your Purchases</h3>
@@ -159,28 +182,41 @@
                 </div>
 
                 <!-- Quantified Impact Beta -->
-                <div class="glass-card mt-4" style="background: linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4));">
+                <div class="glass-card mt-4"
+                    style="background: linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4));">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <h3>Your Quantified Impact</h3>
-                        <span style="font-size: 0.7rem; background: var(--accent-primary); padding: 0.2rem 0.6rem; border-radius:1rem; font-weight:bold;">BETA</span>
+                        <h3>Your Quantified Impact (To be implemented)</h3>
+                        <span
+                            style="font-size: 0.7rem; background: var(--accent-primary); padding: 0.2rem 0.6rem; border-radius:1rem; font-weight:bold;">BETA</span>
                     </div>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Based on your verified spending, you have indirectly contributed to the following ISO53001-audited outcomes across our network.</p>
-                    
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Based on your
+                        verified spending, you have indirectly contributed to the following ISO53001-audited outcomes
+                        across our network.</p>
+
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem;">
-                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
-                            <i class="fa-solid fa-recycle" style="color:var(--accent-success); font-size:1.5rem; margin-bottom:0.5rem;"></i>
-                            <div style="font-size:1.5rem; font-weight:bold;">12.5 <span style="font-size:0.8rem">kg</span></div>
+                        <div
+                            style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-recycle"
+                                style="color:var(--accent-success); font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">12.5 <span
+                                    style="font-size:0.8rem">kg</span></div>
                             <div style="font-size:0.8rem; color:var(--text-secondary);">Waste Diverted</div>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
-                            <i class="fa-solid fa-hand-holding-dollar" style="color:#FFA000; font-size:1.5rem; margin-bottom:0.5rem;"></i>
-                            <div style="font-size:1.5rem; font-weight:bold;">150 <span style="font-size:0.8rem">RM</span></div>
+                        <div
+                            style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-hand-holding-dollar"
+                                style="color:#FFA000; font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">150 <span
+                                    style="font-size:0.8rem">RM</span></div>
                             <div style="font-size:0.8rem; color:var(--text-secondary);">Given to Charity</div>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
-                            <i class="fa-solid fa-users" style="color:var(--accent-primary); font-size:1.5rem; margin-bottom:0.5rem;"></i>
-                            <div style="font-size:1.5rem; font-weight:bold;">2 <span style="font-size:0.8rem">Jobs</span></div>
-                            <div style="font-size:0.8rem; color:var(--text-secondary);">Ethical Careers</div>
+                        <div
+                            style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+                            <i class="fa-solid fa-users"
+                                style="color:var(--accent-primary); font-size:1.5rem; margin-bottom:0.5rem;"></i>
+                            <div style="font-size:1.5rem; font-weight:bold;">2 <span
+                                    style="font-size:0.8rem">Families</span></div>
+                            <div style="font-size:0.8rem; color:var(--text-secondary);">Supported</div>
                         </div>
                     </div>
                 </div>
@@ -195,9 +231,10 @@
                     <h1 id="user-history-title">History</h1>
                     <p id="user-history-subtitle">Review your past activities</p>
                 </div>
-                
+
                 <div class="glass-card">
-                    <div id="user-history-list" style="max-height: 400px; overflow-y: auto; display:flex; flex-direction:column; gap:0.5rem;">
+                    <div id="user-history-list"
+                        style="max-height: 400px; overflow-y: auto; display:flex; flex-direction:column; gap:0.5rem;">
                         <!-- JS injected -->
                     </div>
                 </div>
@@ -232,14 +269,18 @@
                 </div>
                 <div class="scanner-container glass-card" style="padding: 1.5rem;">
                     <div id="reader-container" style="display: none; margin-bottom: 1rem;">
-                        <div id="reader" style="width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;"></div>
-                        <button class="btn btn-secondary btn-block mt-4" onclick="app.stopScanner()">Stop Scanner</button>
+                        <div id="reader"
+                            style="width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;">
+                        </div>
+                        <button class="btn btn-secondary btn-block mt-4" onclick="app.stopScanner()">Stop
+                            Scanner</button>
                     </div>
                     <div class="scanner-actions" id="scanner-actions">
                         <button class="btn btn-primary btn-block" onclick="app.startScanner()">
                             <i class="fa-solid fa-camera"></i> Start Camera Scanner
                         </button>
-                        <button class="btn btn-secondary btn-block" style="margin-top: 1rem;" onclick="app.mockScanSuccess()">
+                        <button class="btn btn-secondary btn-block" style="margin-top: 1rem;"
+                            onclick="app.mockScanSuccess()">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Simulate Scan
                         </button>
                     </div>
@@ -267,8 +308,12 @@
                             <i class="fa-solid fa-user"></i>
                         </div>
                         <h3 id="profile-name">Nickname</h3>
-                        <div id="profile-role-badges" style="margin-top: 0.4rem; display:flex; gap:0.3rem; flex-wrap:wrap; justify-content:center;"></div>
-                        <p id="profile-email" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.2rem;">email@example.com</p>
+                        <div id="profile-role-badges"
+                            style="margin-top: 0.4rem; display:flex; gap:0.3rem; flex-wrap:wrap; justify-content:center;">
+                        </div>
+                        <p id="profile-email"
+                            style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                            email@example.com</p>
                         <p class="user-id" style="margin-top: 0.5rem;">ID: <span id="profile-id">---</span></p>
                     </div>
                     <div class="badge-footer" style="margin-top: 1.5rem;">
@@ -278,11 +323,14 @@
                             </button>
                         </div>
                         <div id="business-portal-container" style="display: none; margin-bottom: 1rem;">
-                            <button class="btn btn-primary btn-block feature-gradient" onclick="app.openBusinessDashboard()" style="color:white; border:none;">
+                            <button class="btn btn-primary btn-block feature-gradient"
+                                onclick="app.openBusinessDashboard()" style="color:white; border:none;">
                                 <i class="fa-solid fa-store"></i> My Business Portal
                             </button>
                         </div>
-                        <button class="btn btn-secondary btn-block" style="border: 1px solid var(--text-warning); color: var(--text-warning);" onclick="app.logout()">
+                        <button class="btn btn-secondary btn-block"
+                            style="border: 1px solid var(--text-warning); color: var(--text-warning);"
+                            onclick="app.logout()">
                             <i class="fa-solid fa-right-from-bracket"></i> Sign Out
                         </button>
                     </div>
@@ -300,7 +348,8 @@
                 </div>
                 <div class="glass-card">
                     <h3>Basic Information</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
                         <div class="form-group">
                             <label>Nickname</label>
                             <input type="text" id="settings-nickname" class="input-modern">
@@ -309,8 +358,13 @@
                             <label>Email Address</label>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                                 <input type="email" id="settings-email" class="input-modern" style="flex: 1;">
-                                <button id="btn-verify-email" class="btn btn-secondary" onclick="app.promptVerifyEmail()" style="display:none; white-space:nowrap;">Verify Email</button>
-                                <span id="badge-verified" style="display:none; align-items:center; color:var(--accent-success); font-weight:bold;"><i class="fa-solid fa-circle-check" style="margin-right:0.3rem;"></i> Verified</span>
+                                <button id="btn-verify-email" class="btn btn-secondary"
+                                    onclick="app.promptVerifyEmail()" style="display:none; white-space:nowrap;">Verify
+                                    Email</button>
+                                <span id="badge-verified"
+                                    style="display:none; align-items:center; color:var(--accent-success); font-weight:bold;"><i
+                                        class="fa-solid fa-circle-check" style="margin-right:0.3rem;"></i>
+                                    Verified</span>
                             </div>
                         </div>
                         <div class="form-group">
@@ -335,7 +389,8 @@
 
                 <div class="glass-card mt-4">
                     <h3>Security</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Keep your account safe.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Keep your account
+                        safe.</p>
                     <button class="btn btn-secondary" onclick="app.sendPasswordResetFromSettings()">
                         <i class="fa-solid fa-key"></i> Send Password Reset Email
                     </button>
@@ -343,18 +398,30 @@
 
                 <div class="glass-card mt-4">
                     <h3>Causes You Support</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Select the causes in Malaysia you are most passionate about.</p>
-                    <div id="settings-causes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem;">
-                        <label class="checkbox-container"><input type="checkbox" value="Poverty Eradication"> <span class="checkmark"></span> Poverty Eradication</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Quality Education"> <span class="checkmark"></span> Quality Education</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Food Security"> <span class="checkmark"></span> Food Security</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Wildlife Conservation"> <span class="checkmark"></span> Wildlife Conservation</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Healthcare Access"> <span class="checkmark"></span> Healthcare Access</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Clean Water"> <span class="checkmark"></span> Clean Water</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Affordable Housing"> <span class="checkmark"></span> Affordable Housing</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Climate Action"> <span class="checkmark"></span> Climate Action</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Gender Equality"> <span class="checkmark"></span> Gender Equality</label>
-                        <label class="checkbox-container"><input type="checkbox" value="Indigenous Rights"> <span class="checkmark"></span> Indigenous Rights</label>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Select the causes
+                        in Malaysia you are most passionate about.</p>
+                    <div id="settings-causes"
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem;">
+                        <label class="checkbox-container"><input type="checkbox" value="Poverty Eradication"> <span
+                                class="checkmark"></span> Poverty Eradication</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Quality Education"> <span
+                                class="checkmark"></span> Quality Education</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Food Security"> <span
+                                class="checkmark"></span> Food Security</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Wildlife Conservation"> <span
+                                class="checkmark"></span> Wildlife Conservation</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Healthcare Access"> <span
+                                class="checkmark"></span> Healthcare Access</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Clean Water"> <span
+                                class="checkmark"></span> Clean Water</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Affordable Housing"> <span
+                                class="checkmark"></span> Affordable Housing</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Climate Action"> <span
+                                class="checkmark"></span> Climate Action</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Gender Equality"> <span
+                                class="checkmark"></span> Gender Equality</label>
+                        <label class="checkbox-container"><input type="checkbox" value="Indigenous Rights"> <span
+                                class="checkmark"></span> Indigenous Rights</label>
                     </div>
                 </div>
 
@@ -374,45 +441,63 @@
                         <p>Manage the network</p>
                     </div>
                     <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
-                        <button class="btn btn-secondary superadmin-only" onclick="app.openSpreadsheet()" title="Business Spreadsheet" style="border-color:#4CAF50; color:#4CAF50;"><i class="fa-solid fa-table-columns"></i></button>
-                        <button class="btn btn-secondary" onclick="app.exportData()" title="Backup Database"><i class="fa-solid fa-download"></i></button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()" title="Restore Database"><i class="fa-solid fa-upload"></i></button>
-                        <input type="file" id="import-file" style="display:none;" accept=".json" onchange="app.importData(event)">
+                        <button class="btn btn-secondary superadmin-only" onclick="app.openSpreadsheet()"
+                            title="Business Spreadsheet" style="border-color:#4CAF50; color:#4CAF50;"><i
+                                class="fa-solid fa-table-columns"></i></button>
+                        <button class="btn btn-secondary" onclick="app.exportData()" title="Backup Database"><i
+                                class="fa-solid fa-download"></i></button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()"
+                            title="Restore Database"><i class="fa-solid fa-upload"></i></button>
+                        <input type="file" id="import-file" style="display:none;" accept=".json"
+                            onchange="app.importData(event)">
                     </div>
                 </div>
 
                 <div class="glass-card" style="margin-bottom: 1.5rem;">
                     <h3><i class="fa-solid fa-users-gear" style="color:var(--accent-primary)"></i> Role Management</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Only the Super Admin (<strong>jayshong@gmail.com</strong>) can assign and remove roles.</p>
-                    
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Only the Super
+                        Admin (<strong>jayshong@gmail.com</strong>) can assign and remove roles.</p>
+
                     <!-- Admin Role Section -->
-                    <div style="background:rgba(0,0,0,0.15); padding:1rem; border-radius:var(--radius-sm); margin-bottom:1rem; border-left:3px solid var(--accent-primary);">
+                    <div
+                        style="background:rgba(0,0,0,0.15); padding:1rem; border-radius:var(--radius-sm); margin-bottom:1rem; border-left:3px solid var(--accent-primary);">
                         <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
                             <i class="fa-solid fa-shield-halved" style="color:var(--accent-primary)"></i>
                             <strong>Admins</strong>
-                            <span style="font-size:0.7rem; color:var(--text-secondary); margin-left:auto;">Can manage businesses & network</span>
+                            <span style="font-size:0.7rem; color:var(--text-secondary); margin-left:auto;">Can manage
+                                businesses & network</span>
                         </div>
-                        <div class="superadmin-only" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                            <input type="email" id="admin-new-email" class="input-modern" placeholder="user@example.com" style="flex: 1; min-width: 200px;">
-                            <button class="btn btn-secondary" onclick="app.addAdmin()"><i class="fa-solid fa-user-plus"></i> Add Admin</button>
+                        <div class="superadmin-only"
+                            style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <input type="email" id="admin-new-email" class="input-modern" placeholder="user@example.com"
+                                style="flex: 1; min-width: 200px;">
+                            <button class="btn btn-secondary" onclick="app.addAdmin()"><i
+                                    class="fa-solid fa-user-plus"></i> Add Admin</button>
                         </div>
-                        <div id="admin-list-container" style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div id="admin-list-container"
+                            style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <!-- Injected by JS -->
                         </div>
                     </div>
 
                     <!-- Auditor Role Section -->
-                    <div style="background:rgba(0,0,0,0.15); padding:1rem; border-radius:var(--radius-sm); border-left:3px solid #4CAF50;">
+                    <div
+                        style="background:rgba(0,0,0,0.15); padding:1rem; border-radius:var(--radius-sm); border-left:3px solid #4CAF50;">
                         <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
                             <i class="fa-solid fa-clipboard-check" style="color:#4CAF50"></i>
                             <strong>Auditors</strong>
-                            <span style="font-size:0.7rem; color:var(--text-secondary); margin-left:auto;">Can enter/edit audited YA data</span>
+                            <span style="font-size:0.7rem; color:var(--text-secondary); margin-left:auto;">Can
+                                enter/edit audited YA data</span>
                         </div>
-                        <div class="superadmin-only" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                            <input type="email" id="auditor-new-email" class="input-modern" placeholder="auditor@example.com" style="flex: 1; min-width: 200px;">
-                            <button class="btn btn-secondary" style="border-color:#4CAF50; color:#4CAF50;" onclick="app.addAuditor()"><i class="fa-solid fa-user-plus"></i> Add Auditor</button>
+                        <div class="superadmin-only"
+                            style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <input type="email" id="auditor-new-email" class="input-modern"
+                                placeholder="auditor@example.com" style="flex: 1; min-width: 200px;">
+                            <button class="btn btn-secondary" style="border-color:#4CAF50; color:#4CAF50;"
+                                onclick="app.addAuditor()"><i class="fa-solid fa-user-plus"></i> Add Auditor</button>
                         </div>
-                        <div id="auditor-list-container" style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div id="auditor-list-container"
+                            style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <!-- Injected by JS -->
                         </div>
                     </div>
@@ -420,26 +505,32 @@
 
                 <div class="glass-card" style="margin-bottom: 1.5rem;">
                     <h3>Business Database</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Search and manage business profiles.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Search and manage
+                        business profiles.</p>
                     <div style="margin-bottom: 1rem;">
-                        <input type="text" id="admin-biz-search" class="input-modern" placeholder="Search by business name or founder..." onkeyup="app.renderAdminBusinessList()">
+                        <input type="text" id="admin-biz-search" class="input-modern"
+                            placeholder="Search by business name or founder..." onkeyup="app.renderAdminBusinessList()">
                     </div>
-                    <div id="admin-biz-table-container" style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 1rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div id="admin-biz-table-container"
+                        style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 1rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
                         <!-- Injected by JS -->
                     </div>
                 </div>
 
                 <div class="glass-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
                         <h3 id="admin-form-title" style="margin:0;">Add New Business</h3>
                         <div>
-                            <button id="btn-admin-cancel-edit" class="btn btn-secondary hidden" onclick="app.loadAdminBizToEdit('')" title="Clear form">Clear Form & Create New</button>
+                            <button id="btn-admin-cancel-edit" class="btn btn-secondary hidden"
+                                onclick="app.loadAdminBizToEdit('')" title="Clear form">Clear Form & Create New</button>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Business Name</label>
-                            <input type="text" id="admin-biz-name" class="input-modern" placeholder="e.g. Earthly Goods">
+                            <input type="text" id="admin-biz-name" class="input-modern"
+                                placeholder="e.g. Earthly Goods">
                         </div>
                         <div class="form-group">
                             <label>Founder Name</label>
@@ -447,31 +538,38 @@
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Owner Email Address (For Portal Access)</label>
-                            <input type="email" id="admin-biz-owner-email" class="input-modern" placeholder="owner@business.com">
+                            <input type="email" id="admin-biz-owner-email" class="input-modern"
+                                placeholder="owner@business.com">
                         </div>
                         <div class="form-group">
                             <label>Contact Email</label>
-                            <input type="email" id="admin-biz-contact" class="input-modern" placeholder="hello@business.com">
+                            <input type="email" id="admin-biz-contact" class="input-modern"
+                                placeholder="hello@business.com">
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Website URL</label>
-                            <input type="url" id="admin-biz-website" class="input-modern" placeholder="https://example.com">
+                            <input type="url" id="admin-biz-website" class="input-modern"
+                                placeholder="https://example.com">
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Founder's Story</label>
-                            <textarea id="admin-biz-story" class="input-modern" rows="3" placeholder="Their conviction..."></textarea>
+                            <textarea id="admin-biz-story" class="input-modern" rows="3"
+                                placeholder="Their conviction..."></textarea>
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Location (Full Address for Google Maps)</label>
-                            <input type="text" id="admin-biz-location" class="input-modern" placeholder="e.g. 1600 Amphitheatre Pkwy, Mountain View, CA">
+                            <input type="text" id="admin-biz-location" class="input-modern"
+                                placeholder="e.g. 1600 Amphitheatre Pkwy, Mountain View, CA">
                         </div>
                         <div class="form-group">
                             <label>Shopfront Image URL</label>
-                            <input type="text" id="admin-biz-shopfront" class="input-modern" placeholder="https://example.com/shop.jpg">
+                            <input type="text" id="admin-biz-shopfront" class="input-modern"
+                                placeholder="https://example.com/shop.jpg">
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Founder Headshot URL</label>
-                            <input type="text" id="admin-biz-founder-img" class="input-modern" placeholder="https://example.com/founder.jpg">
+                            <input type="text" id="admin-biz-founder-img" class="input-modern"
+                                placeholder="https://example.com/founder.jpg">
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Membership Type</label>
@@ -481,28 +579,61 @@
                             </select>
                         </div>
                         <div class="form-group" id="score-section" style="grid-column: 1 / -1; display:none;">
-                            <label><i class="fa-solid fa-clipboard-check" style="color:#4CAF50"></i> TheBFG.Team Paradigm Score (A-D)</label>
-                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:0.5rem;"><i class="fa-solid fa-lock"></i> Auditor role required to edit scores.</p>
-                            <div class="score-inputs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem;">
-                                <select id="score-shareholder" class="input-modern"><option value="A">Shareholder: A</option><option value="B">Shareholder: B</option><option value="C">Shareholder: C</option><option value="D">Shareholder: D</option></select>
-                                <select id="score-employee" class="input-modern"><option value="A">Employee: A</option><option value="B">Employee: B</option><option value="C">Employee: C</option><option value="D">Employee: D</option></select>
-                                <select id="score-customer" class="input-modern"><option value="A">Customer: A</option><option value="B">Customer: B</option><option value="C">Customer: C</option><option value="D">Customer: D</option></select>
-                                <select id="score-society" class="input-modern"><option value="A">Society: A</option><option value="B">Society: B</option><option value="C">Society: C</option><option value="D">Society: D</option></select>
-                                <select id="score-env" class="input-modern"><option value="A">Environment: A</option><option value="B">Environment: B</option><option value="C">Environment: C</option><option value="D">Environment: D</option></select>
+                            <label><i class="fa-solid fa-clipboard-check" style="color:#4CAF50"></i> TheBFG.Team
+                                Paradigm Score (A-D)</label>
+                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:0.5rem;"><i
+                                    class="fa-solid fa-lock"></i> Auditor role required to edit scores.</p>
+                            <div class="score-inputs"
+                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem;">
+                                <select id="score-shareholder" class="input-modern">
+                                    <option value="A">Shareholder: A</option>
+                                    <option value="B">Shareholder: B</option>
+                                    <option value="C">Shareholder: C</option>
+                                    <option value="D">Shareholder: D</option>
+                                </select>
+                                <select id="score-employee" class="input-modern">
+                                    <option value="A">Employee: A</option>
+                                    <option value="B">Employee: B</option>
+                                    <option value="C">Employee: C</option>
+                                    <option value="D">Employee: D</option>
+                                </select>
+                                <select id="score-customer" class="input-modern">
+                                    <option value="A">Customer: A</option>
+                                    <option value="B">Customer: B</option>
+                                    <option value="C">Customer: C</option>
+                                    <option value="D">Customer: D</option>
+                                </select>
+                                <select id="score-society" class="input-modern">
+                                    <option value="A">Society: A</option>
+                                    <option value="B">Society: B</option>
+                                    <option value="C">Society: C</option>
+                                    <option value="D">Society: D</option>
+                                </select>
+                                <select id="score-env" class="input-modern">
+                                    <option value="A">Environment: A</option>
+                                    <option value="B">Environment: B</option>
+                                    <option value="C">Environment: C</option>
+                                    <option value="D">Environment: D</option>
+                                </select>
                             </div>
                         </div>
 
                         <!-- Yearly Assessment Data (Auditor-gated) -->
                         <div class="form-group" id="admin-ya-section" style="grid-column: 1 / -1; display:none;">
                             <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 0.5rem 0 1rem;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                                <label style="margin:0; font-weight:600;"><i class="fa-solid fa-clipboard-check" style="color:#4CAF50"></i> Yearly Assessment (YA) Data</label>
-                                <button type="button" class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="app.addAdminYARow()">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                                <label style="margin:0; font-weight:600;"><i class="fa-solid fa-clipboard-check"
+                                        style="color:#4CAF50"></i> Yearly Assessment (YA) Data</label>
+                                <button type="button" class="btn btn-secondary"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="app.addAdminYARow()">
                                     <i class="fa-solid fa-plus"></i> Add Year
                                 </button>
                             </div>
-                            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">Enter yearly figures for revenue, waste diverted, and trees planted.</p>
-                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:1rem;"><i class="fa-solid fa-lock"></i> Auditor role required to edit these fields.</p>
+                            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">Enter yearly
+                                figures for revenue, waste diverted, and trees planted.</p>
+                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:1rem;"><i
+                                    class="fa-solid fa-lock"></i> Auditor role required to edit these fields.</p>
                             <div id="admin-ya-rows" style="display:flex; flex-direction:column; gap:0.8rem;">
                                 <!-- JS injected YA rows -->
                             </div>
@@ -511,18 +642,21 @@
                         <!-- Expiry Management (Admin/SuperAdmin, edit mode only) -->
                         <div class="form-group" id="admin-expiry-section" style="grid-column: 1 / -1; display:none;">
                             <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 0.5rem 0 1rem;">
-                            <label style="font-weight:600;"><i class="fa-solid fa-ban" style="color:var(--text-warning)"></i> Business Status Management</label>
+                            <label style="font-weight:600;"><i class="fa-solid fa-ban"
+                                    style="color:var(--text-warning)"></i> Business Status Management</label>
                             <div style="margin-top:0.8rem; display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;">
                                 <div>
                                     <label style="font-size:0.75rem; color:var(--text-secondary);">Status</label>
-                                    <select id="admin-biz-status" class="input-modern" onchange="var e=this.value==='expired';document.getElementById('admin-expiry-fields').style.display=e?'block':'none';document.getElementById('admin-expiry-reason-container').style.display=e?'block':'none';">
+                                    <select id="admin-biz-status" class="input-modern"
+                                        onchange="var e=this.value==='expired';document.getElementById('admin-expiry-fields').style.display=e?'block':'none';document.getElementById('admin-expiry-reason-container').style.display=e?'block':'none';">
                                         <option value="active">✅ Active</option>
                                         <option value="expired">⛔ Expired</option>
                                     </select>
                                 </div>
                                 <div id="admin-expiry-fields" style="display:none;">
                                     <label style="font-size:0.75rem; color:var(--text-secondary);">Expiry Date</label>
-                                    <input type="date" id="admin-biz-expiry-date" class="input-modern" style="padding:0.5rem;">
+                                    <input type="date" id="admin-biz-expiry-date" class="input-modern"
+                                        style="padding:0.5rem;">
                                 </div>
                             </div>
                             <div id="admin-expiry-reason-container" style="margin-top:0.8rem; display:none;">
@@ -537,9 +671,12 @@
                         </div>
                     </div>
                     <button id="btn-add-biz" class="btn btn-primary btn-block mt-4" onclick="app.addBusiness()">
-                        <i class="fa-solid fa-plus" id="btn-add-biz-icon"></i> <span id="btn-add-biz-text">Add Business</span>
+                        <i class="fa-solid fa-plus" id="btn-add-biz-icon"></i> <span id="btn-add-biz-text">Add
+                            Business</span>
                     </button>
-                    <p id="admin-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Processing images, please wait...</p>
+                    <p id="admin-loading" class="hidden"
+                        style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i
+                            class="fa-solid fa-spinner fa-spin"></i> Processing images, please wait...</p>
                 </div>
             </section>
 
@@ -557,7 +694,7 @@
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                 </div>
-                
+
                 <div class="stats-grid">
                     <div class="stat-card glass-card feature-gradient">
                         <i class="fa-solid fa-location-dot stat-icon"></i>
@@ -584,16 +721,20 @@
                 </div>
                 <div class="glass-card mt-4">
                     <h3>Reconcile End-of-Day CSV</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Upload your POS export to verify pending transactions. Transactions will only be credited once approved.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Upload your POS
+                        export to verify pending transactions. Transactions will only be credited once approved.</p>
                     <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="file" id="reconcile-csv-upload" accept=".csv, .txt" class="input-modern" style="flex:1;">
-                        <button class="btn btn-primary" onclick="app.processReconciliationCSV()"><i class="fa-solid fa-file-csv"></i> Analyze</button>
+                        <input type="file" id="reconcile-csv-upload" accept=".csv, .txt" class="input-modern"
+                            style="flex:1;">
+                        <button class="btn btn-primary" onclick="app.processReconciliationCSV()"><i
+                                class="fa-solid fa-file-csv"></i> Analyze</button>
                     </div>
                     <div id="reconcile-results" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
                         <!-- Results injected here -->
                     </div>
                     <div id="reconcile-actions" class="hidden mt-3" style="text-align: right;">
-                        <button class="btn btn-secondary" onclick="app.finalizeReconciliation()">Finalize Approved Matches</button>
+                        <button class="btn btn-secondary" onclick="app.finalizeReconciliation()">Finalize Approved
+                            Matches</button>
                     </div>
                 </div>
             </section>
@@ -607,7 +748,7 @@
                     <h1>Edit Profile</h1>
                     <p>Update your public network presence</p>
                 </div>
-                
+
                 <div class="glass-card">
                     <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
                         <div class="form-group">
@@ -628,7 +769,8 @@
                         </div>
                         <div class="form-group">
                             <label>Website URL</label>
-                            <input type="url" id="edit-biz-website" class="input-modern" placeholder="https://example.com">
+                            <input type="url" id="edit-biz-website" class="input-modern"
+                                placeholder="https://example.com">
                         </div>
                         <div class="form-group">
                             <label>Location (Address)</label>
@@ -636,56 +778,71 @@
                         </div>
 
                         <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
-                        
+
                         <div class="form-group">
                             <label>ISO53001 Social Impact</label>
-                            <textarea id="edit-biz-impact" class="input-modern" rows="3" placeholder="Briefly summarize the social/environmental impact verified offline."></textarea>
+                            <textarea id="edit-biz-impact" class="input-modern" rows="3"
+                                placeholder="Briefly summarize the social/environmental impact verified offline."></textarea>
                         </div>
                         <div style="display:flex; gap:1rem;">
                             <div class="form-group" style="flex:1;">
-                                <label>Waste Diverted (kg) <span style="font-size:0.7rem; color:var(--text-secondary);">(Legacy)</span></label>
-                                <input type="number" id="edit-biz-impact-waste" class="input-modern" placeholder="e.g. 150">
+                                <label>Waste Diverted (kg) <span
+                                        style="font-size:0.7rem; color:var(--text-secondary);">(Legacy)</span></label>
+                                <input type="number" id="edit-biz-impact-waste" class="input-modern"
+                                    placeholder="e.g. 150">
                             </div>
                             <div class="form-group" style="flex:1;">
                                 <label>Ethical Jobs</label>
-                                <input type="number" id="edit-biz-impact-jobs" class="input-modern" placeholder="e.g. 5">
+                                <input type="number" id="edit-biz-impact-jobs" class="input-modern"
+                                    placeholder="e.g. 5">
                             </div>
                         </div>
 
                         <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
-                        
+
                         <!-- Yearly Assessment Data (Business Portal - Auditor-gated) -->
                         <div class="form-group" id="edit-ya-section" style="display:none;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                                <label style="margin:0; font-weight:600;"><i class="fa-solid fa-clipboard-check" style="color:#4CAF50"></i> Yearly Assessment (YA) Data</label>
-                                <button type="button" class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="app.addEditYARow()">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                                <label style="margin:0; font-weight:600;"><i class="fa-solid fa-clipboard-check"
+                                        style="color:#4CAF50"></i> Yearly Assessment (YA) Data</label>
+                                <button type="button" class="btn btn-secondary"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="app.addEditYARow()">
                                     <i class="fa-solid fa-plus"></i> Add Year
                                 </button>
                             </div>
-                            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">Enter yearly revenue, waste diverted, and trees planted figures.</p>
-                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:1rem;"><i class="fa-solid fa-lock"></i> Auditor role required to edit these fields.</p>
+                            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">Enter yearly
+                                revenue, waste diverted, and trees planted figures.</p>
+                            <p style="font-size:0.7rem; color:#81C784; margin-bottom:1rem;"><i
+                                    class="fa-solid fa-lock"></i> Auditor role required to edit these fields.</p>
                             <div id="edit-ya-rows" style="display:flex; flex-direction:column; gap:0.8rem;">
                                 <!-- JS injected YA rows for business portal -->
                             </div>
                         </div>
-                        
+
                         <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 1rem 0;">
-                        
+
                         <div class="form-group">
                             <label>Update Shopfront Image URL</label>
-                            <input type="text" id="edit-biz-shopfront" class="input-modern" placeholder="https://example.com/shop.jpg">
-                            <small style="color:var(--text-secondary)">Link to an image on your website or social media.</small>
+                            <input type="text" id="edit-biz-shopfront" class="input-modern"
+                                placeholder="https://example.com/shop.jpg">
+                            <small style="color:var(--text-secondary)">Link to an image on your website or social
+                                media.</small>
                         </div>
                         <div class="form-group">
                             <label>Intro Video URL (YouTube/Vimeo)</label>
-                            <input type="text" id="edit-biz-video" class="input-modern" placeholder="e.g. https://www.youtube.com/watch?v=...">
+                            <input type="text" id="edit-biz-video" class="input-modern"
+                                placeholder="e.g. https://www.youtube.com/watch?v=...">
                             <small style="color:var(--text-secondary)">Paste a link to your public video.</small>
                         </div>
                     </div>
-                    <button id="btn-save-biz-profile" class="btn btn-primary btn-block mt-4" onclick="app.saveBusinessProfile()">
+                    <button id="btn-save-biz-profile" class="btn btn-primary btn-block mt-4"
+                        onclick="app.saveBusinessProfile()">
                         <i class="fa-solid fa-floppy-disk"></i> Save Profile
                     </button>
-                    <p id="edit-biz-loading" class="hidden" style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i class="fa-solid fa-spinner fa-spin"></i> Processing image & saving profile...</p>
+                    <p id="edit-biz-loading" class="hidden"
+                        style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i
+                            class="fa-solid fa-spinner fa-spin"></i> Processing image & saving profile...</p>
                 </div>
             </section>
 
@@ -694,13 +851,15 @@
                 <button class="back-btn" onclick="app.navigate('admin')">
                     <i class="fa-solid fa-arrow-left"></i> Back to Admin Portal
                 </button>
-                <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+                <div class="page-header"
+                    style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
                     <div>
                         <h1><i class="fa-solid fa-table-columns" style="color:#4CAF50"></i> Business Spreadsheet</h1>
                         <p>Super Admin — Complete business registry</p>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn btn-secondary" onclick="app.exportSpreadsheetCSV()" title="Export as CSV" style="border-color:#4CAF50; color:#4CAF50;">
+                        <button class="btn btn-secondary" onclick="app.exportSpreadsheetCSV()" title="Export as CSV"
+                            style="border-color:#4CAF50; color:#4CAF50;">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
                         </button>
                     </div>
@@ -710,17 +869,21 @@
                 <div class="glass-card" style="margin-bottom:1rem;">
                     <div style="display:flex; gap:0.8rem; flex-wrap:wrap; align-items:center;">
                         <div style="flex:1; min-width:200px;">
-                            <input type="text" id="sheet-search" class="input-modern" placeholder="Search by name, founder, email, location..." oninput="app.renderSpreadsheet()" style="width:100%;">
+                            <input type="text" id="sheet-search" class="input-modern"
+                                placeholder="Search by name, founder, email, location..."
+                                oninput="app.renderSpreadsheet()" style="width:100%;">
                         </div>
                         <div>
-                            <select id="sheet-type-filter" class="input-modern" onchange="app.renderSpreadsheet()" style="min-width:160px;">
+                            <select id="sheet-type-filter" class="input-modern" onchange="app.renderSpreadsheet()"
+                                style="min-width:160px;">
                                 <option value="all">All Types</option>
                                 <option value="full">Full Members</option>
                                 <option value="affiliate">Affiliates</option>
                             </select>
                         </div>
                         <div>
-                            <select id="sheet-score-filter" class="input-modern" onchange="app.renderSpreadsheet()" style="min-width:160px;">
+                            <select id="sheet-score-filter" class="input-modern" onchange="app.renderSpreadsheet()"
+                                style="min-width:160px;">
                                 <option value="all">All Scores</option>
                                 <option value="A">Has any A</option>
                                 <option value="B">Has any B</option>
@@ -731,12 +894,18 @@
                     </div>
                     <div style="margin-top:0.8rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                         <span style="font-size:0.8rem; color:var(--text-secondary);">Show columns:</span>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="contact" onchange="app.renderSpreadsheet()" checked> Contact</label>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="location" onchange="app.renderSpreadsheet()" checked> Location</label>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="website" onchange="app.renderSpreadsheet()"> Website</label>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="impact" onchange="app.renderSpreadsheet()"> Impact</label>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="ya" onchange="app.renderSpreadsheet()"> YA Data</label>
-                        <label class="sheet-col-toggle"><input type="checkbox" value="activity" onchange="app.renderSpreadsheet()" checked> Activity</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="contact"
+                                onchange="app.renderSpreadsheet()" checked> Contact</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="location"
+                                onchange="app.renderSpreadsheet()" checked> Location</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="website"
+                                onchange="app.renderSpreadsheet()"> Website</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="impact"
+                                onchange="app.renderSpreadsheet()"> Impact</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="ya"
+                                onchange="app.renderSpreadsheet()"> YA Data</label>
+                        <label class="sheet-col-toggle"><input type="checkbox" value="activity"
+                                onchange="app.renderSpreadsheet()" checked> Activity</label>
                     </div>
                     <div style="margin-top:0.5rem;">
                         <span id="sheet-count" style="font-size:0.8rem; color:var(--text-secondary);"></span>
@@ -755,24 +924,33 @@
             <section id="view-about" class="view hidden">
                 <div class="page-header">
                     <h1>About TheBFG.Team</h1>
-                    <p>A private commercial network connecting socially conscious consumers with empathetic businesses.</p>
+                    <p>A private commercial network connecting socially conscious consumers with empathetic businesses.
+                    </p>
                 </div>
-                
+
                 <div class="glass-card detail-section">
                     <h3>The Grading Paradigms</h3>
-                    <p style="margin-bottom: 1rem;">Businesses are scored across 5 core paradigms. Each paradigm receives a grade between A and D. Grade A highlights paradigm-defining leadership. If you do not see a business in this network, it could be that we are not aware of them, or they are embarassed for scoring a D for exploitative practices.</p>
+                    <p style="margin-bottom: 1rem;">Businesses are scored across 5 core paradigms. Each paradigm
+                        receives a grade between A and D. Grade A highlights paradigm-defining leadership. If you do not
+                        see a business in this network, it could be that we are not aware of them, or they are
+                        embarassed for scoring a D for exploitative practices.</p>
                     <ul style="color: var(--text-secondary); margin-left: 1.5rem; line-height: 1.6;">
                         <li><strong>Shareholder:</strong> Balances short term survival and achieving the vision.</li>
-                        <li><strong>Employee:</strong> Treating employees like co-owners, just in a different capacity.</li>
+                        <li><strong>Employee:</strong> Treating employees like co-owners, just in a different capacity.
+                        </li>
                         <li><strong>Customer:</strong> Treats customers like co-partners, driving the same vision.</li>
-                        <li><strong>Society:</strong> Treats society like co-collaborators. Balanced giving and taking.</li>
-                        <li><strong>Natural Environment:</strong> Nurtures the Earth and everything non-human, just like how they nurtured humans.</li>
+                        <li><strong>Society:</strong> Treats society like co-collaborators. Balanced giving and taking.
+                        </li>
+                        <li><strong>Natural Environment:</strong> Nurtures the Earth and everything non-human, just like
+                            how they nurtured humans.</li>
                     </ul>
                 </div>
 
                 <div class="glass-card detail-section mt-4">
                     <h3>How checking-in works</h3>
-                    <p>By scanning a QR code at a partner business, you record your support for their humanistic practices. If you made a purchase, you can log it to further help the network quantify the impact of empathetic commerce.</p>
+                    <p>By scanning a QR code at a partner business, you record your support for their humanistic
+                        practices. If you made a purchase, you can log it to further help the network quantify the
+                        impact of empathetic commerce.</p>
                 </div>
             </section>
 
@@ -795,7 +973,7 @@
                             <i class="fa-solid fa-receipt"></i> Log a Purchase
                         </button>
                     </div>
-                    
+
                     <div class="purchase-form hidden" id="purchase-form">
                         <div class="form-group">
                             <label>Receipt Number</label>
@@ -811,13 +989,16 @@
                     </div>
                 </div>
             </div>
-            
-            <div class="modal-content glass-card hidden" id="modal-success-content" style="text-align: center; padding: 2rem;">
+
+            <div class="modal-content glass-card hidden" id="modal-success-content"
+                style="text-align: center; padding: 2rem;">
                 <div class="success-animation">
-                    <i class="fa-solid fa-circle-check" style="font-size: 4rem; color: var(--accent-success); margin-bottom: 1rem;"></i>
+                    <i class="fa-solid fa-circle-check"
+                        style="font-size: 4rem; color: var(--accent-success); margin-bottom: 1rem;"></i>
                 </div>
                 <h2>Success!</h2>
-                <p id="success-message" style="margin-top: 0.5rem; margin-bottom: 1.5rem;">Your transaction was recorded.</p>
+                <p id="success-message" style="margin-top: 0.5rem; margin-bottom: 1.5rem;">Your transaction was
+                    recorded.</p>
             </div>
         </div>
 
@@ -825,10 +1006,13 @@
             <div class="modal-content glass-card">
                 <div class="modal-header">
                     <h2>Verify Your Email</h2>
-                    <button class="close-btn" onclick="document.getElementById('action-modal-verify').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+                    <button class="close-btn"
+                        onclick="document.getElementById('action-modal-verify').classList.add('hidden')"><i
+                            class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="modal-body" style="text-align: center;">
-                    <i class="fa-solid fa-envelope-open-text" style="font-size: 3rem; color: var(--accent-primary); margin: 1rem 0;"></i>
+                    <i class="fa-solid fa-envelope-open-text"
+                        style="font-size: 3rem; color: var(--accent-primary); margin: 1rem 0;"></i>
                     <p>We'll send a secure verification link to your inbox.</p>
                     <button class="btn btn-primary btn-block mt-4" onclick="app.sendRealEmailVerification()">
                         Send Verification Link
@@ -860,4 +1044,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
