@@ -358,8 +358,15 @@ const app = {
         document.getElementById('stat-global-checkins').innerText = MOCK_STATS.checkins.toLocaleString();
         document.getElementById('stat-global-purchases').innerText = MOCK_STATS.purchases.toLocaleString();
 
-        document.getElementById('stat-personal-checkins').innerText = MOCK_USER.checkins.toLocaleString();
-        document.getElementById('stat-personal-purchases').innerText = MOCK_USER.purchases.toLocaleString();
+        // National business penetration baseline (1.2M businesses in Malaysia)
+        const TOTAL_MY_BUSINESSES = 1200000;
+        const penetration = (MOCK_STATS.businesses / TOTAL_MY_BUSINESSES) * 100;
+        document.getElementById('stat-global-penetration').innerText = penetration.toFixed(4) + '%';
+
+        if (MOCK_USER) {
+            document.getElementById('stat-personal-checkins').innerText = MOCK_USER.checkins.toLocaleString();
+            document.getElementById('stat-personal-purchases').innerText = MOCK_USER.purchases.toLocaleString();
+        }
     },
 
     renderBusinessList() {
