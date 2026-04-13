@@ -513,7 +513,7 @@ const app = {
                         <i class="fa-solid fa-circle-info"></i> Affiliate Member
                     </div>
                     <div style="font-size:1rem; color:rgba(255,255,255,0.8); line-height: 1.5; font-style: italic;">
-                        "Affiliates support our Purpose and have been visited by the team. They have yet to apply to become a full member and receive their score."
+                        "Affiliates support our Purpose and have been visited by the team. They have yet to apply to become a full member and receive their score. Persuade them to join by giving them check-ins!"
                     </div>
                 </div>`;
             } else {
@@ -2554,14 +2554,19 @@ const app = {
             return;
         }
 
-        // Sort: Active first, then by recency (updatedAt)
+        // Sort: Active first, then by chronological end date (most recent end first)
         const sortedList = [...PLATFORM_INITIATIVES].sort((a, b) => {
             if (a.status === 'active' && b.status !== 'active') return -1;
             if (a.status !== 'active' && b.status === 'active') return 1;
-            // secondary sort by date
-            const dateA = new Date(a.updatedAt || 0);
-            const dateB = new Date(b.updatedAt || 0);
-            return dateB - dateA;
+            
+            // Handle dates (treat blank endDate as far future/Present)
+            const dateA = a.endDate ? new Date(a.endDate) : new Date('9999-12');
+            const dateB = b.endDate ? new Date(b.endDate) : new Date('9999-12');
+            
+            if (dateA > dateB) return -1;
+            if (dateA < dateB) return 1;
+            
+            return (a.title || "").localeCompare(b.title || "");
         });
 
         // Helper to format 'YYYY-MM' to 'Feb 2025'
@@ -2611,10 +2616,14 @@ const app = {
                 if (a.status === 'active' && b.status !== 'active') return -1;
                 if (a.status !== 'active' && b.status === 'active') return 1;
                 
-                // Priority 2: Newest updates first within the same status
-                const dateA = new Date(a.updatedAt || 0);
-                const dateB = new Date(b.updatedAt || 0);
-                return dateB - dateA;
+                // Priority 2: Chronological (most recent end date first)
+                const dateA = a.endDate ? new Date(a.endDate) : new Date('9999-12');
+                const dateB = b.endDate ? new Date(b.endDate) : new Date('9999-12');
+                
+                if (dateA > dateB) return -1;
+                if (dateA < dateB) return 1;
+
+                return (a.title || "").localeCompare(b.title || "");
             });
 
         if (activeList.length === 0) {
