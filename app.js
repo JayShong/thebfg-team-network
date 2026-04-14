@@ -88,9 +88,45 @@ let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
 let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
 let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
 const SUPER_ADMIN_EMAIL = 'jayshong@gmail.com';
-let PLATFORM_INITIATIVES = [];
+let PLATFORM_INITIATIVES = JSON.parse(localStorage.getItem('bfg_initiatives')) || [];
+let PLATFORM_PRIVILEGES = JSON.parse(localStorage.getItem('bfg_privileges')) || [];
 let MOCK_ADMINS = ['jayshong@gmail.com'];
 let MOCK_AUDITORS = ['jayshong@gmail.com'];
+
+const BADGES_CONFIG = [
+    { 
+        id: 'habit_first_step', title: 'The First Step', category: 'Habit', icon: 'fa-shoe-prints', 
+        description: 'Recorded your very first choice of empathy.',
+        why: 'Every journey begins with a single choice. We want to celebrate the exact moment you deliberately chose the empathy economy.',
+        how: 'Automatically earned the first time you scan and check-in to any verified Conviction Network business.',
+        actionText: 'Scan QR to Check-in',
+        actionTarget: 'scanner'
+    },
+    { 
+        id: 'discovery_explorer', title: 'The Explorer', category: 'Discovery', icon: 'fa-compass', 
+        description: 'Checked into 3 unique for-good businesses.',
+        why: 'True support means stepping out of your comfort zone. This badge exists to encourage discovering new paradigms across the city.',
+        how: 'Earned by checking in at 3 completely different business profiles on the Conviction Network.',
+        actionText: 'Find New Businesses',
+        actionTarget: 'directory'
+    },
+    { 
+        id: 'habit_consummate', title: 'Consummate Supporter', category: 'Habit', icon: 'fa-basket-shopping', 
+        description: 'Recorded 10 separate purchases.',
+        why: 'Good intentions are great, but monetary flow sustains the empathy economy. This badge honors true believers who habitually vote with their wallet.',
+        how: 'Earned by logging 10 valid purchase receipts across any Conviction Network business.',
+        actionText: 'Scan QR for Receipt',
+        actionTarget: 'scanner'
+    },
+    { 
+        id: 'community_builder', title: 'Community Builder', category: 'Community', icon: 'fa-people-group', 
+        description: 'Helped build the community.',
+        why: 'The Conviction Network is only as strong as its nodes. This badge is reserved for those who actively expand the reach of empathetic commerce.',
+        how: 'Earned by successfully referring a friend or executing a Group Check-in.',
+        actionText: 'Explore Directory',
+        actionTarget: 'directory'
+    }
+];
 
 // --- App State & Logic ---
 
@@ -121,7 +157,9 @@ const app = {
                                 isEmailVerified: user.emailVerified,
                                 checkins: 0,
                                 purchases: 0,
-                                isAdmin: false
+                                isAdmin: false,
+                                badges: {},
+                                visitedBizIds: []
                             };
                             await db.collection('users').doc(user.uid).set(MOCK_USER);
                         }
@@ -137,6 +175,7 @@ const app = {
                     this.renderStats();
                     this.renderBusinessList();
                     this.renderInitiatives();
+                    this.renderPrivileges();
                     this.populateProfile();
                     this.navigate('dashboard');
                 } else {
@@ -164,6 +203,7 @@ const app = {
             this.renderStats();
             this.renderBusinessList();
             this.renderInitiatives();
+            this.renderPrivileges();
             this.populateProfile();
         }
 
@@ -226,7 +266,7 @@ const app = {
                     // Seed Eat2Give Default Initiative if DB is completely empty.
                     const initial = {
                         title: 'Eat2Give',
-                        narrative: 'Eat2Give partnered with local restaurants to donate RM5 per meal directly to The Society for the Severely Mentally Handicapped (SSMH) in Malaysia, allowing our network to effortlessly support great causes.',
+                        narrative: 'Eat2Give partnered with local restaurants to donate RM5 per meal directly to The Society for the Severely Mentally Handicapped (SSMH) in Malaysia, allowing our Conviction Network to effortlessly support great causes.',
                         mechanism: 'Order participating items from partnered menus.\nProve it by scanning the Eat2Give badge in the CheckD Wallet.\nThe Merchant Donates RM5 directly to charity without costing the user extra!',
                         url: 'https://www.checkd.io/eat2give',
                         status: 'past',
@@ -236,6 +276,30 @@ const app = {
                     initial.id = docRef.id;
                     PLATFORM_INITIATIVES.push(initial);
                 }
+
+                // Fetch privileges
+                const privSnapshot = await db.collection('privileges').get();
+                if (!privSnapshot.empty) {
+                    PLATFORM_PRIVILEGES = [];
+                    privSnapshot.forEach(doc => {
+                        let data = doc.data();
+                        data.id = doc.id;
+                        PLATFORM_PRIVILEGES.push(data);
+                    });
+                } else if (MOCK_USER && MOCK_USER.isSuperAdmin) {
+                    // Seed a default privilege
+                    const initialPriv = {
+                        title: 'Early Access',
+                        description: 'Be the first to join upcoming initiatives and special community events.',
+                        requiredTier: 'Silver',
+                        status: 'active',
+                        icon: 'fa-star'
+                    };
+                    const docRef = await db.collection('privileges').add(initialPriv);
+                    initialPriv.id = docRef.id;
+                    PLATFORM_PRIVILEGES.push(initialPriv);
+                }
+
 
                 if(MOCK_USER && MOCK_USER.email) {
                     MOCK_USER.isSuperAdmin = MOCK_USER.email === SUPER_ADMIN_EMAIL;
@@ -259,6 +323,7 @@ const app = {
         this.renderStats();
         this.renderBusinessList();
         this.renderInitiatives();
+        this.renderPrivileges();
         this.populateProfile();
         
         if (this.currentView === 'business-dashboard') {
@@ -274,6 +339,7 @@ const app = {
         localStorage.setItem('bfg_stats', JSON.stringify(MOCK_STATS));
         localStorage.setItem('bfg_businesses', JSON.stringify(MOCK_BUSINESSES));
         localStorage.setItem('bfg_initiatives', JSON.stringify(PLATFORM_INITIATIVES));
+        localStorage.setItem('bfg_privileges', JSON.stringify(PLATFORM_PRIVILEGES));
 
         // Push user to cloud
         if(db && MOCK_USER && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -357,7 +423,7 @@ const app = {
                 err.classList.remove('hidden');
             }
             btn.disabled = false;
-            btn.innerText = 'Join the Network / Login';
+            btn.innerText = 'Join the Conviction Network / Login';
         } else {
             this.showToast("Auth module not loaded!");
         }
@@ -391,7 +457,7 @@ const app = {
         // DOSM Nominal GDP for Malaysia 2023 (~RM 1.82 Trillion)
         const NOMINAL_GDP_MY_RM = 1820000000000;
         
-        let totalNetworkRevenue = 0;
+        let totalConvictionNetworkRevenue = 0;
         MOCK_BUSINESSES.forEach(biz => {
             if (biz.status !== 'expired' && biz.yearlyAssessments) {
                 let latestRev = 0;
@@ -401,17 +467,233 @@ const app = {
                         if (!isNaN(rev)) latestRev = Math.max(latestRev, rev);
                     }
                 });
-                totalNetworkRevenue += latestRev;
+                totalConvictionNetworkRevenue += latestRev;
             }
         });
 
-        const penetration = (totalNetworkRevenue / NOMINAL_GDP_MY_RM) * 100;
+        const penetration = (totalConvictionNetworkRevenue / NOMINAL_GDP_MY_RM) * 100;
         document.getElementById('stat-global-penetration').innerText = penetration.toFixed(10) + '%';
 
         if (MOCK_USER) {
             document.getElementById('stat-personal-checkins').innerText = MOCK_USER.checkins.toLocaleString();
             document.getElementById('stat-personal-purchases').innerText = MOCK_USER.purchases.toLocaleString();
         }
+    },
+
+    evaluateBadges(user) {
+        if (!user || (!user.checkins && !user.purchases && (!user.badges || Object.keys(user.badges).length === 0))) return;
+
+        if (!user.badges) user.badges = {};
+        if (!user.visitedBizIds) user.visitedBizIds = [];
+
+        let newlyUnlocked = [];
+
+        const checkUnlock = (id, condition) => {
+            if (!user.badges[id]?.unlocked && condition) {
+                user.badges[id] = { unlocked: true, date: new Date().toISOString() };
+                newlyUnlocked.push(BADGES_CONFIG.find(b => b.id === id));
+            }
+        };
+
+        const totalActivities = (user.checkins || 0) + (user.purchases || 0);
+
+        // Badge 1: The First Step
+        checkUnlock('habit_first_step', totalActivities >= 1);
+
+        // Badge 2: The Explorer
+        checkUnlock('discovery_explorer', user.visitedBizIds.length >= 3);
+
+        // Badge 3: Consummate Supporter
+        checkUnlock('habit_consummate', (user.purchases || 0) >= 10);
+
+        // Badge 4: Community Builder is triggered via explicit admin/referral action.
+
+        if (newlyUnlocked.length > 0) {
+            newlyUnlocked.forEach(b => {
+                this.showToast(`🏆 You unlocked a badge: ${b.title}!`);
+            });
+            this.saveData();
+            if (this.currentView === 'privileges') this.renderPrivileges();
+        }
+    },
+
+    getUserTier(user) {
+        if (!user || (!user.badges && !user.checkins)) return { name: 'Blue', badgeCount: 0, nextThreshold: 2, progress: 0, isMax: false };
+        
+        const unlockedCount = user.badges ? Object.values(user.badges).filter(b => b.unlocked).length : 0;
+        
+        let name = 'Blue';
+        let baseCount = 0;
+        let nextThreshold = 2;
+        let isMax = false;
+
+        if (unlockedCount >= 4) {
+            name = 'Platinum';
+            baseCount = 4;
+            nextThreshold = 4;
+            isMax = true;
+        } else if (unlockedCount >= 3) {
+            name = 'Gold';
+            baseCount = 3;
+            nextThreshold = 4;
+        } else if (unlockedCount >= 2) {
+            name = 'Silver';
+            baseCount = 2;
+            nextThreshold = 3;
+        }
+
+        let progress = isMax ? 100 : ((unlockedCount - baseCount) / (nextThreshold - baseCount)) * 100;
+        return { name, badgeCount: unlockedCount, nextThreshold, progress, isMax, totalNext: nextThreshold };
+    },
+
+    renderPrivileges() {
+        const listContainer = document.getElementById('privileges-list-container');
+        const tierCardContainer = document.getElementById('privileges-tier-card');
+        const badgeGalleryContainer = document.getElementById('badge-gallery-container');
+        
+        if (!listContainer || !tierCardContainer || !badgeGalleryContainer) return;
+
+        const tierInfo = this.getUserTier(MOCK_USER);
+        const tName = tierInfo.name.toLowerCase();
+        
+        // Update Showcase Card
+        tierCardContainer.className = `glass-card tier-card tier-${tName}`;
+        let ptsText = tierInfo.isMax ? `${tierInfo.badgeCount} Badges Unlocked` : `${tierInfo.badgeCount} / ${tierInfo.totalNext} Badges`;
+        
+        let targetTierName = 'Silver';
+        if (tierInfo.nextThreshold === 4 && tierInfo.badgeCount === 3) targetTierName = 'Platinum';
+        else if (tierInfo.nextThreshold === 4 && tierInfo.badgeCount < 3) targetTierName = 'Gold';
+
+        let msgText = tierInfo.isMax ? `You have reached the highest tier!` : `Unlock ${tierInfo.totalNext - tierInfo.badgeCount} more badges to reach ${targetTierName}`;
+
+        tierCardContainer.innerHTML = `
+            <div style="position: relative; z-index: 2;">
+                <p style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem; opacity: 0.8;">Current Tier</p>
+                <h2>${tierInfo.name} Status</h2>
+                <div style="font-size: 1.5rem; font-weight: bold; margin: 1rem 0;">
+                    <i class="fa-solid fa-gem"></i>
+                </div>
+                <p style="font-weight: 500;">${ptsText}</p>
+                <div class="tier-progress-bg">
+                    <div class="tier-progress-fill" style="width: ${tierInfo.progress}%;"></div>
+                </div>
+                <p style="font-size: 0.8rem; margin-top: 0.8rem; opacity: 0.9;">${msgText}</p>
+            </div>
+        `;
+
+        // Render Badge Gallery
+        badgeGalleryContainer.innerHTML = '';
+        BADGES_CONFIG.forEach(b => {
+            const isUnlocked = MOCK_USER.badges && MOCK_USER.badges[b.id] && MOCK_USER.badges[b.id].unlocked;
+            const stateClass = isUnlocked ? 'unlocked' : 'locked';
+            
+            badgeGalleryContainer.innerHTML += `
+                <div class="badge-item ${stateClass}" style="cursor: pointer;" onclick="app.openBadgeModal('${b.id}')" title="${b.title}">
+                    <div class="badge-icon-container">
+                        <i class="fa-solid ${b.icon}"></i>
+                    </div>
+                    <h4>${b.title}</h4>
+                    <p>${b.category} Badge</p>
+                </div>
+            `;
+        });
+
+        // Render Rewards List
+        listContainer.innerHTML = '';
+        const tierOrder = { 'Blue': 1, 'Silver': 2, 'Gold': 3, 'Platinum': 4 };
+        const userTierLevel = tierOrder[tierInfo.name] || 1;
+
+        const activePrivs = PLATFORM_PRIVILEGES.filter(p => p.status !== 'hidden').sort((a, b) => {
+            const ta = tierOrder[a.requiredTier] || 0;
+            const tb = tierOrder[b.requiredTier] || 0;
+            return ta - tb;
+        });
+
+        if (activePrivs.length === 0) {
+            listContainer.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:2rem;">No privileges available at the moment. Keep building your momentum!</p>';
+            return;
+        }
+
+        activePrivs.forEach(priv => {
+            const reqLevel = tierOrder[priv.requiredTier] || 1;
+            const isUnlocked = userTierLevel >= reqLevel;
+            const lockClass = isUnlocked ? '' : 'locked';
+            
+            let tierColorText = 'var(--text-secondary)';
+            if (priv.requiredTier === 'Silver') tierColorText = '#c0c0c0';
+            if (priv.requiredTier === 'Gold') tierColorText = '#ffd700';
+            if (priv.requiredTier === 'Platinum') tierColorText = '#E5E4E2';
+
+            listContainer.innerHTML += `
+                <div class="privilege-card ${lockClass}">
+                    <div class="privilege-icon">
+                        <i class="fa-solid ${priv.icon || 'fa-star'}" style="color: ${isUnlocked ? tierColorText : 'inherit'};"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="margin: 0; font-size: 1.1rem;">${priv.title}</h4>
+                            ${isUnlocked ? '<span style="font-size: 0.7rem; color: var(--accent-success); border: 1px solid var(--accent-success); padding: 0.2rem 0.5rem; border-radius: 1rem;"><i class="fa-solid fa-unlock"></i> Unlocked</span>' : `<span style="font-size: 0.7rem; color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.2); padding: 0.2rem 0.5rem; border-radius: 1rem;"><i class="fa-solid fa-lock"></i> Requires ${priv.requiredTier}</span>`}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem; line-height: 1.4;">
+                            ${priv.description}
+                        </p>
+                    </div>
+                </div>
+            `;
+        });
+    },
+
+    openBadgeModal(badgeId) {
+        const b = BADGES_CONFIG.find(x => x.id === badgeId);
+        if(!b) return;
+
+        document.getElementById('badge-modal-title').innerText = b.title;
+        document.getElementById('badge-modal-category').innerText = b.category + ' Badge';
+        document.getElementById('badge-modal-icon').className = 'fa-solid ' + b.icon;
+        document.getElementById('badge-modal-description').innerText = b.description;
+        document.getElementById('badge-modal-why').innerText = b.why || 'Exploration pending.';
+        document.getElementById('badge-modal-how').innerText = b.how || 'Details to be revealed.';
+
+        const isUnlocked = MOCK_USER && MOCK_USER.badges && MOCK_USER.badges[b.id] && MOCK_USER.badges[b.id].unlocked;
+        
+        const iContainer = document.getElementById('badge-modal-icon-container');
+        const actionContainer = document.getElementById('badge-modal-action-container');
+        const actionBtn = document.getElementById('badge-modal-action-btn');
+
+        if (isUnlocked) {
+            iContainer.style.background = 'linear-gradient(135deg, var(--accent-primary), #FF8C00)';
+            iContainer.style.color = '#FFF';
+            iContainer.style.borderColor = '#FFD700';
+            
+            document.getElementById('badge-modal-acquired-container').style.display = 'block';
+            actionContainer.style.display = 'none';
+
+            const dateStr = MOCK_USER.badges[b.id].date;
+            document.getElementById('badge-modal-date').innerText = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
+        } else {
+            iContainer.style.background = 'rgba(0,0,0,0.5)';
+            iContainer.style.color = 'var(--text-secondary)';
+            iContainer.style.borderColor = 'rgba(255,255,255,0.1)';
+            
+            document.getElementById('badge-modal-acquired-container').style.display = 'none';
+            
+            if (b.actionText && b.actionTarget) {
+                actionContainer.style.display = 'block';
+                actionBtn.innerText = b.actionText;
+                actionBtn.onclick = () => {
+                    this.closeBadgeModal();
+                    this.navigate(b.actionTarget);
+                };
+            } else {
+                actionContainer.style.display = 'none';
+            }
+        }
+
+        document.getElementById('badge-modal').classList.remove('hidden');
+    },
+
+    closeBadgeModal() {
+        document.getElementById('badge-modal').classList.add('hidden');
     },
 
     renderBusinessList() {
@@ -1131,6 +1413,11 @@ const app = {
         MOCK_USER.checkins++;
 
         if (this.scannedBusiness) {
+            if (!MOCK_USER.visitedBizIds) MOCK_USER.visitedBizIds = [];
+            if (!MOCK_USER.visitedBizIds.includes(this.scannedBusiness.id)) {
+                MOCK_USER.visitedBizIds.push(this.scannedBusiness.id);
+            }
+
             this.scannedBusiness.checkinsCount = (this.scannedBusiness.checkinsCount || 0) + 1;
             if (db) {
                 try {
@@ -1148,6 +1435,7 @@ const app = {
 
         this.saveData();
         this.renderStats();
+        this.evaluateBadges(MOCK_USER);
         
         this.showSuccessModal(`Successfully checked in to ${this.scannedBusiness.name}!`);
     },
@@ -1187,13 +1475,16 @@ const app = {
             }
         }
 
-        this.saveData();
-        this.renderStats();
-        
-        // Reset inputs
         document.getElementById('receipt-input').value = '';
         document.getElementById('amount-input').value = '';
         
+        // This simulates an approved purchase directly for the sake of the hackathon/demo
+        MOCK_USER.purchases++;
+        MOCK_STATS.purchases++;
+        this.saveData();
+        this.renderStats();
+        this.evaluateBadges(MOCK_USER);
+
         this.showSuccessModal(`Logged purchase of $${amount} at ${this.scannedBusiness.name}!`);
     },
 
@@ -1223,7 +1514,7 @@ const app = {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
         const anchor = document.createElement('a');
         anchor.setAttribute("href", dataStr);
-        anchor.setAttribute("download", "bfg_network_backup.json");
+        anchor.setAttribute("download", "bfg_conviction_network_backup.json");
         document.body.appendChild(anchor); 
         anchor.click();
         anchor.remove();
@@ -2714,6 +3005,133 @@ const app = {
                                 Learn More <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.8rem; margin-left: 0.3rem;"></i>
                             </button>
                         </a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    },
+
+    // --- Privileges Management ---
+    async savePrivilege() {
+        const idInput = document.getElementById('admin-priv-id').value;
+        const title = document.getElementById('admin-priv-title').value.trim();
+        const description = document.getElementById('admin-priv-desc').value.trim();
+        const requiredTier = document.getElementById('admin-priv-tier').value;
+        const icon = document.getElementById('admin-priv-icon').value.trim() || 'fa-gem';
+        const status = document.getElementById('admin-priv-status').value;
+
+        if (!title) return this.showToast('Privilege Title is required', true);
+
+        const loading = document.getElementById('admin-priv-loading');
+        loading.classList.remove('hidden');
+
+        try {
+            const data = {
+                title, description, requiredTier, icon, status,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                if (idInput) {
+                    await db.collection('privileges').doc(idInput).set(data, {merge:true});
+                } else {
+                    const docRef = await db.collection('privileges').add(data);
+                    data.id = docRef.id;
+                }
+            }
+            
+            if (idInput) {
+                const idx = PLATFORM_PRIVILEGES.findIndex(i => i.id === idInput);
+                if(idx > -1) PLATFORM_PRIVILEGES[idx] = { ...PLATFORM_PRIVILEGES[idx], ...data };
+            } else {
+                if (!data.id) data.id = 'priv_' + Date.now();
+                PLATFORM_PRIVILEGES.push(data);
+            }
+
+            this.showToast('Privilege saved successfully!');
+            this.loadAdminPrivilegeToEdit(''); 
+            this.saveData();
+            this.renderAdminPrivileges();
+            
+        } catch (e) {
+            console.error("Error saving privilege:", e);
+            this.showToast('Failed to save privilege', true);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    },
+
+    loadAdminPrivilegeToEdit(id) {
+        document.getElementById('admin-priv-id').value = id || '';
+        document.getElementById('btn-admin-cancel-privilege').classList.toggle('hidden', !id);
+        const titleEl = document.getElementById('admin-privilege-form-title');
+        if(titleEl) titleEl.innerText = id ? 'Edit Privilege' : 'Add New Privilege';
+        
+        const priv = PLATFORM_PRIVILEGES.find(p => p.id === id) || {};
+        document.getElementById('admin-priv-title').value = priv.title || '';
+        document.getElementById('admin-priv-desc').value = priv.description || '';
+        document.getElementById('admin-priv-tier').value = priv.requiredTier || 'Blue';
+        document.getElementById('admin-priv-icon').value = priv.icon || '';
+        document.getElementById('admin-priv-status').value = priv.status || 'active';
+    },
+
+    _togglePrivilegeStatus(id, currentStatus) {
+        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        const newStatus = currentStatus === 'active' ? 'hidden' : 'active';
+        
+        if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+             db.collection('privileges').doc(id).set({status: newStatus}, {merge:true});
+        }
+        
+        const idx = PLATFORM_PRIVILEGES.findIndex(p => p.id === id);
+        if(idx > -1) PLATFORM_PRIVILEGES[idx].status = newStatus;
+        
+        this.saveData();
+        this.renderAdminPrivileges();
+        this.showToast(`Set to ${newStatus}`);
+    },
+
+    renderAdminPrivileges() {
+        const container = document.getElementById('admin-privileges-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (PLATFORM_PRIVILEGES.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:1rem;">No privileges found.</p>';
+            return;
+        }
+
+        const tierOrder = { 'Blue': 1, 'Silver': 2, 'Gold': 3, 'Platinum': 4 };
+        
+        const sortedList = [...PLATFORM_PRIVILEGES].sort((a, b) => {
+            if (a.status === 'active' && b.status !== 'active') return -1;
+            if (a.status !== 'active' && b.status === 'active') return 1;
+            
+            const tierA = tierOrder[a.requiredTier] || 0;
+            const tierB = tierOrder[b.requiredTier] || 0;
+
+            if (tierA !== tierB) return tierA - tierB;
+            
+            return (a.title || "").localeCompare(b.title || "");
+        });
+
+        sortedList.forEach(priv => {
+            const statusColor = priv.status === 'active' ? 'var(--accent-success)' : 'var(--text-secondary)';
+            let tierColor = 'var(--text-secondary)';
+            if (priv.requiredTier === 'Silver') tierColor = '#c0c0c0';
+            if (priv.requiredTier === 'Gold') tierColor = '#ffd700';
+            if (priv.requiredTier === 'Platinum') tierColor = '#E5E4E2';
+
+            container.innerHTML += `
+                <div style="background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong><i class="fa-solid ${priv.icon || 'fa-gem'}" style="margin-right: 0.5rem; color: ${tierColor};"></i> ${priv.title}</strong><br>
+                        <span style="font-size:0.75rem; color:${statusColor}; font-weight:bold; text-transform:uppercase;">${priv.status}</span>
+                        <span style="font-size:0.75rem; color:var(--text-secondary);"> &bull; Tier: <span style="color:${tierColor}; font-weight:bold;">${priv.requiredTier}</span></span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="icon-btn" onclick="app.loadAdminPrivilegeToEdit('${priv.id}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="icon-btn" style="color:var(--text-warning);" onclick="app._togglePrivilegeStatus('${priv.id}', '${priv.status}')"><i class="fa-solid fa-power-off"></i></button>
                     </div>
                 </div>
             `;
