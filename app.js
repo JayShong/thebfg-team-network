@@ -8,6 +8,7 @@ const firebaseConfig = {
   appId: "1:155869642900:web:208498b7f5dd3ef2adf481",
   measurementId: "G-NJSLNYN6Z7"
 };
+const APP_VERSION = "0.9";
 
 let db = null;
 let auth = null;
@@ -22,7 +23,7 @@ if (typeof firebase !== 'undefined') {
     }
 }
 
-// --- Mock Data & Persistence ---
+// --- Data & Persistence ---
 
 const INITIAL_STATS = {
     consumers: 1542,
@@ -38,6 +39,7 @@ const INITIAL_BUSINESSES = [
         founder: "Maria Lin",
         story: "Maria believes every cup of coffee should power the future. Solaris roasts 100% fair-trade beans using only solar energy.",
         type: "full",
+        sector: "F&B",
         score: { s: 'A', e: 'A', c: 'A', soc: 'B', env: 'A' },
         location: "404 Sunshine Blvd, Eco District",
         contact: "hello@solariscoffee.example.com",
@@ -54,6 +56,7 @@ const INITIAL_BUSINESSES = [
         founder: "Kai Manu",
         story: "Kai built Oceanic to protect the waves he loves. Every surfboard and rash guard is made from upcycled ocean plastics.",
         type: "full",
+        sector: "Retail",
         score: { s: 'B', e: 'B', c: 'A', soc: 'A', env: 'A' },
         location: "15 Coastline Way, Marina Bay",
         contact: "ride@oceanicsurf.example.com",
@@ -70,6 +73,7 @@ const INITIAL_BUSINESSES = [
         founder: "David Chen",
         story: "David brought agriculture to the city center. Urban Harvest provides zero-mile, pesticide-free produce to local communities.",
         type: "full",
+        sector: "Agriculture",
         score: { s: 'A', e: 'A', c: 'A', soc: 'A', env: 'A' },
         location: "99 Metro Plaza, City Center",
         contact: "info@urbanharvest.example.com",
@@ -84,47 +88,292 @@ const INITIAL_BUSINESSES = [
 
 
 
-let MOCK_USER = JSON.parse(localStorage.getItem('bfg_user')) || null;
-let MOCK_STATS = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
-let MOCK_BUSINESSES = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
+let currentUser = JSON.parse(localStorage.getItem('bfg_user')) || null;
+if (currentUser && !currentUser.activityLog) currentUser.activityLog = [];
+let networkStats = JSON.parse(localStorage.getItem('bfg_stats')) || INITIAL_STATS;
+let businesses = JSON.parse(localStorage.getItem('bfg_businesses')) || INITIAL_BUSINESSES;
 const SUPER_ADMIN_EMAIL = 'jayshong@gmail.com';
 let PLATFORM_INITIATIVES = JSON.parse(localStorage.getItem('bfg_initiatives')) || [];
 let PLATFORM_PRIVILEGES = JSON.parse(localStorage.getItem('bfg_privileges')) || [];
-let MOCK_ADMINS = ['jayshong@gmail.com'];
-let MOCK_AUDITORS = ['jayshong@gmail.com'];
+let adminEmails = ['jayshong@gmail.com'];
+let auditorEmails = ['jayshong@gmail.com'];
+
+// --- Season System ---
+const CURRENT_SEASON = {
+    id: 'season_1',
+    name: 'Season 1: Genesis',
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-09-30T23:59:59.000Z',
+    description: 'The founding season of the Conviction Network.'
+};
+
+const BADGE_CATEGORIES = {
+    'Seen':     { label: 'Seen',     icon: 'fa-binoculars',        color: '#3B82F6', description: 'Making for-good businesses discoverable.' },
+    'Verified': { label: 'Verified', icon: 'fa-shield-halved',     color: '#10B981', description: 'Normalising audited impact as a benchmark.' },
+    'Valued':   { label: 'Valued',   icon: 'fa-hand-holding-heart', color: '#F59E0B', description: 'Making founders feel noticed and appreciated.' }
+};
 
 const BADGES_CONFIG = [
+    // ===================== SEEN (Visibility) =====================
     { 
-        id: 'habit_first_step', title: 'The First Step', category: 'Habit', icon: 'fa-shoe-prints', 
-        description: 'Recorded your very first choice of empathy.',
-        why: 'Every journey begins with a single choice. We want to celebrate the exact moment you deliberately chose the empathy economy.',
-        how: 'Automatically earned the first time you scan and check-in to any verified Conviction Network business.',
-        actionText: 'Scan QR to Check-in',
-        actionTarget: 'scanner'
+        id: 'seen_first_step', title: 'The First Step', category: 'Seen', icon: 'fa-shoe-prints',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Recorded your very first check-in.',
+        why: 'Every journey begins with a single choice. This badge marks the moment you entered the empathy economy.',
+        how: 'Automatically earned the first time you check-in to any Conviction Network business.',
+        actionText: 'Scan QR to Check-in', actionTarget: 'scanner'
     },
     { 
-        id: 'discovery_explorer', title: 'The Explorer', category: 'Discovery', icon: 'fa-compass', 
+        id: 'seen_explorer', title: 'The Explorer', category: 'Seen', icon: 'fa-compass',
+        tier: null, tierGroup: null, seasonal: false,
         description: 'Checked into 3 unique for-good businesses.',
-        why: 'True support means stepping out of your comfort zone. This badge exists to encourage discovering new paradigms across the city.',
-        how: 'Earned by checking in at 3 completely different business profiles on the Conviction Network.',
-        actionText: 'Find New Businesses',
-        actionTarget: 'directory'
+        why: 'Discovery is the first step to making businesses visible. The more diverse your visits, the wider the network becomes.',
+        how: 'Earned by checking in at 3 completely different business profiles.',
+        actionText: 'Find New Businesses', actionTarget: 'directory'
     },
     { 
-        id: 'habit_consummate', title: 'Consummate Supporter', category: 'Habit', icon: 'fa-basket-shopping', 
+        id: 'seen_pathfinder', title: 'The Pathfinder', category: 'Seen', icon: 'fa-route',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Checked into 7 unique for-good businesses.',
+        why: 'You are actively mapping the empathy economy. Every new door you open makes that business more visible to others.',
+        how: 'Earned by checking in at 7 completely different business profiles.',
+        actionText: 'Discover More', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_cartographer', title: 'The Cartographer', category: 'Seen', icon: 'fa-map',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Checked into 15 unique for-good businesses.',
+        why: 'You are drawing the map of the empathy economy. Founders across the city know they are being seen.',
+        how: 'Earned by checking in at 15 completely different business profiles.',
+        actionText: 'Keep Exploring', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_nomad', title: 'Neighborhood Nomad', category: 'Seen', icon: 'fa-map-location-dot',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited businesses in 3 different locations.',
+        why: 'Crossing district lines to support for-good businesses is the physical effort that makes the network real.',
+        how: 'Earned by checking in at businesses located in 3 distinct areas.',
+        actionText: 'Explore Map', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_wanderer', title: 'State Wanderer', category: 'Seen', icon: 'fa-earth-asia',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Supported businesses in 2 or more states.',
+        why: 'When the empathy economy crosses state borders, it becomes a national movement.',
+        how: 'Earned by checking in at businesses in at least 2 different states.',
+        actionText: 'Go Further', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_pioneer', title: 'The Pioneer', category: 'Seen', icon: 'fa-flag',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'One of the first to visit a newly listed business.',
+        why: 'New businesses are fragile. Being among the first visitors gives founders the confidence that they are seen.',
+        how: 'Earned by checking in within 30 days of a business being added to the network.',
+        actionText: 'Find New Listings', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_sector_specialist', title: 'Sector Specialist', category: 'Seen', icon: 'fa-layer-group',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Supported businesses across 3 different industries.',
+        why: 'A diverse empathy economy is a resilient economy. Supporting multiple sectors builds a broad foundation.',
+        how: 'Earned by checking in at businesses in 3+ different sectors (e.g. F&B, Retail, Services).',
+        actionText: 'Diversify', actionTarget: 'directory'
+    },
+    { 
+        id: 'seen_night_owl', title: 'Night Owl', category: 'Seen', icon: 'fa-moon',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Checked in after 8 PM.',
+        why: 'Evening support keeps businesses alive beyond the daytime rush. You showed up when others went home.',
+        how: 'Earned by recording a check-in after 8:00 PM local time.',
+        actionText: 'Visit Tonight', actionTarget: 'scanner'
+    },
+    { 
+        id: 'seen_early_bird', title: 'Early Bird', category: 'Seen', icon: 'fa-sun',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Checked in before 9 AM.',
+        why: 'Starting the day with an empathetic choice sets the tone. You are part of the morning crew that keeps founders going.',
+        how: 'Earned by recording a check-in before 9:00 AM local time.',
+        actionText: 'Visit Tomorrow', actionTarget: 'scanner'
+    },
+
+    // ===================== VERIFIED (Verification) =====================
+    { 
+        id: 'verified_eco_warrior', title: 'Eco-Warrior', category: 'Verified', icon: 'fa-leaf',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited 3 businesses with an Environment "A" score.',
+        why: 'By choosing verified green businesses, you signal that environmental commitment is worth paying for.',
+        how: 'Earned by checking in at 3 different businesses with an Environment paradigm score of "A".',
+        actionText: 'Find Green Businesses', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_eco_champion', title: 'Eco-Champion', category: 'Verified', icon: 'fa-seedling',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited 7 businesses with an Environment "A" score.',
+        why: 'Deep environmental commitment, repeated across many businesses, builds the trust infrastructure for green GDP.',
+        how: 'Earned by checking in at 7 different businesses with an Environment paradigm score of "A".',
+        actionText: 'Go Deeper', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_social_hero', title: 'Social Hero', category: 'Verified', icon: 'fa-users',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited 3 businesses with a Social "A" score.',
+        why: 'Social equity is the backbone of a fair economy. Your support validates businesses that invest in people.',
+        how: 'Earned by checking in at 3 different businesses with a Social paradigm score of "A".',
+        actionText: 'Support Social Impact', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_social_sentinel', title: 'Social Sentinel', category: 'Verified', icon: 'fa-shield-heart',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited 7 businesses with a Social "A" score.',
+        why: 'Sustained support for socially excellent businesses drives systemic change, not just good feelings.',
+        how: 'Earned by checking in at 7 different businesses with a Social paradigm score of "A".',
+        actionText: 'Defend the Standard', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_purist', title: 'The Purist', category: 'Verified', icon: 'fa-gem',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited a business with a perfect AAAAA score.',
+        why: 'Total commitment to the BFG paradigm is rare. By visiting, you prove that perfection is worth the journey.',
+        how: 'Earned by checking in at any business with a perfect AAAAA paradigm score.',
+        actionText: 'Find Top Rated', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_idealist', title: 'The Idealist', category: 'Verified', icon: 'fa-star',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Visited 3 businesses with a perfect AAAAA score.',
+        why: 'You are building a portfolio of perfection. This signals to the market that the highest standard of impact is valued.',
+        how: 'Earned by checking in at 3 different businesses with a perfect AAAAA paradigm score.',
+        actionText: 'Chase Perfection', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_initiative_ally', title: 'Initiative Ally', category: 'Verified', icon: 'fa-bullhorn',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Participated in a platform initiative.',
+        why: 'Initiatives are how the network moves together. Your participation amplifies collective impact.',
+        how: 'Earned by actively participating in at least 1 Conviction Network initiative.',
+        actionText: 'View Initiatives', actionTarget: 'directory'
+    },
+    { 
+        id: 'verified_zero_waste', title: 'Zero Waste Partner', category: 'Verified', icon: 'fa-recycle',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Checked in 5 times at businesses with waste reduction programs.',
+        why: 'Waste diversion is measurable impact. Repeat visits to waste-conscious businesses sustain their mission.',
+        how: 'Earned by recording 5 check-ins at businesses with high Environment paradigm scores.',
+        actionText: 'Support Zero Waste', actionTarget: 'directory'
+    },
+
+    // ===================== VALUED (Appreciation) =====================
+    { 
+        id: 'valued_weekend', title: 'Weekend Philanthropist', category: 'Valued', icon: 'fa-calendar-check',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Showed up on your time off.',
+        why: 'Choosing to support a for-good business on your day off tells the founder: "You matter enough for my free time."',
+        how: 'Earned by recording a check-in or purchase on any Saturday or Sunday.',
+        actionText: 'Visit This Weekend', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_weekend_regular', title: 'Weekend Regular', category: 'Valued', icon: 'fa-calendar-week',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Showed up on 4 separate weekends.',
+        why: 'One weekend is a nice gesture. Four weekends is a relationship. Founders notice who comes back.',
+        how: 'Earned by recording activity on 4 distinct weekend days (Saturdays or Sundays).',
+        actionText: 'Keep Coming', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_weekly_pulse', title: 'The Weekly Pulse', category: 'Valued', icon: 'fa-heart-pulse',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Recorded 4 or more activities in a single week.',
+        why: 'When you visit 4 times in one week, the empathy economy has a heartbeat. You are the pulse.',
+        how: 'Earned by logging 4+ check-ins or purchases within a single calendar week (Mon-Sun).',
+        actionText: 'Build Momentum', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_streak_bronze', title: 'Empathy Streak', category: 'Valued', icon: 'fa-fire',
+        tier: 'Bronze', tierGroup: 'empathy_streak', seasonal: true,
+        description: '2 consecutive weeks of activity.',
+        why: 'Consistency is how habits form. Two weeks of showing up means the empathy economy is becoming part of your life.',
+        how: 'Earned by recording at least 1 activity per week for 2 consecutive weeks.',
+        actionText: 'Keep the Streak', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_streak_silver', title: 'Empathy Streak', category: 'Valued', icon: 'fa-fire',
+        tier: 'Silver', tierGroup: 'empathy_streak', seasonal: true,
+        description: '4 consecutive weeks of activity.',
+        why: 'A month of unbroken support. Founders are starting to rely on people like you.',
+        how: 'Earned by recording at least 1 activity per week for 4 consecutive weeks.',
+        actionText: 'Keep the Streak', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_streak_gold', title: 'Empathy Streak', category: 'Valued', icon: 'fa-fire',
+        tier: 'Gold', tierGroup: 'empathy_streak', seasonal: true,
+        description: '8 consecutive weeks of activity.',
+        why: 'Two months of unbroken commitment. You are the foundation the empathy economy is built on.',
+        how: 'Earned by recording at least 1 activity per week for 8 consecutive weeks.',
+        actionText: 'Keep the Streak', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_local_legend', title: 'Local Legend', category: 'Valued', icon: 'fa-store',
+        tier: null, tierGroup: 'local_loyalty', seasonal: false,
+        description: '5 visits to the same business.',
+        why: 'When the barista knows your name, the empathy economy has a face. You are making one founder feel truly seen.',
+        how: 'Earned by recording 5 check-ins at a single business.',
+        actionText: 'Visit Your Local', actionTarget: 'directory'
+    },
+    { 
+        id: 'valued_local_anchor', title: 'Local Anchor', category: 'Valued', icon: 'fa-anchor',
+        tier: null, tierGroup: 'local_loyalty', seasonal: false,
+        description: '15 visits to the same business.',
+        why: 'You are the anchor that keeps a small business grounded. They know you, and they count on you.',
+        how: 'Earned by recording 15 check-ins at a single business.',
+        actionText: 'Deepen Your Bond', actionTarget: 'directory'
+    },
+    { 
+        id: 'valued_local_family', title: 'Local Family', category: 'Valued', icon: 'fa-house-heart',
+        tier: null, tierGroup: 'local_loyalty', seasonal: false,
+        description: '30 visits to the same business.',
+        why: 'You are not a customer anymore. You are family. This is what being valued truly means.',
+        how: 'Earned by recording 30 check-ins at a single business.',
+        actionText: 'You Are Home', actionTarget: 'directory'
+    },
+    { 
+        id: 'valued_consummate', title: 'Consummate Supporter', category: 'Valued', icon: 'fa-basket-shopping',
+        tier: null, tierGroup: null, seasonal: false,
         description: 'Recorded 10 separate purchases.',
-        why: 'Good intentions are great, but monetary flow sustains the empathy economy. This badge honors true believers who habitually vote with their wallet.',
+        why: 'Every purchase is a vote. Ten votes says you are committed to keeping the empathy economy alive.',
         how: 'Earned by logging 10 valid purchase receipts across any Conviction Network business.',
-        actionText: 'Scan QR for Receipt',
-        actionTarget: 'scanner'
+        actionText: 'Log a Purchase', actionTarget: 'scanner'
     },
     { 
-        id: 'community_builder', title: 'Community Builder', category: 'Community', icon: 'fa-people-group', 
-        description: 'Helped build the community.',
-        why: 'The Conviction Network is only as strong as its nodes. This badge is reserved for those who actively expand the reach of empathetic commerce.',
+        id: 'valued_community_builder', title: 'Community Builder', category: 'Valued', icon: 'fa-people-group',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Helped expand the network.',
+        why: 'The network is only as strong as its nodes. You are actively expanding the reach of empathetic commerce.',
         how: 'Earned by successfully referring a friend or executing a Group Check-in.',
-        actionText: 'Explore Directory',
-        actionTarget: 'directory'
+        actionText: 'Invite a Friend', actionTarget: 'directory'
+    },
+    { 
+        id: 'valued_the_bridge', title: 'The Bridge', category: 'Valued', icon: 'fa-bridge',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Referred 3 people to the network.',
+        why: 'You are the bridge between the old economy and the empathy economy. Three connections and growing.',
+        how: 'Earned by successfully referring 3 new members to the Conviction Network.',
+        actionText: 'Grow the Network', actionTarget: 'directory'
+    },
+    { 
+        id: 'valued_monday_motivator', title: 'Monday Motivator', category: 'Valued', icon: 'fa-mug-hot',
+        tier: null, tierGroup: null, seasonal: true,
+        description: 'Made a check-in on a Monday.',
+        why: 'Mondays are hard. Choosing empathy on the hardest day of the week is a statement of intent.',
+        how: 'Earned by recording a check-in on any Monday.',
+        actionText: 'Start the Week Right', actionTarget: 'scanner'
+    },
+    { 
+        id: 'valued_the_returnee', title: 'The Returnee', category: 'Valued', icon: 'fa-rotate-left',
+        tier: null, tierGroup: null, seasonal: false,
+        description: 'Came back after 30+ days away.',
+        why: 'Life gets busy. Coming back after a break shows that the empathy economy is still part of who you are.',
+        how: 'Earned by recording an activity after 30 or more days of inactivity.',
+        actionText: 'Welcome Back', actionTarget: 'scanner'
     }
 ];
 
@@ -142,11 +391,12 @@ const app = {
                     try {
                         const userDoc = await db.collection('users').doc(user.uid).get();
                         if (userDoc.exists) {
-                            MOCK_USER = userDoc.data();
-                            MOCK_USER.email = user.email;
-                            MOCK_USER.isEmailVerified = user.emailVerified;
+                            currentUser = userDoc.data();
+                            currentUser.email = user.email;
+                            currentUser.isEmailVerified = user.emailVerified;
+                            if (!currentUser.activityLog) currentUser.activityLog = [];
                         } else {
-                            MOCK_USER = {
+                            currentUser = {
                                 id: user.uid,
                                 name: user.displayName || 'User',
                                 email: user.email,
@@ -159,9 +409,10 @@ const app = {
                                 purchases: 0,
                                 isAdmin: false,
                                 badges: {},
-                                visitedBizIds: []
+                                visitedBizIds: [],
+                                activityLog: []
                             };
-                            await db.collection('users').doc(user.uid).set(MOCK_USER);
+                            await db.collection('users').doc(user.uid).set(currentUser);
                         }
                     } catch (e) {
                         console.error('Error handling user auth state:', e);
@@ -179,7 +430,7 @@ const app = {
                     this.populateProfile();
                     this.navigate('dashboard');
                 } else {
-                    MOCK_USER = null;
+                    currentUser = null;
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('bottom-nav').style.display = 'none';
                     this.navigate('login');
@@ -188,7 +439,7 @@ const app = {
             });
         } else {
             // Fallback if SDK fails
-            if (!MOCK_USER) {
+            if (!currentUser) {
                 document.getElementById('main-header').style.display = 'none';
                 document.getElementById('bottom-nav').style.display = 'none';
                 this.navigate('login');
@@ -224,31 +475,31 @@ const app = {
                 const rolesDoc = await db.collection('system').doc('roles').get();
                 if(rolesDoc.exists) {
                     const rolesData = rolesDoc.data();
-                    MOCK_ADMINS = rolesData.adminEmails || [SUPER_ADMIN_EMAIL];
-                    MOCK_AUDITORS = rolesData.auditorEmails || [SUPER_ADMIN_EMAIL];
+                    adminEmails = rolesData.adminEmails || [SUPER_ADMIN_EMAIL];
+                    auditorEmails = rolesData.auditorEmails || [SUPER_ADMIN_EMAIL];
                     // Ensure super admin is always in all role lists
-                    if (!MOCK_ADMINS.includes(SUPER_ADMIN_EMAIL)) MOCK_ADMINS.unshift(SUPER_ADMIN_EMAIL);
-                    if (!MOCK_AUDITORS.includes(SUPER_ADMIN_EMAIL)) MOCK_AUDITORS.unshift(SUPER_ADMIN_EMAIL);
+                    if (!adminEmails.includes(SUPER_ADMIN_EMAIL)) adminEmails.unshift(SUPER_ADMIN_EMAIL);
+                    if (!auditorEmails.includes(SUPER_ADMIN_EMAIL)) auditorEmails.unshift(SUPER_ADMIN_EMAIL);
                 } else {
                     await db.collection('system').doc('roles').set({
-                        adminEmails: MOCK_ADMINS,
-                        auditorEmails: MOCK_AUDITORS
+                        adminEmails: adminEmails,
+                        auditorEmails: auditorEmails
                     });
                 }
 
                 // Fetch stats
                 const statsDoc = await db.collection('system').doc('stats').get();
-                if(statsDoc.exists) MOCK_STATS = statsDoc.data();
-                else await db.collection('system').doc('stats').set(MOCK_STATS); // inject default
+                if(statsDoc.exists) networkStats = statsDoc.data();
+                else await db.collection('system').doc('stats').set(networkStats); // inject default
                 
                 // Fetch businesses
                 const bizSnapshot = await db.collection('businesses').get();
                 if (!bizSnapshot.empty) {
-                    MOCK_BUSINESSES = [];
-                    bizSnapshot.forEach(doc => MOCK_BUSINESSES.push(doc.data()));
+                    businesses = [];
+                    bizSnapshot.forEach(doc => businesses.push(doc.data()));
                 } else {
                     // Seed businesses
-                    MOCK_BUSINESSES.forEach(async biz => {
+                    businesses.forEach(async biz => {
                         await db.collection('businesses').doc(biz.id).set(biz);
                     });
                 }
@@ -262,7 +513,7 @@ const app = {
                         data.id = doc.id;
                         PLATFORM_INITIATIVES.push(data);
                     });
-                } else if (MOCK_USER && MOCK_USER.isSuperAdmin) {
+                } else if (currentUser && currentUser.isSuperAdmin) {
                     // Seed Eat2Give Default Initiative if DB is completely empty.
                     const initial = {
                         title: 'Eat2Give',
@@ -286,7 +537,7 @@ const app = {
                         data.id = doc.id;
                         PLATFORM_PRIVILEGES.push(data);
                     });
-                } else if (MOCK_USER && MOCK_USER.isSuperAdmin) {
+                } else if (currentUser && currentUser.isSuperAdmin) {
                     // Seed a default privilege
                     const initialPriv = {
                         title: 'Early Access',
@@ -301,10 +552,10 @@ const app = {
                 }
 
 
-                if(MOCK_USER && MOCK_USER.email) {
-                    MOCK_USER.isSuperAdmin = MOCK_USER.email === SUPER_ADMIN_EMAIL;
-                    MOCK_USER.isAdmin = MOCK_ADMINS.includes(MOCK_USER.email);
-                    MOCK_USER.isAuditor = MOCK_AUDITORS.includes(MOCK_USER.email);
+                if(currentUser && currentUser.email) {
+                    currentUser.isSuperAdmin = currentUser.email === SUPER_ADMIN_EMAIL;
+                    currentUser.isAdmin = adminEmails.includes(currentUser.email);
+                    currentUser.isAuditor = auditorEmails.includes(currentUser.email);
                 }
                 if (this.currentView === 'admin') this.renderAdminList();
             } catch (e) {
@@ -335,16 +586,16 @@ const app = {
     },
 
     async saveData() {
-        localStorage.setItem('bfg_user', JSON.stringify(MOCK_USER));
-        localStorage.setItem('bfg_stats', JSON.stringify(MOCK_STATS));
-        localStorage.setItem('bfg_businesses', JSON.stringify(MOCK_BUSINESSES));
+        localStorage.setItem('bfg_user', JSON.stringify(currentUser));
+        localStorage.setItem('bfg_stats', JSON.stringify(networkStats));
+        localStorage.setItem('bfg_businesses', JSON.stringify(businesses));
         localStorage.setItem('bfg_initiatives', JSON.stringify(PLATFORM_INITIATIVES));
         localStorage.setItem('bfg_privileges', JSON.stringify(PLATFORM_PRIVILEGES));
 
         // Push user to cloud
-        if(db && MOCK_USER && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        if(db && currentUser && firebaseConfig.apiKey !== "YOUR_API_KEY") {
             try {
-                await db.collection('users').doc(MOCK_USER.id).set(MOCK_USER, {merge: true});
+                await db.collection('users').doc(currentUser.id).set(currentUser, {merge: true});
             } catch (e) {
                 console.warn("Could not sync user to cloud:", e);
             }
@@ -434,7 +685,7 @@ const app = {
             await auth.signOut();
         }
         
-        MOCK_USER = null;
+        currentUser = null;
         localStorage.removeItem('bfg_user');
         
         document.getElementById('login-nickname').value = '';
@@ -448,17 +699,17 @@ const app = {
     },
 
     renderStats() {
-        document.getElementById('stat-global-consumers').innerText = MOCK_STATS.consumers.toLocaleString();
-        document.getElementById('stat-global-businesses').innerText = MOCK_STATS.businesses.toLocaleString();
-        document.getElementById('stat-global-checkins').innerText = MOCK_STATS.checkins.toLocaleString();
-        document.getElementById('stat-global-purchases').innerText = MOCK_STATS.purchases.toLocaleString();
+        document.getElementById('stat-global-consumers').innerText = networkStats.consumers.toLocaleString();
+        document.getElementById('stat-global-businesses').innerText = networkStats.businesses.toLocaleString();
+        document.getElementById('stat-global-checkins').innerText = networkStats.checkins.toLocaleString();
+        document.getElementById('stat-global-purchases').innerText = networkStats.purchases.toLocaleString();
 
         // National business penetration baseline using GDP
         // DOSM Nominal GDP for Malaysia 2023 (~RM 1.82 Trillion)
         const NOMINAL_GDP_MY_RM = 1820000000000;
         
         let totalConvictionNetworkRevenue = 0;
-        MOCK_BUSINESSES.forEach(biz => {
+        businesses.forEach(biz => {
             if (biz.status !== 'expired' && biz.yearlyAssessments) {
                 let latestRev = 0;
                 Object.values(biz.yearlyAssessments).forEach(ya => {
@@ -474,9 +725,9 @@ const app = {
         const penetration = (totalConvictionNetworkRevenue / NOMINAL_GDP_MY_RM) * 100;
         document.getElementById('stat-global-penetration').innerText = penetration.toFixed(10) + '%';
 
-        if (MOCK_USER) {
-            document.getElementById('stat-personal-checkins').innerText = MOCK_USER.checkins.toLocaleString();
-            document.getElementById('stat-personal-purchases').innerText = MOCK_USER.purchases.toLocaleString();
+        if (currentUser) {
+            document.getElementById('stat-personal-checkins').innerText = currentUser.checkins.toLocaleString();
+            document.getElementById('stat-personal-purchases').innerText = currentUser.purchases.toLocaleString();
         }
     },
 
@@ -485,32 +736,160 @@ const app = {
 
         if (!user.badges) user.badges = {};
         if (!user.visitedBizIds) user.visitedBizIds = [];
+        if (!user.activityLog) user.activityLog = [];
 
         let newlyUnlocked = [];
 
         const checkUnlock = (id, condition) => {
             if (!user.badges[id]?.unlocked && condition) {
-                user.badges[id] = { unlocked: true, date: new Date().toISOString() };
+                user.badges[id] = { unlocked: true, date: new Date().toISOString(), season: CURRENT_SEASON.id };
                 newlyUnlocked.push(BADGES_CONFIG.find(b => b.id === id));
             }
         };
 
         const totalActivities = (user.checkins || 0) + (user.purchases || 0);
 
-        // Badge 1: The First Step
-        checkUnlock('habit_first_step', totalActivities >= 1);
+        // ====== SEEN BADGES ======
+        checkUnlock('seen_first_step', totalActivities >= 1);
+        checkUnlock('seen_explorer', user.visitedBizIds.length >= 3);
+        checkUnlock('seen_pathfinder', user.visitedBizIds.length >= 7);
+        checkUnlock('seen_cartographer', user.visitedBizIds.length >= 15);
 
-        // Badge 2: The Explorer
-        checkUnlock('discovery_explorer', user.visitedBizIds.length >= 3);
+        // Analysis pass over activityLog
+        const ecoBizIds = new Set();
+        const socialBizIds = new Set();
+        const perfectBizIds = new Set();
+        const locations = new Set();
+        const sectors = new Set();
+        const bizCheckinCounts = {};
+        let hasWeekend = false;
+        let weekendDays = new Set(); // unique weekend dates
+        let hasMonday = false;
+        let hasNightOwl = false;
+        let hasEarlyBird = false;
+        let envCheckinCount = 0;
+        const weeklyActivityMap = {}; // 'YYYY-WW' => count
 
-        // Badge 3: Consummate Supporter
-        checkUnlock('habit_consummate', (user.purchases || 0) >= 10);
+        user.activityLog.forEach(log => {
+            const biz = businesses.find(b => b.id === log.bizId);
+            const logDate = new Date(log.timestamp);
+            const dayOfWeek = logDate.getDay();
+            const hour = logDate.getHours();
 
-        // Badge 4: Community Builder is triggered via explicit admin/referral action.
+            // Score-based analysis
+            if (biz && biz.score && typeof biz.score === 'object') {
+                if (biz.score.env === 'A') { ecoBizIds.add(log.bizId); envCheckinCount++; }
+                if (biz.score.soc === 'A') socialBizIds.add(log.bizId);
+                if (biz.score.s === 'A' && biz.score.e === 'A' && biz.score.c === 'A' && biz.score.soc === 'A' && biz.score.env === 'A') {
+                    perfectBizIds.add(log.bizId);
+                }
+            }
+
+            // Location & sector
+            if (log.location) locations.add(log.location);
+            if (biz && biz.sector) sectors.add(biz.sector);
+
+            // Time-based
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                hasWeekend = true;
+                weekendDays.add(logDate.toISOString().slice(0, 10));
+            }
+            if (dayOfWeek === 1) hasMonday = true;
+            if (hour >= 20) hasNightOwl = true;
+            if (hour < 9) hasEarlyBird = true;
+
+            // Checkin counts per biz
+            if (log.type === 'checkin') {
+                bizCheckinCounts[log.bizId] = (bizCheckinCounts[log.bizId] || 0) + 1;
+            }
+
+            // Pioneer: check if business was added within 30 days of this checkin
+            if (biz && biz.createdAt) {
+                const bizCreated = new Date(biz.createdAt);
+                const diffDays = (logDate - bizCreated) / (1000 * 60 * 60 * 24);
+                if (diffDays >= 0 && diffDays <= 30) {
+                    checkUnlock('seen_pioneer', true);
+                }
+            }
+
+            // Weekly activity tracking
+            const startOfYear = new Date(logDate.getFullYear(), 0, 1);
+            const weekNum = Math.ceil(((logDate - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+            const weekKey = `${logDate.getFullYear()}-W${weekNum}`;
+            weeklyActivityMap[weekKey] = (weeklyActivityMap[weekKey] || 0) + 1;
+        });
+
+        // Seen badges
+        checkUnlock('seen_nomad', locations.size >= 3);
+        checkUnlock('seen_sector_specialist', sectors.size >= 3);
+        checkUnlock('seen_night_owl', hasNightOwl);
+        checkUnlock('seen_early_bird', hasEarlyBird);
+        // State Wanderer - stub: check if 2+ distinct "state-like" locations (simplified)
+        // For now, won't auto-trigger — needs state field on businesses
+
+        // ====== VERIFIED BADGES ======
+        checkUnlock('verified_eco_warrior', ecoBizIds.size >= 3);
+        checkUnlock('verified_eco_champion', ecoBizIds.size >= 7);
+        checkUnlock('verified_social_hero', socialBizIds.size >= 3);
+        checkUnlock('verified_social_sentinel', socialBizIds.size >= 7);
+        checkUnlock('verified_purist', perfectBizIds.size > 0);
+        checkUnlock('verified_idealist', perfectBizIds.size >= 3);
+        checkUnlock('verified_zero_waste', envCheckinCount >= 5);
+        // Initiative Ally - contextual, triggered elsewhere
+
+        // ====== VALUED BADGES ======
+        checkUnlock('valued_weekend', hasWeekend);
+        checkUnlock('valued_weekend_regular', weekendDays.size >= 4);
+        checkUnlock('valued_monday_motivator', hasMonday);
+        checkUnlock('valued_consummate', (user.purchases || 0) >= 10);
+
+        // Local loyalty family
+        const maxBizVisits = Math.max(0, ...Object.values(bizCheckinCounts));
+        checkUnlock('valued_local_legend', maxBizVisits >= 5);
+        checkUnlock('valued_local_anchor', maxBizVisits >= 15);
+        checkUnlock('valued_local_family', maxBizVisits >= 30);
+
+        // Weekly Pulse: any single week with 4+ activities
+        const hasWeeklyPulse = Object.values(weeklyActivityMap).some(count => count >= 4);
+        checkUnlock('valued_weekly_pulse', hasWeeklyPulse);
+
+        // Empathy Streak: consecutive weeks with activity
+        const sortedWeeks = Object.keys(weeklyActivityMap).sort();
+        let maxConsecutiveWeeks = 0;
+        let currentStreak = 1;
+        for (let i = 1; i < sortedWeeks.length; i++) {
+            const [curYear, curWeek] = sortedWeeks[i].split('-W').map(Number);
+            const [prevYear, prevWeek] = sortedWeeks[i-1].split('-W').map(Number);
+            if ((curYear === prevYear && curWeek === prevWeek + 1) || (curYear === prevYear + 1 && prevWeek >= 52 && curWeek === 1)) {
+                currentStreak++;
+            } else {
+                currentStreak = 1;
+            }
+            maxConsecutiveWeeks = Math.max(maxConsecutiveWeeks, currentStreak);
+        }
+        if (sortedWeeks.length === 1) maxConsecutiveWeeks = 1;
+        checkUnlock('valued_streak_bronze', maxConsecutiveWeeks >= 2);
+        checkUnlock('valued_streak_silver', maxConsecutiveWeeks >= 4);
+        checkUnlock('valued_streak_gold', maxConsecutiveWeeks >= 8);
+
+        // The Returnee: activity after 30+ days of inactivity
+        if (user.activityLog.length >= 2) {
+            const sortedByDate = [...user.activityLog].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            for (let i = 1; i < sortedByDate.length; i++) {
+                const daysBetween = (new Date(sortedByDate[i].timestamp) - new Date(sortedByDate[i-1].timestamp)) / (1000 * 60 * 60 * 24);
+                if (daysBetween >= 30) {
+                    checkUnlock('valued_the_returnee', true);
+                    break;
+                }
+            }
+        }
+
+        // Community Builder / The Bridge - triggered via explicit admin/referral action
 
         if (newlyUnlocked.length > 0) {
             newlyUnlocked.forEach(b => {
-                this.showToast(`🏆 You unlocked a badge: ${b.title}!`);
+                const tierLabel = b.tier ? ` (${b.tier})` : '';
+                this.showToast(`🏆 Badge unlocked: ${b.title}${tierLabel}!`);
             });
             this.saveData();
             if (this.currentView === 'privileges') this.renderPrivileges();
@@ -518,32 +897,55 @@ const app = {
     },
 
     getUserTier(user) {
-        if (!user || (!user.badges && !user.checkins)) return { name: 'Blue', badgeCount: 0, nextThreshold: 2, progress: 0, isMax: false };
+        if (!user || (!user.badges && !user.checkins)) {
+            return { name: 'Blue', badgeCount: 0, nextThreshold: 5, progress: 0, isMax: false, missingCats: [], totalNext: 5, categoryCounts: { 'Seen': 0, 'Verified': 0, 'Valued': 0 } };
+        }
         
         const unlockedCount = user.badges ? Object.values(user.badges).filter(b => b.unlocked).length : 0;
-        
+        const categoryCounts = { 'Seen': 0, 'Verified': 0, 'Valued': 0 };
+        BADGES_CONFIG.forEach(b => {
+            if (user.badges && user.badges[b.id]?.unlocked) {
+                categoryCounts[b.category] = (categoryCounts[b.category] || 0) + 1;
+            }
+        });
+
         let name = 'Blue';
         let baseCount = 0;
-        let nextThreshold = 2;
+        let nextThreshold = 5;
         let isMax = false;
+        let missingCats = [];
 
-        if (unlockedCount >= 4) {
+        // Categorical Mastery Requirements
+        const hasSilver = unlockedCount >= 5 && categoryCounts['Seen'] >= 3;
+        const hasGold = hasSilver && unlockedCount >= 12 && categoryCounts['Valued'] >= 5;
+        const hasPlatinum = hasGold && unlockedCount >= 20 && categoryCounts['Verified'] >= 5;
+
+        if (hasPlatinum) {
             name = 'Platinum';
-            baseCount = 4;
-            nextThreshold = 4;
+            baseCount = 20;
+            nextThreshold = 20;
             isMax = true;
-        } else if (unlockedCount >= 3) {
+        } else if (hasGold) {
             name = 'Gold';
-            baseCount = 3;
-            nextThreshold = 4;
-        } else if (unlockedCount >= 2) {
+            baseCount = 12;
+            nextThreshold = 20;
+            if (unlockedCount >= 20 && categoryCounts['Verified'] < 5) missingCats.push('Verified');
+        } else if (hasSilver) {
             name = 'Silver';
-            baseCount = 2;
-            nextThreshold = 3;
+            baseCount = 5;
+            nextThreshold = 12;
+            if (unlockedCount >= 12 && categoryCounts['Valued'] < 5) missingCats.push('Valued');
+        } else {
+            name = 'Blue';
+            baseCount = 0;
+            nextThreshold = 5;
+            if (unlockedCount >= 5 && categoryCounts['Seen'] < 3) missingCats.push('Seen');
         }
 
-        let progress = isMax ? 100 : ((unlockedCount - baseCount) / (nextThreshold - baseCount)) * 100;
-        return { name, badgeCount: unlockedCount, nextThreshold, progress, isMax, totalNext: nextThreshold };
+        let progress = isMax ? 100 : ((unlockedCount - baseCount) / (Math.max(1, nextThreshold - baseCount))) * 100;
+        if (!isMax && unlockedCount >= nextThreshold && missingCats.length > 0) progress = 95;
+
+        return { name, badgeCount: unlockedCount, nextThreshold, progress, isMax, totalNext: nextThreshold, missingCats, categoryCounts };
     },
 
     renderPrivileges() {
@@ -553,7 +955,7 @@ const app = {
         
         if (!listContainer || !tierCardContainer || !badgeGalleryContainer) return;
 
-        const tierInfo = this.getUserTier(MOCK_USER);
+        const tierInfo = this.getUserTier(currentUser);
         const tName = tierInfo.name.toLowerCase();
         
         // Update Showcase Card
@@ -561,19 +963,43 @@ const app = {
         let ptsText = tierInfo.isMax ? `${tierInfo.badgeCount} Badges Unlocked` : `${tierInfo.badgeCount} / ${tierInfo.totalNext} Badges`;
         
         let targetTierName = 'Silver';
-        if (tierInfo.nextThreshold === 4 && tierInfo.badgeCount === 3) targetTierName = 'Platinum';
-        else if (tierInfo.nextThreshold === 4 && tierInfo.badgeCount < 3) targetTierName = 'Gold';
+        if (tierInfo.name === 'Gold') targetTierName = 'Platinum';
+        else if (tierInfo.name === 'Silver') targetTierName = 'Gold';
+        else if (tierInfo.name === 'Blue') targetTierName = 'Silver';
 
         let msgText = tierInfo.isMax ? `You have reached the highest tier!` : `Unlock ${tierInfo.totalNext - tierInfo.badgeCount} more badges to reach ${targetTierName}`;
+        
+        if (!tierInfo.isMax && tierInfo.missingCats && tierInfo.missingCats.length > 0) {
+            const countDiff = Math.max(0, tierInfo.totalNext - tierInfo.badgeCount);
+            if (countDiff > 0) {
+                msgText = `Unlock ${countDiff} more badges AND mastery in <strong>${tierInfo.missingCats.join(', ')}</strong> to reach ${targetTierName}.`;
+            } else {
+                msgText = `Badge count met! Complete <strong>${tierInfo.missingCats.join(', ')}</strong> requirements to reach ${targetTierName}.`;
+            }
+        }
+
+        // Season end
+        const seasonEnd = new Date(CURRENT_SEASON.endDate);
+        const daysLeft = Math.max(0, Math.ceil((seasonEnd - new Date()) / (1000 * 60 * 60 * 24)));
 
         tierCardContainer.innerHTML = `
             <div style="position: relative; z-index: 2;">
-                <p style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem; opacity: 0.8;">Current Tier</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+                    <p style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin:0;">Current Tier</p>
+                    <span style="font-size: 0.65rem; background: rgba(255,255,255,0.15); padding: 0.2rem 0.6rem; border-radius: 1rem; letter-spacing: 0.5px;">
+                        <i class="fa-solid fa-clock"></i> ${CURRENT_SEASON.name} · ${daysLeft} days left
+                    </span>
+                </div>
                 <h2>${tierInfo.name} Status</h2>
                 <div style="font-size: 1.5rem; font-weight: bold; margin: 1rem 0;">
                     <i class="fa-solid fa-gem"></i>
                 </div>
                 <p style="font-weight: 500;">${ptsText}</p>
+                <div style="display: flex; gap: 0.5rem; justify-content: center; margin: 0.5rem 0;">
+                    <span style="font-size: 0.65rem; background: ${BADGE_CATEGORIES['Seen'].color}33; color: ${BADGE_CATEGORIES['Seen'].color}; padding: 0.15rem 0.5rem; border-radius: 1rem;"><i class="fa-solid ${BADGE_CATEGORIES['Seen'].icon}"></i> ${tierInfo.categoryCounts['Seen'] || 0} Seen</span>
+                    <span style="font-size: 0.65rem; background: ${BADGE_CATEGORIES['Verified'].color}33; color: ${BADGE_CATEGORIES['Verified'].color}; padding: 0.15rem 0.5rem; border-radius: 1rem;"><i class="fa-solid ${BADGE_CATEGORIES['Verified'].icon}"></i> ${tierInfo.categoryCounts['Verified'] || 0} Verified</span>
+                    <span style="font-size: 0.65rem; background: ${BADGE_CATEGORIES['Valued'].color}33; color: ${BADGE_CATEGORIES['Valued'].color}; padding: 0.15rem 0.5rem; border-radius: 1rem;"><i class="fa-solid ${BADGE_CATEGORIES['Valued'].icon}"></i> ${tierInfo.categoryCounts['Valued'] || 0} Valued</span>
+                </div>
                 <div class="tier-progress-bg">
                     <div class="tier-progress-fill" style="width: ${tierInfo.progress}%;"></div>
                 </div>
@@ -581,22 +1007,47 @@ const app = {
             </div>
         `;
 
-        // Render Badge Gallery
+        // Render Badge Gallery grouped by category
         badgeGalleryContainer.innerHTML = '';
-        BADGES_CONFIG.forEach(b => {
-            const isUnlocked = MOCK_USER.badges && MOCK_USER.badges[b.id] && MOCK_USER.badges[b.id].unlocked;
-            const stateClass = isUnlocked ? 'unlocked' : 'locked';
-            
-            badgeGalleryContainer.innerHTML += `
-                <div class="badge-item ${stateClass}" style="cursor: pointer;" onclick="app.openBadgeModal('${b.id}')" title="${b.title}">
-                    <div class="badge-icon-container">
-                        <i class="fa-solid ${b.icon}"></i>
+        const categoryOrder = ['Seen', 'Verified', 'Valued'];
+        categoryOrder.forEach(catKey => {
+            const catInfo = BADGE_CATEGORIES[catKey];
+            const catBadges = BADGES_CONFIG.filter(b => b.category === catKey);
+            const unlockedInCat = catBadges.filter(b => currentUser.badges && currentUser.badges[b.id]?.unlocked).length;
+
+            let sectionHTML = `
+                <div class="badge-category-section" style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; padding-bottom: 0.5rem; border-bottom: 2px solid ${catInfo.color}33;">
+                        <i class="fa-solid ${catInfo.icon}" style="color: ${catInfo.color}; font-size: 1.1rem;"></i>
+                        <div style="flex:1;">
+                            <h4 style="margin: 0; font-size: 1rem; color: ${catInfo.color};">${catInfo.label}</h4>
+                            <p style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${catInfo.description}</p>
+                        </div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">${unlockedInCat}/${catBadges.length}</span>
                     </div>
-                    <h4>${b.title}</h4>
-                    <p>${b.category} Badge</p>
-                </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.75rem;">
             `;
+
+            catBadges.forEach(b => {
+                const isUnlocked = currentUser.badges && currentUser.badges[b.id] && currentUser.badges[b.id].unlocked;
+                const stateClass = isUnlocked ? 'unlocked' : 'locked';
+                const tierLabel = b.tier ? `<span style="font-size: 0.55rem; display: inline-block; margin-top: 0.2rem; padding: 0.1rem 0.4rem; border-radius: 1rem; background: rgba(255,255,255,0.1); color: var(--text-secondary);">${b.tier}</span>` : '';
+                
+                sectionHTML += `
+                    <div class="badge-item ${stateClass}" style="cursor: pointer; padding: 0.8rem 0.5rem;" onclick="app.openBadgeModal('${b.id}')" title="${b.title}">
+                        <div class="badge-icon-container" style="width: 50px; height: 50px; font-size: 1.2rem;">
+                            <i class="fa-solid ${b.icon}"></i>
+                        </div>
+                        <h4 style="font-size: 0.75rem; line-height: 1.2;">${b.title}</h4>
+                        ${tierLabel}
+                    </div>
+                `;
+            });
+
+            sectionHTML += `</div></div>`;
+            badgeGalleryContainer.innerHTML += sectionHTML;
         });
+
 
         // Render Rewards List
         listContainer.innerHTML = '';
@@ -654,7 +1105,7 @@ const app = {
         document.getElementById('badge-modal-why').innerText = b.why || 'Exploration pending.';
         document.getElementById('badge-modal-how').innerText = b.how || 'Details to be revealed.';
 
-        const isUnlocked = MOCK_USER && MOCK_USER.badges && MOCK_USER.badges[b.id] && MOCK_USER.badges[b.id].unlocked;
+        const isUnlocked = currentUser && currentUser.badges && currentUser.badges[b.id] && currentUser.badges[b.id].unlocked;
         
         const iContainer = document.getElementById('badge-modal-icon-container');
         const actionContainer = document.getElementById('badge-modal-action-container');
@@ -668,7 +1119,7 @@ const app = {
             document.getElementById('badge-modal-acquired-container').style.display = 'block';
             actionContainer.style.display = 'none';
 
-            const dateStr = MOCK_USER.badges[b.id].date;
+            const dateStr = currentUser.badges[b.id].date;
             document.getElementById('badge-modal-date').innerText = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
         } else {
             iContainer.style.background = 'rgba(0,0,0,0.5)';
@@ -701,7 +1152,7 @@ const app = {
         container.innerHTML = '';
         
         // Sort: active businesses first, expired at bottom
-        const sorted = [...MOCK_BUSINESSES].sort((a, b) => {
+        const sorted = [...businesses].sort((a, b) => {
             const aExp = a.status === 'expired' ? 1 : 0;
             const bExp = b.status === 'expired' ? 1 : 0;
             return aExp - bExp;
@@ -740,7 +1191,7 @@ const app = {
     },
 
     openBusinessDetail(bizId) {
-        const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+        const biz = businesses.find(b => b.id === bizId);
         if(!biz) return;
 
         const container = document.getElementById('business-detail-content');
@@ -778,7 +1229,7 @@ const app = {
         </iframe>
         <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-warning);"><i class="fa-solid fa-triangle-exclamation"></i> Note: For production, replace 'YOUR_API_KEY_HERE' in app.js with a valid Google Maps API Key.</p>`;
 
-        const isOwnerOrAdmin = MOCK_USER && (MOCK_USER.isSuperAdmin || MOCK_USER.isAdmin || MOCK_USER.businessId === biz.id);
+        const isOwnerOrAdmin = currentUser && (currentUser.isSuperAdmin || currentUser.isAdmin || currentUser.businessId === biz.id);
         const downloadAction = isOwnerOrAdmin ? `<button class="btn btn-secondary mt-3" onclick="app.downloadQRStandee('${biz.id}')"><i class="fa-solid fa-download"></i> Download A5 Standee</button>` : '';
 
         const qrContainer = `<div class="detail-section glass-card" style="text-align: center;">
@@ -931,38 +1382,38 @@ const app = {
     },
 
     populateProfile() {
-        if (!MOCK_USER) return;
+        if (!currentUser) return;
 
         // Auto-link business to user if email matches ownerEmail
-        if (MOCK_USER.email) {
-            const biz = MOCK_BUSINESSES.find(b => b.ownerEmail && b.ownerEmail.toLowerCase() === MOCK_USER.email.toLowerCase());
-            MOCK_USER.businessId = biz ? biz.id : null;
+        if (currentUser.email) {
+            const biz = businesses.find(b => b.ownerEmail && b.ownerEmail.toLowerCase() === currentUser.email.toLowerCase());
+            currentUser.businessId = biz ? biz.id : null;
         }
 
-        document.getElementById('profile-name').innerText = MOCK_USER.name;
-        document.getElementById('profile-email').innerHTML = MOCK_USER.email ? (MOCK_USER.email + (MOCK_USER.isEmailVerified ? ` <i class="fa-solid fa-circle-check" style="color: var(--accent-success);" title="Verified"></i>` : '')) : '';
-        document.getElementById('profile-id').innerText = MOCK_USER.id;
+        document.getElementById('profile-name').innerText = currentUser.name;
+        document.getElementById('profile-email').innerHTML = currentUser.email ? (currentUser.email + (currentUser.isEmailVerified ? ` <i class="fa-solid fa-circle-check" style="color: var(--accent-success);" title="Verified"></i>` : '')) : '';
+        document.getElementById('profile-id').innerText = currentUser.id;
 
         // Role badges
         const roleBadgesContainer = document.getElementById('profile-role-badges');
         if (roleBadgesContainer) {
             let badges = '';
-            if (MOCK_USER.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:linear-gradient(135deg, #FFD700, #FF8C00); color:#000; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:700;"><i class="fa-solid fa-crown"></i> Super Admin</span> ';
-            else if (MOCK_USER.isAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--accent-primary); color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-shield-halved"></i> Admin</span> ';
-            if (MOCK_USER.isAuditor && !MOCK_USER.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:#4CAF50; color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-clipboard-check"></i> Auditor</span> ';
+            if (currentUser.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:linear-gradient(135deg, #FFD700, #FF8C00); color:#000; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:700;"><i class="fa-solid fa-crown"></i> Super Admin</span> ';
+            else if (currentUser.isAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--accent-primary); color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-shield-halved"></i> Admin</span> ';
+            if (currentUser.isAuditor && !currentUser.isSuperAdmin) badges += '<span style="display:inline-flex; align-items:center; gap:0.3rem; background:#4CAF50; color:#fff; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-clipboard-check"></i> Auditor</span> ';
             roleBadgesContainer.innerHTML = badges;
         }
         
         // Show admin portal button if isAdmin OR isSuperAdmin
         const adminPortal = document.getElementById('admin-portal-container');
         if (adminPortal) {
-            adminPortal.style.display = MOCK_USER.isAdmin ? 'block' : 'none';
+            adminPortal.style.display = currentUser.isAdmin ? 'block' : 'none';
         }
 
         // Show business portal if businessId exists
         const bizPortal = document.getElementById('business-portal-container');
         if (bizPortal) {
-            bizPortal.style.display = MOCK_USER.businessId ? 'block' : 'none';
+            bizPortal.style.display = currentUser.businessId ? 'block' : 'none';
         }
         
         // Update Impact Panel based on dynamic purchases
@@ -970,7 +1421,7 @@ const app = {
     },
 
     async _calculatePersonalImpact() {
-        if (!MOCK_USER) return;
+        if (!currentUser) return;
         
         let wasteDivertedAmount = 0;
         let treesPlantedAmount = 0;
@@ -979,7 +1430,7 @@ const app = {
         try {
             if (db) {
                 const querySnapshot = await db.collection('transactions')
-                    .where('userId', '==', MOCK_USER.id)
+                    .where('userId', '==', currentUser.id)
                     .where('type', '==', 'purchase')
                     .get();
 
@@ -998,7 +1449,7 @@ const app = {
                 const uniqueBizIds = Object.keys(bizPurchases);
                 
                 uniqueBizIds.forEach(bizId => {
-                    const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+                    const biz = businesses.find(b => b.id === bizId);
                     if (biz && biz.status !== 'expired') {
                         // 1 employee / job = 1 family supported. Counted once per unique business purchased from.
                         const impactJobs = parseInt(biz.impactJobs) || 0;
@@ -1053,14 +1504,14 @@ const app = {
     async _syncRolesToCloud() {
         if (db) {
             await db.collection('system').doc('roles').set({
-                adminEmails: MOCK_ADMINS,
-                auditorEmails: MOCK_AUDITORS
+                adminEmails: adminEmails,
+                auditorEmails: auditorEmails
             }, { merge: true });
         }
     },
 
     async addRole(role) {
-        if (!MOCK_USER.isSuperAdmin) {
+        if (!currentUser.isSuperAdmin) {
             this.showToast('Access Denied: Only the Super Admin can manage roles.', true);
             return;
         }
@@ -1070,7 +1521,7 @@ const app = {
             this.showToast("Please enter an email address.");
             return;
         }
-        const list = role === 'admin' ? MOCK_ADMINS : MOCK_AUDITORS;
+        const list = role === 'admin' ? adminEmails : auditorEmails;
         const label = role === 'admin' ? 'Admin' : 'Auditor';
         if (list.includes(email)) {
             this.showToast(`This email is already an ${label}.`);
@@ -1088,7 +1539,7 @@ const app = {
     async addAuditor() { return this.addRole('auditor'); },
 
     async removeRole(email, role) {
-        if (!MOCK_USER.isSuperAdmin) {
+        if (!currentUser.isSuperAdmin) {
             this.showToast('Access Denied: Only the Super Admin can manage roles.', true);
             return;
         }
@@ -1096,7 +1547,7 @@ const app = {
             this.showToast('Access Denied: The Super Admin cannot be removed from any role.', true);
             return;
         }
-        const list = role === 'admin' ? MOCK_ADMINS : MOCK_AUDITORS;
+        const list = role === 'admin' ? adminEmails : auditorEmails;
         const label = role === 'admin' ? 'Admin' : 'Auditor';
         const index = list.indexOf(email);
         if (index > -1) {
@@ -1112,13 +1563,13 @@ const app = {
 
     renderAdminList() {
         this.renderAdminBusinessList();
-        const isSuperAdmin = MOCK_USER && MOCK_USER.isSuperAdmin;
+        const isSuperAdmin = currentUser && currentUser.isSuperAdmin;
 
         // --- Admin list ---
         const container = document.getElementById('admin-list-container');
         if (!container) return;
         container.innerHTML = '';
-        MOCK_ADMINS.forEach(email => {
+        adminEmails.forEach(email => {
             const isSA = email === SUPER_ADMIN_EMAIL;
             container.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
@@ -1134,7 +1585,7 @@ const app = {
         const auditorContainer = document.getElementById('auditor-list-container');
         if (!auditorContainer) return;
         auditorContainer.innerHTML = '';
-        MOCK_AUDITORS.forEach(email => {
+        auditorEmails.forEach(email => {
             const isSA = email === SUPER_ADMIN_EMAIL;
             auditorContainer.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
@@ -1153,7 +1604,7 @@ const app = {
         });
 
         // Show/hide auditor-gated sections based on role
-        const isAuditor = MOCK_USER && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin);
+        const isAuditor = currentUser && (currentUser.isAuditor || currentUser.isSuperAdmin);
         const adminYASection = document.getElementById('admin-ya-section');
         if (adminYASection) {
             adminYASection.style.display = isAuditor ? 'block' : 'none';
@@ -1170,7 +1621,7 @@ const app = {
     },
 
     _checkRenewals() {
-        if (!MOCK_USER) return;
+        if (!currentUser) return;
         const alertContainer = document.getElementById('admin-renewal-alert');
         if (alertContainer) alertContainer.remove();
 
@@ -1178,7 +1629,7 @@ const app = {
         const sixMonthsAhead = new Date();
         sixMonthsAhead.setMonth(now.getMonth() + 6);
 
-        const dueForRenewal = MOCK_BUSINESSES.filter(biz => {
+        const dueForRenewal = businesses.filter(biz => {
             if (biz.status === 'expired') return false;
             if (!biz.validUntil) {
                 const legacyDate = new Date();
@@ -1190,8 +1641,8 @@ const app = {
         });
 
         const actionableRenewals = dueForRenewal.filter(biz => {
-            if (MOCK_USER.isSuperAdmin) return true;
-            return biz.createdBy === MOCK_USER.email;
+            if (currentUser.isSuperAdmin) return true;
+            return biz.createdBy === currentUser.email;
         });
 
         if (actionableRenewals.length > 0) {
@@ -1220,15 +1671,15 @@ const app = {
 
     // --- Settings & Demographics Logic ---
     openSettings() {
-        document.getElementById('settings-nickname').value = MOCK_USER.name || '';
-        document.getElementById('settings-email').value = MOCK_USER.email || '';
-        document.getElementById('settings-gender').value = MOCK_USER.gender || '';
-        document.getElementById('settings-city').value = MOCK_USER.city || '';
-        document.getElementById('settings-dob').value = MOCK_USER.dob || '';
+        document.getElementById('settings-nickname').value = currentUser.name || '';
+        document.getElementById('settings-email').value = currentUser.email || '';
+        document.getElementById('settings-gender').value = currentUser.gender || '';
+        document.getElementById('settings-city').value = currentUser.city || '';
+        document.getElementById('settings-dob').value = currentUser.dob || '';
 
         // Reset checkboxes
         document.querySelectorAll('#settings-causes input[type="checkbox"]').forEach(cb => {
-            cb.checked = MOCK_USER.causes && MOCK_USER.causes.includes(cb.value);
+            cb.checked = currentUser.causes && currentUser.causes.includes(cb.value);
         });
 
         this.renderEmailVerificationStatus();
@@ -1250,16 +1701,16 @@ const app = {
             return;
         }
 
-        if (MOCK_USER.email !== email) {
-            MOCK_USER.isEmailVerified = false; // reset verification if email changes
+        if (currentUser.email !== email) {
+            currentUser.isEmailVerified = false; // reset verification if email changes
         }
 
-        MOCK_USER.name = nickname;
-        MOCK_USER.email = email;
-        MOCK_USER.gender = gender;
-        MOCK_USER.city = city;
-        MOCK_USER.dob = dob;
-        MOCK_USER.causes = causes;
+        currentUser.name = nickname;
+        currentUser.email = email;
+        currentUser.gender = gender;
+        currentUser.city = city;
+        currentUser.dob = dob;
+        currentUser.causes = causes;
 
         this.saveData();
         this.populateProfile();
@@ -1271,7 +1722,7 @@ const app = {
         const verifyBtn = document.getElementById('btn-verify-email');
         const badge = document.getElementById('badge-verified');
         
-        if (MOCK_USER.isEmailVerified) {
+        if (currentUser.isEmailVerified) {
             verifyBtn.style.display = 'none';
             badge.style.display = 'inline-flex';
         } else {
@@ -1367,12 +1818,12 @@ const app = {
     },
 
     mockScanSuccess() {
-        const randomBiz = MOCK_BUSINESSES[Math.floor(Math.random() * MOCK_BUSINESSES.length)];
+        const randomBiz = businesses[Math.floor(Math.random() * businesses.length)];
         this.handleScanResult(randomBiz.id);
     },
 
     handleScanResult(bizId) {
-        const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+        const biz = businesses.find(b => b.id === bizId);
         if (biz) {
             this.scannedBusiness = biz;
             document.getElementById('modal-business-name').innerText = this.scannedBusiness.name;
@@ -1409,13 +1860,21 @@ const app = {
 
     async submitCheckin() {
         // Update stats
-        MOCK_STATS.checkins++;
-        MOCK_USER.checkins++;
+        networkStats.checkins++;
+        currentUser.checkins++;
 
         if (this.scannedBusiness) {
-            if (!MOCK_USER.visitedBizIds) MOCK_USER.visitedBizIds = [];
-            if (!MOCK_USER.visitedBizIds.includes(this.scannedBusiness.id)) {
-                MOCK_USER.visitedBizIds.push(this.scannedBusiness.id);
+            if (!currentUser.activityLog) currentUser.activityLog = [];
+            currentUser.activityLog.push({
+                timestamp: new Date().toISOString(),
+                bizId: this.scannedBusiness.id,
+                type: 'checkin',
+                location: this.scannedBusiness.location || ''
+            });
+
+            if (!currentUser.visitedBizIds) currentUser.visitedBizIds = [];
+            if (!currentUser.visitedBizIds.includes(this.scannedBusiness.id)) {
+                currentUser.visitedBizIds.push(this.scannedBusiness.id);
             }
 
             this.scannedBusiness.checkinsCount = (this.scannedBusiness.checkinsCount || 0) + 1;
@@ -1424,8 +1883,8 @@ const app = {
                     await db.collection('transactions').add({
                         type: 'checkin',
                         bizId: this.scannedBusiness.id,
-                        userId: MOCK_USER.id,
-                        userNickname: MOCK_USER.name,
+                        userId: currentUser.id,
+                        userNickname: currentUser.name,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     await db.collection('businesses').doc(this.scannedBusiness.id).set({ checkinsCount: this.scannedBusiness.checkinsCount }, {merge:true});
@@ -1435,7 +1894,7 @@ const app = {
 
         this.saveData();
         this.renderStats();
-        this.evaluateBadges(MOCK_USER);
+        this.evaluateBadges(currentUser);
         
         this.showSuccessModal(`Successfully checked in to ${this.scannedBusiness.name}!`);
     },
@@ -1449,12 +1908,12 @@ const app = {
         const amount = document.getElementById('amount-input').value.trim();
         
         if(!receipt || !amount) {
-            alert('Please enter both receipt number and amount.');
+            this.showToast('Please enter both receipt number and amount.');
             return;
         }
 
         if (this.scannedBusiness && this.scannedBusiness.type === 'affiliate') {
-            alert('Purchases can only be recorded for full members. Please encourage them to apply!');
+            this.showToast('Purchases can only be recorded for full members. Please encourage them to apply!');
             return;
         }
 
@@ -1464,8 +1923,8 @@ const app = {
                     await db.collection('transactions').add({
                         type: 'purchase',
                         bizId: this.scannedBusiness.id,
-                        userId: MOCK_USER.id,
-                        userNickname: MOCK_USER.name,
+                        userId: currentUser.id,
+                        userNickname: currentUser.name,
                         receipt: receipt,
                         amount: parseFloat(amount),
                         status: 'pending',
@@ -1478,14 +1937,21 @@ const app = {
         document.getElementById('receipt-input').value = '';
         document.getElementById('amount-input').value = '';
         
-        // This simulates an approved purchase directly for the sake of the hackathon/demo
-        MOCK_USER.purchases++;
-        MOCK_STATS.purchases++;
+        // Update local purchase count (server reconciliation handles final verification)
+        currentUser.purchases++;
+        if (!currentUser.activityLog) currentUser.activityLog = [];
+        currentUser.activityLog.push({
+            timestamp: new Date().toISOString(),
+            bizId: this.scannedBusiness ? this.scannedBusiness.id : 'unknown',
+            type: 'purchase',
+            location: this.scannedBusiness ? (this.scannedBusiness.location || '') : ''
+        });
+        networkStats.purchases++;
         this.saveData();
         this.renderStats();
-        this.evaluateBadges(MOCK_USER);
+        this.evaluateBadges(currentUser);
 
-        this.showSuccessModal(`Logged purchase of $${amount} at ${this.scannedBusiness.name}!`);
+        this.showSuccessModal(`Logged purchase of RM${amount} at ${this.scannedBusiness.name}!`);
     },
 
     showToast(message) {
@@ -1507,9 +1973,9 @@ const app = {
     // --- Admin Export/Import Logic ---
     exportData() {
         const data = {
-            user: MOCK_USER,
-            stats: MOCK_STATS,
-            businesses: MOCK_BUSINESSES
+            user: currentUser,
+            stats: networkStats,
+            businesses: businesses
         };
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
         const anchor = document.createElement('a');
@@ -1530,9 +1996,9 @@ const app = {
             try {
                 const data = JSON.parse(e.target.result);
                 if (data.user && data.stats && data.businesses) {
-                    MOCK_USER = data.user;
-                    MOCK_STATS = data.stats;
-                    MOCK_BUSINESSES = data.businesses;
+                    currentUser = data.user;
+                    networkStats = data.stats;
+                    businesses = data.businesses;
                     this.saveData();
                     this.renderStats();
                     this.renderBusinessList();
@@ -1601,9 +2067,9 @@ const app = {
         const searchInput = document.getElementById('admin-biz-search');
         if (searchInput) searchTerm = searchInput.value.toLowerCase().trim();
         
-        let filteredBiz = MOCK_BUSINESSES;
+        let filteredBiz = businesses;
         if (searchTerm) {
-            filteredBiz = MOCK_BUSINESSES.filter(b => 
+            filteredBiz = businesses.filter(b => 
                 (b.name && b.name.toLowerCase().includes(searchTerm)) || 
                 (b.founder && b.founder.toLowerCase().includes(searchTerm))
             );
@@ -1630,14 +2096,14 @@ const app = {
 
     // --- Audit Log Helper ---
     _addAuditEntry(bizIndex, action, details) {
-        if (bizIndex < 0 || bizIndex >= MOCK_BUSINESSES.length) return;
-        if (!MOCK_BUSINESSES[bizIndex].auditLog) MOCK_BUSINESSES[bizIndex].auditLog = [];
-        MOCK_BUSINESSES[bizIndex].auditLog.push({
+        if (bizIndex < 0 || bizIndex >= businesses.length) return;
+        if (!businesses[bizIndex].auditLog) businesses[bizIndex].auditLog = [];
+        businesses[bizIndex].auditLog.push({
             timestamp: new Date().toISOString(),
             action: action,
             details: details || '',
-            user: MOCK_USER ? MOCK_USER.email : 'system',
-            userNickname: MOCK_USER ? (MOCK_USER.name || 'Admin') : 'System'
+            user: currentUser ? currentUser.email : 'system',
+            userNickname: currentUser ? (currentUser.name || 'Admin') : 'System'
         });
     },
 
@@ -1669,7 +2135,7 @@ const app = {
     },
 
     downloadQRStandee(bizId) {
-        const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+        const biz = businesses.find(b => b.id === bizId);
         if(!biz) return;
         
         if (typeof QRCode === 'undefined') {
@@ -1917,7 +2383,7 @@ const app = {
             const expirySection = document.getElementById('admin-expiry-section');
             if (expirySection) expirySection.style.display = 'none';
         } else {
-            const biz = MOCK_BUSINESSES.find(b => b.id === bizId);
+            const biz = businesses.find(b => b.id === bizId);
             if (!biz) return;
             
             if(title) title.innerText = `Editing: ${biz.name}`;
@@ -1982,7 +2448,7 @@ const app = {
         const bizType = typeSelectElem ? typeSelectElem.value : 'full';
         
         let score = null;
-        if (bizType !== 'affiliate' && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin)) {
+        if (bizType !== 'affiliate' && (currentUser.isAuditor || currentUser.isSuperAdmin)) {
             score = {
                 s: document.getElementById('score-shareholder').value,
                 e: document.getElementById('score-employee').value,
@@ -1992,7 +2458,7 @@ const app = {
             };
         } else if (bizType !== 'affiliate') {
             // Preserve existing score if not auditor
-            const existingBiz = this.adminEditingBizId ? MOCK_BUSINESSES.find(b => b.id === this.adminEditingBizId) : null;
+            const existingBiz = this.adminEditingBizId ? businesses.find(b => b.id === this.adminEditingBizId) : null;
             score = existingBiz ? existingBiz.score : null;
         }
 
@@ -2008,13 +2474,13 @@ const app = {
         const founderImg = document.getElementById('admin-biz-founder-img').value.trim();
 
         // Collect YA data from admin form (Auditor-gated)
-        const yearlyAssessments = (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin) ? this._collectYAData('admin-ya-rows') : undefined;
+        const yearlyAssessments = (currentUser.isAuditor || currentUser.isSuperAdmin) ? this._collectYAData('admin-ya-rows') : undefined;
 
         if (this.adminEditingBizId) {
             // Update mode
-            const bizIndex = MOCK_BUSINESSES.findIndex(b => b.id === this.adminEditingBizId);
+            const bizIndex = businesses.findIndex(b => b.id === this.adminEditingBizId);
             if(bizIndex !== -1) {
-                const oldBiz = { ...MOCK_BUSINESSES[bizIndex] };
+                const oldBiz = { ...businesses[bizIndex] };
 
                 // Collect expiry data
                 const statusSelect = document.getElementById('admin-biz-status');
@@ -2022,8 +2488,8 @@ const app = {
                 const expiryDate = document.getElementById('admin-biz-expiry-date')?.value || '';
                 const expiryReason = document.getElementById('admin-biz-expiry-reason')?.value || '';
 
-                MOCK_BUSINESSES[bizIndex] = {
-                    ...MOCK_BUSINESSES[bizIndex],
+                businesses[bizIndex] = {
+                    ...businesses[bizIndex],
                     name, founder, ownerEmail, story, location, contact, website, type: bizType, score, shopfrontImg, founderImg,
                     ...(yearlyAssessments !== undefined ? { yearlyAssessments } : {}),
                     status: newStatus,
@@ -2044,11 +2510,11 @@ const app = {
                 if (yearlyAssessments !== undefined && JSON.stringify(yearlyAssessments) !== JSON.stringify(oldBiz.yearlyAssessments || {})) {
                     this._addAuditEntry(bizIndex, 'YA Data Updated', `Years updated: ${Object.keys(yearlyAssessments).join(', ')}`);
                 }
-                this._addAuditEntry(bizIndex, 'Edited', `Business details updated by ${MOCK_USER.email}`);
+                this._addAuditEntry(bizIndex, 'Edited', `Business details updated by ${currentUser.email}`);
 
                 if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
                     try {
-                        await db.collection('businesses').doc(this.adminEditingBizId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
+                        await db.collection('businesses').doc(this.adminEditingBizId).set(businesses[bizIndex], {merge:true});
                     } catch (e) {
                         console.warn("Could not sync business update to cloud:", e);
                     }
@@ -2089,22 +2555,22 @@ const app = {
             purchasesCount: 0,
             createdAt: activeDate.toISOString(),
             validUntil: validUntilDate.toISOString(),
-            createdBy: MOCK_USER.email
+            createdBy: currentUser.email
         };
 
-        // Update mock state
-        MOCK_BUSINESSES.push(newBiz);
-        const newBizIndex = MOCK_BUSINESSES.length - 1;
-        this._addAuditEntry(newBizIndex, 'Created', `Business created by ${MOCK_USER.email}`);
-        MOCK_STATS.businesses++;
+        // Update local state
+        businesses.push(newBiz);
+        const newBizIndex = businesses.length - 1;
+        this._addAuditEntry(newBizIndex, 'Created', `Business created by ${currentUser.email}`);
+        networkStats.businesses++;
         
         try {
             this.saveData();
         } catch (e) {
             // Local storage quota exceeded
-            alert("Error saving your business. The images might be too large for local mock storage. Try uploading smaller images.");
-            MOCK_BUSINESSES.pop();
-            MOCK_STATS.businesses--;
+            this.showToast("Error saving business. Images may be too large. Try smaller files.");
+            businesses.pop();
+            networkStats.businesses--;
             return;
         }
         
@@ -2135,8 +2601,8 @@ const app = {
 
     // --- Business Portal Logic ---
     async openBusinessDashboard() {
-        if (!MOCK_USER.businessId) return;
-        const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+        if (!currentUser.businessId) return;
+        const biz = businesses.find(b => b.id === currentUser.businessId);
         if (!biz) return;
 
         document.getElementById('biz-dash-name').innerText = biz.name;
@@ -2189,8 +2655,8 @@ const app = {
     },
 
     openBusinessProfileEdit() {
-        if (!MOCK_USER.businessId) return;
-        const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+        if (!currentUser.businessId) return;
+        const biz = businesses.find(b => b.id === currentUser.businessId);
         if (!biz) return;
 
         document.getElementById('edit-biz-name').value = biz.name || '';
@@ -2209,7 +2675,7 @@ const app = {
         
         // Populate YA rows in business portal edit (Auditor-gated)
         const editYASection = document.getElementById('edit-ya-section');
-        const isAuditor = MOCK_USER && (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin);
+        const isAuditor = currentUser && (currentUser.isAuditor || currentUser.isSuperAdmin);
         if (editYASection) {
             editYASection.style.display = isAuditor ? 'block' : 'none';
         }
@@ -2244,7 +2710,7 @@ const app = {
         try {
             // 1. Fetch pending transactions
             const pendingQuery = await db.collection('transactions')
-                .where('bizId', '==', MOCK_USER.businessId)
+                .where('bizId', '==', currentUser.businessId)
                 .where('type', '==', 'purchase')
                 .get();
                 
@@ -2353,17 +2819,15 @@ const app = {
             
             await batch.commit();
             
-            // Increment Mock Business Score
-            const biz = MOCK_BUSINESSES.find(b => b.id === MOCK_USER.businessId);
+            // Update business purchase count
+            const biz = businesses.find(b => b.id === currentUser.businessId);
             if (biz) {
                 biz.purchasesCount = (biz.purchasesCount || 0) + addedPurchases;
                 await db.collection('businesses').doc(biz.id).set({ purchasesCount: biz.purchasesCount }, {merge:true});
             }
             
-            // To be technically accurate, the user who bought should get the points. 
-            // In a real backend, a Cloud Function watches `status: verified` and increments the user's document.
-            // For this frontend-mock MVP, we visually update global mock stats:
-            MOCK_STATS.purchases += addedPurchases;
+            // Update global network stats (server-side Cloud Functions handle per-user attribution)
+            networkStats.purchases += addedPurchases;
             this.saveData();
 
             this.showToast(`Successfully verified ${addedPurchases} transactions!`);
@@ -2378,8 +2842,8 @@ const app = {
     },
 
     async saveBusinessProfile() {
-        if (!MOCK_USER.businessId) return;
-        const bizIndex = MOCK_BUSINESSES.findIndex(b => b.id === MOCK_USER.businessId);
+        if (!currentUser.businessId) return;
+        const bizIndex = businesses.findIndex(b => b.id === currentUser.businessId);
         if (bizIndex === -1) return;
 
         const name = document.getElementById('edit-biz-name').value.trim();
@@ -2401,7 +2865,7 @@ const app = {
         loader.classList.remove('hidden');
 
         try {
-            let shopfrontUrl = MOCK_BUSINESSES[bizIndex].shopfrontImg;
+            let shopfrontUrl = businesses[bizIndex].shopfrontImg;
             let videoUrl = videoInputVal;
 
             // Handle Photo URL
@@ -2414,25 +2878,25 @@ const app = {
             const impactWaste = document.getElementById('edit-biz-impact-waste').value.trim();
             const impactJobs = document.getElementById('edit-biz-impact-jobs').value.trim();
 
-            MOCK_BUSINESSES[bizIndex].name = name;
-            MOCK_BUSINESSES[bizIndex].founder = founder;
-            MOCK_BUSINESSES[bizIndex].story = story;
-            MOCK_BUSINESSES[bizIndex].contact = contact;
-            MOCK_BUSINESSES[bizIndex].website = website;
-            MOCK_BUSINESSES[bizIndex].location = location;
-            MOCK_BUSINESSES[bizIndex].shopfrontImg = shopfrontUrl;
-            MOCK_BUSINESSES[bizIndex].videoUrl = videoUrl;
-            MOCK_BUSINESSES[bizIndex].impactStatement = impactStatement;
-            MOCK_BUSINESSES[bizIndex].impactWaste = impactWaste;
-            MOCK_BUSINESSES[bizIndex].impactJobs = impactJobs;
+            businesses[bizIndex].name = name;
+            businesses[bizIndex].founder = founder;
+            businesses[bizIndex].story = story;
+            businesses[bizIndex].contact = contact;
+            businesses[bizIndex].website = website;
+            businesses[bizIndex].location = location;
+            businesses[bizIndex].shopfrontImg = shopfrontUrl;
+            businesses[bizIndex].videoUrl = videoUrl;
+            businesses[bizIndex].impactStatement = impactStatement;
+            businesses[bizIndex].impactWaste = impactWaste;
+            businesses[bizIndex].impactJobs = impactJobs;
 
             // Collect YA data from business portal edit (Auditor-gated)
-            if (MOCK_USER.isAuditor || MOCK_USER.isSuperAdmin) {
-                MOCK_BUSINESSES[bizIndex].yearlyAssessments = this._collectYAData('edit-ya-rows');
+            if (currentUser.isAuditor || currentUser.isSuperAdmin) {
+                businesses[bizIndex].yearlyAssessments = this._collectYAData('edit-ya-rows');
             }
 
             if (db) {
-                await db.collection('businesses').doc(MOCK_USER.businessId).set(MOCK_BUSINESSES[bizIndex], {merge:true});
+                await db.collection('businesses').doc(currentUser.businessId).set(businesses[bizIndex], {merge:true});
             }
             this.saveData();
             this.showToast("Business Profile Updated!");
@@ -2459,7 +2923,7 @@ const app = {
         if (db) {
             try {
                 const querySnapshot = await db.collection('transactions')
-                    .where('userId', '==', MOCK_USER.id)
+                    .where('userId', '==', currentUser.id)
                     .where('type', '==', type)
                     .orderBy('timestamp', 'desc')
                     .limit(50)
@@ -2471,7 +2935,7 @@ const app = {
                     list.innerHTML = '';
                     querySnapshot.forEach(doc => {
                         const t = doc.data();
-                        const biz = MOCK_BUSINESSES.find(b => b.id === t.bizId) || { name: 'Unknown Business' };
+                        const biz = businesses.find(b => b.id === t.bizId) || { name: 'Unknown Business' };
                         const dt = t.timestamp ? t.timestamp.toDate().toLocaleString() : 'Just now';
                         
                         let extraInfo = '';
@@ -2505,7 +2969,7 @@ const app = {
                 list.innerHTML = '<p style="color: var(--text-secondary); padding:2rem 1rem; text-align: center;">Contribute to the growth of empathy economy by purchasing from one of the For-Good Businesses</p>';
             }
         } else {
-            list.innerHTML = `<p style="color: var(--text-warning); padding:1rem; text-align:center;">Cloud history unavailable in local-only demo mode.</p>`;
+            list.innerHTML = `<p style="color: var(--text-warning); padding:1rem; text-align:center;">Cloud connection required to view transaction history.</p>`;
         }
     },
 
@@ -2514,7 +2978,7 @@ const app = {
     sheetSortDir: 'asc',
 
     openSpreadsheet() {
-        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) {
+        if (!currentUser || !currentUser.isSuperAdmin) {
             this.showToast('Access Denied: Super Admin only.', true);
             return;
         }
@@ -2533,7 +2997,7 @@ const app = {
 
     _getAllYAYears() {
         const years = new Set();
-        MOCK_BUSINESSES.forEach(biz => {
+        businesses.forEach(biz => {
             const ya = biz.yearlyAssessments || {};
             Object.keys(ya).forEach(y => years.add(y));
         });
@@ -2562,7 +3026,7 @@ const app = {
         const yaYears = this._getAllYAYears();
 
         // Filter
-        let filtered = MOCK_BUSINESSES.filter(biz => {
+        let filtered = businesses.filter(biz => {
             // Type filter
             if (typeFilter !== 'all' && biz.type !== typeFilter) return false;
 
@@ -2603,7 +3067,7 @@ const app = {
 
         // Update count
         const countEl = document.getElementById('sheet-count');
-        if (countEl) countEl.innerText = `Showing ${filtered.length} of ${MOCK_BUSINESSES.length} businesses`;
+        if (countEl) countEl.innerText = `Showing ${filtered.length} of ${businesses.length} businesses`;
 
         // Build table header
         let thead = '<tr>';
@@ -2682,13 +3146,13 @@ const app = {
     },
 
     exportSpreadsheetCSV() {
-        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        if (!currentUser || !currentUser.isSuperAdmin) return;
         const yaYears = this._getAllYAYears();
         let csv = 'Name,Founder,Owner Email,Type,Sh,Em,Cu,So,Env,Contact,Location,Website,Impact Statement,Waste (kg),Jobs';
         yaYears.forEach(y => { csv += `,${y} Revenue,${y} Waste (kg),${y} Trees`; });
         csv += ',Check-ins,Purchases\n';
 
-        MOCK_BUSINESSES.forEach(biz => {
+        businesses.forEach(biz => {
             const score = (biz.score && typeof biz.score === 'object') ? biz.score : {};
             const ya = biz.yearlyAssessments || {};
             const esc = (v) => '"' + String(v || '').replace(/"/g, '""') + '"';
@@ -2834,7 +3298,7 @@ const app = {
     },
 
     async _toggleInitiativeStatus(id, currentStatus) {
-        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        if (!currentUser || !currentUser.isSuperAdmin) return;
         const newStatus = currentStatus === 'active' ? 'past' : 'active';
         if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
              await db.collection('initiatives').doc(id).set({status: newStatus}, {merge:true});
@@ -3076,7 +3540,7 @@ const app = {
     },
 
     _togglePrivilegeStatus(id, currentStatus) {
-        if (!MOCK_USER || !MOCK_USER.isSuperAdmin) return;
+        if (!currentUser || !currentUser.isSuperAdmin) return;
         const newStatus = currentStatus === 'active' ? 'hidden' : 'active';
         
         if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {

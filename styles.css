@@ -17,6 +17,7 @@
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
     
+    --radius-sm: 8px;
     --radius-md: 16px;
     --radius-lg: 24px;
     --radius-full: 999px;
@@ -707,8 +708,6 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     }
 }
 
-.radius-sm { --radius-sm: 8px; }
-
 /* Expired Business Styling */
 .business-card.biz-expired {
     opacity: 0.5;
@@ -831,201 +830,7 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     background: #1a1a1a; 
 }
 
-.privilege-card {
-    background: rgba(255,255,255,0.05);
-    border-radius: var(--radius-sm);
-    padding: 1rem;
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    border: 1px solid rgba(255,255,255,0.05);
-    background: rgba(15, 23, 42, 0.95);
-    color: var(--text-secondary);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 0.6rem 0.8rem;
-    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
-    text-align: left;
-    cursor: pointer;
-    user-select: none;
-    transition: var(--transition);
-}
-.sheet-table th:hover {
-    color: var(--accent-primary);
-    background: rgba(30, 41, 59, 0.95);
-}
-.sheet-table th.sorted-asc::after { content: ' ▲'; color: var(--accent-primary); }
-.sheet-table th.sorted-desc::after { content: ' ▼'; color: var(--accent-primary); }
-
-.sheet-table td {
-    padding: 0.5rem 0.8rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    color: var(--text-primary);
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.sheet-table tr:nth-child(even) td {
-    background: rgba(255,255,255,0.02);
-}
-.sheet-table tr:hover td {
-    background: rgba(139, 92, 246, 0.08);
-}
-.sheet-table .cell-score {
-    font-weight: 700;
-    font-family: monospace;
-    letter-spacing: 1px;
-}
-.sheet-table .score-a { color: #4CAF50; }
-.sheet-table .score-b { color: #8BC34A; }
-.sheet-table .score-c { color: #FFC107; }
-.sheet-table .score-d { color: #FF5722; }
-.sheet-table .cell-type {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.4rem;
-    border-radius: var(--radius-full);
-    font-weight: 600;
-}
-.cell-type-full { background: rgba(76, 175, 80, 0.2); color: #81C784; }
-.cell-type-affiliate { background: rgba(255, 152, 0, 0.2); color: #FFB74D; }
-
-/* Spreadsheet view breaks out of mobile constraint */
-#view-spreadsheet {
-    max-width: none;
-}
-
-/* Override app container width for spreadsheet */
-@media (min-width: 768px) {
-    #app-container:has(#view-spreadsheet.active) {
-        max-width: 100%;
-    }
-}
-
-.radius-sm { --radius-sm: 8px; }
-
-/* Expired Business Styling */
-.business-card.biz-expired {
-    opacity: 0.5;
-    filter: grayscale(60%);
-    position: relative;
-}
-.business-card.biz-expired::after {
-    content: 'EXPIRED';
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    background: rgba(244, 67, 54, 0.8);
-    color: white;
-    padding: 0.15rem 0.5rem;
-    border-radius: var(--radius-full);
-    letter-spacing: 1px;
-}
-.biz-expired-banner {
-    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(0,0,0,0.3));
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-.biz-expired-banner .expired-icon {
-    font-size: 2rem;
-    color: #F44336;
-    margin-bottom: 0.5rem;
-}
-
-/* Audit Log */
-.audit-log-entry {
-    display: flex;
-    gap: 0.8rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-size: 0.8rem;
-}
-.audit-log-entry:last-child { border-bottom: none; }
-.audit-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-top: 0.35rem;
-    flex-shrink: 0;
-}
-.audit-dot-create { background: #4CAF50; }
-.audit-dot-edit { background: #2196F3; }
-.audit-dot-expire { background: #F44336; }
-.audit-dot-reinstate { background: #FF9800; }
-.audit-dot-score { background: #9C27B0; }
-.audit-dot-ya { background: #00BCD4; }
-.audit-log-time {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    font-family: monospace;
-}
-
-/* Tier Gradients */
-.tier-blue {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-    box-shadow: 0 4px 15px rgba(30, 60, 114, 0.4);
-    border: 1px solid rgba(42, 82, 152, 0.5);
-}
-
-.tier-silver {
-    background: linear-gradient(135deg, #757F9A 0%, #D7DDE8 100%);
-    color: #1a1a1a !important;
-    box-shadow: 0 4px 15px rgba(117, 127, 154, 0.4);
-    border: 1px solid rgba(215, 221, 232, 0.7);
-}
-
-.tier-gold {
-    background: linear-gradient(135deg, #BF953F 0%, #FCF6BA 50%, #B38728 100%);
-    color: #1a1a1a !important; 
-    box-shadow: 0 4px 15px rgba(191, 149, 63, 0.4);
-    border: 1px solid rgba(252, 246, 186, 0.7);
-}
-
-.tier-platinum {
-    background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 50%, #dcdcdc 100%);
-    color: #1a1a1a !important;
-    box-shadow: 0 4px 15px rgba(224, 224, 224, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-}
-
-.tier-card h2 {
-    margin-bottom: 0.5rem;
-    font-size: 2rem;
-    letter-spacing: 1px;
-}
-.tier-progress-bg {
-    background: rgba(0,0,0,0.2);
-    border-radius: 10px;
-    height: 10px;
-    width: 100%;
-    margin-top: 1rem;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
-}
-.tier-progress-fill {
-    height: 100%;
-    background: #fff;
-    border-radius: 10px;
-    transition: width 0.8s ease;
-}
-.tier-blue .tier-progress-fill { background: #fff; }
-.tier-silver .tier-progress-bg,
-.tier-gold .tier-progress-bg,
-.tier-platinum .tier-progress-bg { 
-    background: rgba(0,0,0,0.1); 
-    border-color: rgba(0,0,0,0.1); 
-}
-.tier-silver .tier-progress-fill,
-.tier-gold .tier-progress-fill,
-.tier-platinum .tier-progress-fill { 
-    background: #1a1a1a; 
-}
-
+/* Privilege Cards */
 .privilege-card {
     background: rgba(255,255,255,0.05);
     border-radius: var(--radius-sm);
@@ -1057,6 +862,9 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+}
+.badge-item:hover {
+    transform: translateY(-2px);
 }
 .badge-item .badge-icon-container {
     width: 60px;
@@ -1093,4 +901,14 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     font-size: 0.7rem;
     color: var(--text-secondary);
     margin: 0;
+}
+
+/* Seasonal Badge Indicator */
+.badge-item .badge-seasonal-tag {
+    font-size: 0.55rem;
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
+    padding: 0.1rem 0.4rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(245, 158, 11, 0.3);
 }
