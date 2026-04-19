@@ -8,7 +8,7 @@ const firebaseConfig = {
   appId: "1:155869642900:web:208498b7f5dd3ef2adf481",
   measurementId: "G-NJSLNYN6Z7"
 };
-const APP_VERSION = "0.9";
+const APP_VERSION = "0.91";
 
 let db = null;
 let auth = null;
@@ -383,8 +383,54 @@ const app = {
     currentView: 'dashboard',
     scannedBusiness: null,
     adminEditingBizId: null,
+    tutorialStep: 0,
+    tutorialSteps: [
+        {
+            title: "Step 1: Locate the Standee",
+            icon: "fa-qrcode",
+            text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to start.",
+            color: "#3B82F6",
+            image: "assets/tutorial/scanner.png?v=2"
+        },
+        {
+            title: "Step 2: Selection",
+            icon: "fa-location-dot",
+            text: "Support them by checking In. If you have bought anything, log the purchase.",
+            color: "#10B981",
+            image: "assets/tutorial/recognition.png?v=6"
+        },
+        {
+            title: "Step 3: Log a Purchase",
+            icon: "fa-receipt",
+            text: "When logging a purchase, enter the Receipt ID and the Total Amount (RM) from your bill.",
+            color: "#F59E0B",
+            image: "assets/tutorial/purchase.png?v=6"
+        },
+        {
+            title: "Step 4: Success!",
+            icon: "fa-certificate",
+            text: "A successful registration results in a green confirmation card. Your activity is now securely recorded in our database.",
+            color: "#8B5CF6",
+            image: "assets/tutorial/success.png?v=6"
+        }
+    ],
 
     async init() {
+        // --- Firebase App Check ---
+        if (typeof firebase !== 'undefined' && firebase.appCheck) {
+            try {
+                const appCheck = firebase.appCheck();
+                // reCAPTCHA v3 site key for TheBFG.Team
+                appCheck.activate(
+                    new firebase.appCheck.ReCaptchaV3Provider('6LfLHL8sAAAAAJjW7YlO5Nj4jlx9kYW-cNYTOzeb'),
+                    true // isTokenAutoRefreshEnabled
+                );
+                console.log("Firebase App Check Activated.");
+            } catch (e) {
+                console.warn("App Check activation failed:", e);
+            }
+        }
+
         if (auth) {
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
@@ -394,11 +440,12 @@ const app = {
                             currentUser = userDoc.data();
                             currentUser.email = user.email;
                             currentUser.isEmailVerified = user.emailVerified;
+                            currentUser.isGuest = false;
                             if (!currentUser.activityLog) currentUser.activityLog = [];
                         } else {
                             currentUser = {
                                 id: user.uid,
-                                name: user.displayName || 'User',
+                                name: user.displayName || 'Explorer',
                                 email: user.email,
                                 gender: '',
                                 city: '',
@@ -408,6 +455,7 @@ const app = {
                                 checkins: 0,
                                 purchases: 0,
                                 isAdmin: false,
+                                isGuest: false,
                                 badges: {},
                                 visitedBizIds: [],
                                 activityLog: []
@@ -423,6 +471,7 @@ const app = {
                     
                     await this.fetchCloudData();
                     this.saveData();
+                    this.updateNewsreel();
                     this.renderStats();
                     this.renderBusinessList();
                     this.renderInitiatives();
@@ -430,11 +479,36 @@ const app = {
                     this.populateProfile();
                     this.navigate('dashboard');
                 } else {
-                    currentUser = null;
-                    document.getElementById('main-header').style.display = 'none';
-                    document.getElementById('bottom-nav').style.display = 'none';
-                    this.navigate('login');
-                    this.fetchCloudData(); // fetch generic data in background
+                    // Check if Guest Mode is Persisted
+                    const isGuestMode = localStorage.getItem('bfg_guest_mode') === 'true';
+                    if (isGuestMode) {
+                        currentUser = {
+                            id: 'guest',
+                            name: 'Guest Explorer',
+                            isGuest: true,
+                            checkins: 0,
+                            purchases: 0,
+                            badges: {},
+                            activityLog: []
+                        };
+                        document.getElementById('main-header').style.display = 'flex';
+                        document.getElementById('bottom-nav').style.display = 'flex';
+                        await this.fetchCloudData();
+                        this.updateNewsreel();
+                        this.renderStats();
+                        this.renderBusinessList();
+                        this.renderInitiatives();
+                        this.renderPrivileges();
+                        this.populateProfile();
+                        this.navigate('dashboard');
+                    } else {
+                        currentUser = null;
+                        document.getElementById('main-header').style.display = 'none';
+                        document.getElementById('bottom-nav').style.display = 'none';
+                        this.updateNewsreel(); // will hide it
+                        this.navigate('login');
+                        this.fetchCloudData(); // fetch generic data in background
+                    }
                 }
             });
         } else {
@@ -603,6 +677,15 @@ const app = {
     },
 
     navigate(viewId) {
+        // Guest restrictions
+        if (currentUser && currentUser.isGuest) {
+            const forbidden = ['scanner', 'privileges', 'settings'];
+            if (forbidden.includes(viewId)) {
+                this.openGuestGate();
+                return;
+            }
+        }
+
         // Hide all views
         document.querySelectorAll('.view').forEach(el => {
             el.classList.remove('active');
@@ -630,7 +713,6 @@ const app = {
     },
 
     async login() {
-        const nickname = document.getElementById('login-nickname').value.trim();
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value.trim();
         const err = document.getElementById('login-error');
@@ -638,8 +720,8 @@ const app = {
 
         err.classList.add('hidden');
 
-        if (!email || !password || !nickname) {
-            err.innerText = 'Please enter nickname, email, and password.';
+        if (!email || !password) {
+            err.innerText = 'Please enter your email and password.';
             err.classList.remove('hidden');
             return;
         }
@@ -663,7 +745,7 @@ const app = {
                     if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
                         // Create user
                         const credential = await auth.createUserWithEmailAndPassword(email, password);
-                        await credential.user.updateProfile({ displayName: nickname });
+                        await credential.user.updateProfile({ displayName: 'Explorer' });
                     } else {
                         throw e;
                     }
@@ -688,7 +770,6 @@ const app = {
         currentUser = null;
         localStorage.removeItem('bfg_user');
         
-        document.getElementById('login-nickname').value = '';
         document.getElementById('login-email').value = '';
         document.getElementById('login-password').value = '';
         
@@ -696,6 +777,77 @@ const app = {
         document.getElementById('bottom-nav').style.display = 'none';
         
         this.navigate('login');
+    },
+
+    // --- Guest Mode Logic ---
+    continueAsGuest() {
+        localStorage.setItem('bfg_guest_mode', 'true');
+        // Force state manually to speed up transition
+        currentUser = {
+            id: 'guest',
+            name: 'Guest Explorer',
+            isGuest: true,
+            checkins: 0,
+            purchases: 0,
+            badges: {},
+            activityLog: []
+        };
+        document.getElementById('main-header').style.display = 'flex';
+        document.getElementById('bottom-nav').style.display = 'flex';
+        this.fetchCloudData();
+        this.renderStats();
+        this.renderBusinessList();
+        this.renderInitiatives();
+        this.renderPrivileges();
+        this.populateProfile();
+        this.updateNewsreel();
+        this.navigate('dashboard');
+        this.showToast('Exploring as Guest. Discover for-good businesses!');
+    },
+
+    openGuestGate() {
+        document.getElementById('modal-guest-gate').classList.remove('hidden');
+    },
+
+    closeGuestGate() {
+        document.getElementById('modal-guest-gate').classList.add('hidden');
+    },
+
+    exitGuestMode() {
+        localStorage.removeItem('bfg_guest_mode');
+        this.closeGuestGate();
+        this.logout();
+    },
+
+    updateNewsreel() {
+        const reel = document.getElementById('newsreel');
+        if (!reel) return;
+
+        if (!currentUser) {
+            reel.classList.add('hidden');
+            return;
+        }
+
+        reel.classList.remove('hidden');
+        let message = "";
+
+        // Reset onclick
+        reel.onclick = null;
+        reel.style.cursor = "default";
+
+        if (currentUser.isGuest) {
+            message = "🔍 Exploring Mode: Join the Network to earn status & privileges.";
+            reel.style.cursor = "pointer";
+            reel.onclick = () => this.exitGuestMode();
+        } else if (currentUser.name === 'Explorer') {
+            message = "Introduce yourself to the network with a nickname.";
+            reel.style.cursor = "pointer";
+            reel.onclick = () => this.navigate('settings');
+        } else {
+            message = `✨ Welcome back, ${currentUser.name}! Your support strengthens the Empathy Economy.`;
+        }
+
+        reel.innerText = message;
     },
 
     renderStats() {
@@ -1021,6 +1173,7 @@ const app = {
                         <i class="fa-solid ${catInfo.icon}" style="color: ${catInfo.color}; font-size: 1.1rem;"></i>
                         <div style="flex:1;">
                             <h4 style="margin: 0; font-size: 1rem; color: ${catInfo.color};">${catInfo.label}</h4>
+                            <p style="text-align: center; font-size: 0.7rem; color: var(--text-secondary); margin-top: 1rem; opacity: 0.6;">Version 0.91</p>
                             <p style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${catInfo.description}</p>
                         </div>
                         <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">${unlockedInCat}/${catBadges.length}</span>
@@ -1232,12 +1385,25 @@ const app = {
         const isOwnerOrAdmin = currentUser && (currentUser.isSuperAdmin || currentUser.isAdmin || currentUser.businessId === biz.id);
         const downloadAction = isOwnerOrAdmin ? `<button class="btn btn-secondary mt-3" onclick="app.downloadQRStandee('${biz.id}')"><i class="fa-solid fa-download"></i> Download A5 Standee</button>` : '';
 
-        const qrContainer = `<div class="detail-section glass-card" style="text-align: center;">
-            <h3>Scan at Counter</h3>
-            <p style="font-size: 0.8rem; margin-bottom: 1rem;">Use the Scanner tab to scan this code.</p>
-            <div id="qrcode-${biz.id}" style="display:inline-block; padding: 1rem; background: white; border-radius: var(--radius-md);"></div>
-            <div>${downloadAction}</div>
-        </div>`;
+        // QR Code Handling for Guests
+        let qrContainer = '';
+        if (currentUser && currentUser.isGuest) {
+            qrContainer = `<div class="detail-section glass-card" style="text-align: center; border: 1px dashed var(--accent-primary); background: rgba(139, 92, 246, 0.05);">
+                <i class="fa-solid fa-qrcode" style="font-size: 2.5rem; color: var(--text-secondary); opacity: 0.5; margin-bottom: 1rem;"></i>
+                <h3>Scan to Support</h3>
+                <p style="font-size: 0.85rem; margin-bottom: 1.5rem; color: var(--text-secondary);">Join the network to check-in at this business and earn empathy badges.</p>
+                <button class="btn btn-primary feature-gradient" style="border:none;" onclick="app.exitGuestMode()">
+                    <i class="fa-solid fa-user-plus"></i> Create Free Account
+                </button>
+            </div>`;
+        } else {
+            qrContainer = `<div class="detail-section glass-card" style="text-align: center;">
+                <h3>Scan at Counter</h3>
+                <p style="font-size: 0.8rem; margin-bottom: 1rem;">Use the Scanner tab to scan this code.</p>
+                <div id="qrcode-${biz.id}" style="display:inline-block; padding: 1rem; background: white; border-radius: var(--radius-md);"></div>
+                <div>${downloadAction}</div>
+            </div>`;
+        }
 
             let scoreHTML = '';
             if (biz.type === 'affiliate') {
@@ -1383,6 +1549,48 @@ const app = {
 
     populateProfile() {
         if (!currentUser) return;
+
+        if (currentUser.isGuest) {
+            document.getElementById('profile-name').innerText = 'Guest Explorer';
+            document.getElementById('profile-email').innerText = 'Join to unlock perks';
+            document.getElementById('profile-id').innerText = 'GUEST-MODE';
+            
+            const roleBadgesContainer = document.getElementById('profile-role-badges');
+            if (roleBadgesContainer) {
+                roleBadgesContainer.innerHTML = '<span style="background:rgba(255,255,255,0.1); color:var(--text-secondary); padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.7rem; font-weight:600;"><i class="fa-solid fa-ghost"></i> Guest Explorer</span>';
+            }
+
+            // Hide portals
+            if (document.getElementById('admin-portal-container')) document.getElementById('admin-portal-container').style.display = 'none';
+            if (document.getElementById('business-portal-container')) document.getElementById('business-portal-container').style.display = 'none';
+            
+            // Special Guest CTA in Profile
+            const footer = document.querySelector('#view-profile .badge-footer');
+            if (footer && !document.getElementById('guest-join-cta')) {
+                const cta = document.createElement('div');
+                cta.id = 'guest-join-cta';
+                cta.innerHTML = `
+                    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; text-align: left;">
+                        <h4 style="color: var(--accent-primary); margin-bottom: 0.5rem;"><i class="fa-solid fa-circle-info"></i> Why Sign Up?</h4>
+                        <ul style="font-size: 0.8rem; color: var(--text-secondary); padding-left: 1.2rem; line-height: 1.5;">
+                            <li>Record your check-ins and purchases.</li>
+                            <li>Unlock exclusive empathy badges.</li>
+                            <li>Reach higher Tiers for premium rewards.</li>
+                        </ul>
+                        <button class="btn btn-primary btn-block mt-3 feature-gradient" style="border:none;" onclick="app.exitGuestMode()">
+                            Create Free Account
+                        </button>
+                    </div>
+                `;
+                footer.prepend(cta);
+            }
+            return;
+        }
+
+        // --- Standard Member Logic ---
+        // remove guest cta if it exists
+        const guestCta = document.getElementById('guest-join-cta');
+        if (guestCta) guestCta.remove();
 
         // Auto-link business to user if email matches ownerEmail
         if (currentUser.email) {
@@ -1687,6 +1895,10 @@ const app = {
     },
 
     saveSettings() {
+        if (currentUser && currentUser.isGuest) {
+            this.openGuestGate();
+            return;
+        }
         const nickname = document.getElementById('settings-nickname').value.trim();
         const email = document.getElementById('settings-email').value.trim();
         const gender = document.getElementById('settings-gender').value;
@@ -1714,6 +1926,7 @@ const app = {
 
         this.saveData();
         this.populateProfile();
+        this.updateNewsreel();
         this.showToast('Profile updated successfully!');
         this.navigate('profile');
     },
@@ -1859,6 +2072,11 @@ const app = {
     },
 
     async submitCheckin() {
+        if (currentUser && currentUser.isGuest) {
+            this.closeModal();
+            this.openGuestGate();
+            return;
+        }
         // Update stats
         networkStats.checkins++;
         currentUser.checkins++;
@@ -1896,7 +2114,7 @@ const app = {
         this.renderStats();
         this.evaluateBadges(currentUser);
         
-        this.showSuccessModal(`Successfully checked in to ${this.scannedBusiness.name}!`);
+        this.showSuccessModal(`Successfully checked in! Thank you for being part of the empathy economy!`);
     },
 
     showPurchaseForm() {
@@ -1904,6 +2122,11 @@ const app = {
     },
 
     async submitPurchase() {
+        if (currentUser && currentUser.isGuest) {
+            this.closeModal();
+            this.openGuestGate();
+            return;
+        }
         const receipt = document.getElementById('receipt-input').value.trim();
         const amount = document.getElementById('amount-input').value.trim();
         
@@ -1951,7 +2174,7 @@ const app = {
         this.renderStats();
         this.evaluateBadges(currentUser);
 
-        this.showSuccessModal(`Logged purchase of RM${amount} at ${this.scannedBusiness.name}!`);
+        this.showSuccessModal(`Purchase logged! Thank you for being part of the empathy economy!`);
     },
 
     showToast(message) {
@@ -3599,6 +3822,64 @@ const app = {
                     </div>
                 </div>
             `;
+        });
+    },
+
+    // --- Tutorial Logic ---
+    startTutorial() {
+        this.tutorialStep = 0;
+        document.getElementById('tutorial-modal').classList.remove('hidden');
+        this.renderTutorial();
+    },
+
+    nextTutorialStep() {
+        if (this.tutorialStep < this.tutorialSteps.length - 1) {
+            this.tutorialStep++;
+            this.renderTutorial();
+        } else {
+            this.closeTutorial();
+        }
+    },
+
+    prevTutorialStep() {
+        if (this.tutorialStep > 0) {
+            this.tutorialStep--;
+            this.renderTutorial();
+        }
+    },
+
+    closeTutorial() {
+        document.getElementById('tutorial-modal').classList.add('hidden');
+    },
+
+    renderTutorial() {
+        const step = this.tutorialSteps[this.tutorialStep];
+        const content = document.getElementById('tutorial-content');
+        const nextBtn = document.getElementById('tutorial-next');
+        const prevBtn = document.getElementById('tutorial-prev');
+        const dots = document.getElementById('tutorial-dots');
+
+        content.innerHTML = `
+            <div style="margin-bottom: 1.5rem; position: relative;">
+                <img src="${step.image}" style="width: 100%; max-width: 280px; height: auto; border-radius: var(--radius-md); box-shadow: 0 500 20px rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.05); animation: zoomIn 0.5s ease-out;">
+                <div style="position: absolute; top: -15px; right: -15px; background: ${step.color}; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); animation: bounce 2s infinite;">
+                    <i class="fa-solid ${step.icon}"></i>
+                </div>
+            </div>
+            <h2 style="color: ${step.color}; margin-bottom: 0.8rem; font-size: 1.25rem;">${step.title}</h2>
+            <p style="color: var(--text-secondary); line-height: 1.6; font-size: 0.9rem; margin-bottom: 1rem; padding: 0 0.5rem;">${step.text}</p>
+        `;
+
+        // Update Nav
+        prevBtn.style.visibility = this.tutorialStep === 0 ? 'hidden' : 'visible';
+        nextBtn.innerText = this.tutorialStep === this.tutorialSteps.length - 1 ? 'Finish' : 'Next';
+
+        // Update Dots
+        dots.innerHTML = '';
+        this.tutorialSteps.forEach((_, i) => {
+            const dot = document.createElement('div');
+            dot.className = `tutorial-dot ${i === this.tutorialStep ? 'active' : ''}`;
+            dots.appendChild(dot);
         });
     }
 };

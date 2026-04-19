@@ -18,15 +18,35 @@
     <!-- QR Code & Scanner -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Tutorial Modal -->
+    <div id="tutorial-modal" class="modal hidden">
+        <div class="modal-content glass-card" style="max-width: 450px; position: relative;">
+            <button class="close-btn" style="position: absolute; top: 1rem; right: 1rem; z-index: 10;" onclick="app.closeTutorial()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="tutorial-content" style="text-align: center; padding: 1rem;">
+                <!-- Injected via JS -->
+            </div>
+            <div class="modal-buttons" style="flex-direction: row; justify-content: space-between; gap: 0.5rem; padding: 1rem; border-top: 1px solid var(--glass-border);">
+                <button id="tutorial-prev" class="btn btn-secondary" style="flex:1;" onclick="app.prevTutorialStep()">Back</button>
+                <div id="tutorial-dots" style="display: flex; gap: 0.4rem; align-items: center; justify-content: center; flex: 1;"></div>
+                <button id="tutorial-next" class="btn btn-primary feature-gradient" style="flex:1;" onclick="app.nextTutorialStep()">Next</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
 </head>
 
 <body>
     <!-- App Shell -->
     <div id="app-container">
+        <!-- Newsreel / Top Banner -->
+        <div id="newsreel" class="newsreel hidden"></div>
 
         <!-- Header -->
         <header id="main-header" class="glass-header">
@@ -61,11 +81,6 @@
 
                     <div class="glass-card" style="width: 100%; max-width: 400px;">
                         <div class="form-group">
-                            <label>Nickname (Your Introduction Marker)</label>
-                            <input type="text" id="login-nickname" class="input-modern"
-                                placeholder="e.g. EarthFriend99">
-                        </div>
-                        <div class="form-group">
                             <label>Email Address</label>
                             <input type="email" id="login-email" class="input-modern" placeholder="hello@example.com">
                         </div>
@@ -89,6 +104,11 @@
                         <button class="btn btn-primary btn-block mt-4" id="login-btn" onclick="app.login()">
                             Join the Conviction Network / Login
                         </button>
+                        <div style="text-align: center; margin-top: 1.5rem;">
+                            <a href="#" onclick="app.continueAsGuest(); return false;" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color='var(--text-secondary)'">
+                                <i class="fa-solid fa-magnifying-glass" style="margin-right: 0.3rem;"></i> Continue as Guest Explorer
+                            </a>
+                        </div>
                         <p id="login-error" class="hidden"
                             style="color: var(--text-warning); margin-top: 1rem; text-align: center; font-size: 0.85rem;">
                         </p>
@@ -269,22 +289,28 @@
 
             <!-- Scanner View -->
             <section id="view-scanner" class="view hidden">
-                <div class="page-header">
-                    <h1>Scanner</h1>
-                    <p>Check in or verify a purchase</p>
-                </div>
-                <div class="scanner-container glass-card" style="padding: 1.5rem;">
-                    <div id="reader-container" style="display: none; margin-bottom: 1rem;">
-                        <div id="reader"
-                            style="width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;">
+                <div class="constrained-view">
+                    <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+                        <div>
+                            <h1>Scanner</h1>
                         </div>
-                        <button class="btn btn-secondary btn-block mt-4" onclick="app.stopScanner()">Stop
-                            Scanner</button>
-                    </div>
-                    <div class="scanner-actions" id="scanner-actions">
-                        <button class="btn btn-primary btn-block" onclick="app.startScanner()">
-                            <i class="fa-solid fa-camera"></i> Start Camera Scanner
+                        <button class="btn btn-secondary" onclick="app.startTutorial()" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
+                            Scanning Tutorial
                         </button>
+                    </div>
+                    <div class="scanner-container glass-card" style="padding: 1rem;">
+                        <div id="reader-container" style="display: none; margin-bottom: 1rem;">
+                            <div id="reader"
+                                style="width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;">
+                            </div>
+                            <button class="btn btn-secondary btn-block mt-4" onclick="app.stopScanner()">Stop
+                                Scanner</button>
+                        </div>
+                        <div class="scanner-actions" id="scanner-actions">
+                            <button class="btn btn-primary btn-block" onclick="app.startScanner()">
+                                <i class="fa-solid fa-camera"></i> Start Camera Scanner
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -335,7 +361,7 @@
                             onclick="app.logout()">
                             <i class="fa-solid fa-right-from-bracket"></i> Sign Out
                         </button>
-                        <p style="text-align: center; font-size: 0.7rem; color: var(--text-secondary); margin-top: 1rem; opacity: 0.6;">Version 0.9</p>
+                        <p style="text-align: center; font-size: 0.7rem; color: var(--text-secondary); margin-top: 1rem; opacity: 0.6;">Version 0.91</p>
                     </div>
                 </div>
             </section>
@@ -1176,6 +1202,27 @@
                     <p>We'll send a secure verification link to your inbox.</p>
                     <button class="btn btn-primary btn-block mt-4" onclick="app.sendRealEmailVerification()">
                         Send Verification Link
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guest Gate Modal -->
+        <div id="modal-guest-gate" class="modal hidden">
+            <div class="modal-content glass-card" style="max-width: 400px; text-align: center; padding: 2rem;">
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; justify-content: center; align-items: center; font-size: 2.5rem; margin: 0 auto 1.5rem; box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);">
+                    <i class="fa-solid fa-shield-heart" style="color: #FFF;"></i>
+                </div>
+                <h2 style="margin-bottom: 0.5rem;">Join the Network</h2>
+                <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem;">
+                    Checking-in and earning Privileges requires a verified membership in the Conviction Network.
+                </p>
+                <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <button class="btn btn-primary btn-block feature-gradient" style="border:none;" onclick="app.exitGuestMode()">
+                        <i class="fa-solid fa-user-plus"></i> Join as a Member
+                    </button>
+                    <button class="btn btn-secondary btn-block" onclick="app.closeGuestGate()">
+                        Keep Exploring as Guest
                     </button>
                 </div>
             </div>
