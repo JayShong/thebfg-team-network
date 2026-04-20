@@ -700,7 +700,8 @@ const app = {
             this.currentView = viewId;
         }
         
-        if (viewId === 'admin') this.renderAdminList();
+                if (viewId === 'admin') this.renderAdminList();
+        if (viewId === 'audit-hub') this.renderAuditHub();
 
         // Update Nav
         document.querySelectorAll('.nav-item').forEach(el => {
@@ -1811,21 +1812,19 @@ const app = {
             el.style.display = isSuperAdmin ? '' : 'none';
         });
 
-        // Show/hide auditor-gated sections based on role
+                // Show/hide auditor-gated sections based on role
         const isAuditor = currentUser && (currentUser.isAuditor || currentUser.isSuperAdmin);
+        
         const adminYASection = document.getElementById('admin-ya-section');
-        if (adminYASection) {
-            adminYASection.style.display = isAuditor ? 'block' : 'none';
-        }
         const scoreSection = document.getElementById('score-section');
-        if (scoreSection) {
-            const typeSelect = document.getElementById('admin-biz-type');
-            const isFull = !typeSelect || typeSelect.value !== 'affiliate';
-            scoreSection.style.display = (isAuditor && isFull) ? 'block' : 'none';
-        }
+        const typeGroup = document.getElementById('admin-biz-type-group');
+
+        if (adminYASection) adminYASection.style.display = isAuditor ? 'block' : 'none';
+        if (scoreSection) scoreSection.style.display = isAuditor ? 'block' : 'none';
+        if (typeGroup) typeGroup.style.display = isAuditor ? 'block' : 'none';
         
         this.renderAdminInitiatives();
-        this._checkRenewals();
+        _checkRenewals();
     },
 
     _checkRenewals() {
@@ -2719,29 +2718,27 @@ const app = {
                     ...(newStatus === 'expired' ? { expiryDate, expiryReason } : { expiryDate: '', expiryReason: '' })
                 };
 
-                // Audit: detect changes
-                if ((oldBiz.status || 'active') !== newStatus) {
-                    if (newStatus === 'expired') {
-                        this._addAuditEntry(bizIndex, 'Expired', `Reason: ${expiryReason}. Expiry date: ${expiryDate}`);
-                    } else {
-                        this._addAuditEntry(bizIndex, 'Reinstated', 'Business reinstated to active status.');
+                                // Audit & Gating (v0.95)
+                const isAuditor = currentUser && (currentUser.isAuditor || currentUser.isSuperAdmin);
+                
+                if (!isAuditor) {
+                    // Force revert sensitive fields if an Admin somehow sent them
+                    businesses[bizIndex].score = oldBiz.score;
+                    businesses[bizIndex].yearlyAssessments = oldBiz.yearlyAssessments;
+                    businesses[bizIndex].type = oldBiz.type; // Block upgrade to 'full'
+                } else {
+                    // Auditor is editing: Detect sensitive changes for hierarchical audit logs
+                    if (JSON.stringify(oldBiz.score) !== JSON.stringify(businesses[bizIndex].score)) {
+                        this.createAuditEntry(this.adminEditingBizId, 'SCORE_CHANGE', 'Score updated:', 'Updated paradigm scoring for transparency alignment.');
+                    }
+                    if (oldBiz.type !== businesses[bizIndex].type && businesses[bizIndex].type === 'full') {
+                        this.createAuditEntry(this.adminEditingBizId, 'STATUS_UPGRADE', 'Transitioned from Affiliated to Full Member', 'Business successfully completed manual audit and verification process.');
+                    }
+                    if (JSON.stringify(oldBiz.yearlyAssessments) !== JSON.stringify(businesses[bizIndex].yearlyAssessments)) {
+                        this.createAuditEntry(this.adminEditingBizId, 'YA_UPDATE', 'Impact (YA) Data updated', 'Verified yearly assessment figures for for-good impact quantification.');
                     }
                 }
-                if (score && oldBiz.score && JSON.stringify(score) !== JSON.stringify(oldBiz.score)) {
-                    this._addAuditEntry(bizIndex, 'Score Updated', `New score: ${score.s}${score.e}${score.c}${score.soc}${score.env}`);
-                }
-                if (yearlyAssessments !== undefined && JSON.stringify(yearlyAssessments) !== JSON.stringify(oldBiz.yearlyAssessments || {})) {
-                    this._addAuditEntry(bizIndex, 'YA Data Updated', `Years updated: ${Object.keys(yearlyAssessments).join(', ')}`);
-                }
-                this._addAuditEntry(bizIndex, 'Edited', `Business details updated by ${currentUser.email}`);
 
-                if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-                    try {
-                        await db.collection('businesses').doc(this.adminEditingBizId).set(businesses[bizIndex], {merge:true});
-                    } catch (e) {
-                        console.warn("Could not sync business update to cloud:", e);
-                    }
-                }
                 this.saveData();
                 this.renderBusinessList();
                 this.showToast(`Successfully updated ${name}!`);
@@ -3881,10 +3878,282 @@ const app = {
             dot.className = `tutorial-dot ${i === this.tutorialStep ? 'active' : ''}`;
             dots.appendChild(dot);
         });
-    }
+    },
+
+    initAuditListener() {
+        if (!db || !currentUser || !currentUser.isSupervisor) return;
+        
+        db.collection('audit_logs')
+            .where('status', '==', 'PENDING_APPROVAL')
+            .onSnapshot(snapshot => {
+                let count = 0;
+                snapshot.forEach(doc => {
+                    const log = doc.data();
+                    if (log.supervisorEmail === currentUser.email || (log.supervisorEmails && log.supervisorEmails.includes(currentUser.email))) {
+                        count++;
+                    }
+                });
+                this.pendingApprovalCount = count;
+                this.updateNewsreel();
+            });
+    },
+
+    // --- Audit Lifecycle (v0.95) ---
+    
+    async createAuditEntry(bizId, type, details, initialSummary = '') {
+        if (!db) return null;
+        if (!currentUser) return null;
+
+        const biz = businesses.find(b => b.id === bizId);
+        const logData = {
+            bizId: bizId,
+            bizName: biz ? biz.name : 'Unknown',
+            type: type, // 'STATUS_UPGRADE', 'SCORE_CHANGE', 'YA_UPDATE', 'ADMIN_ONBOARD'
+            details: details, // Technical delta
+            publicSummary: initialSummary, // Auditor will refine this
+            status: 'SYSTEM_DRAFT',
+            auditorEmail: currentUser.email,
+            supervisorEmails: supervisorMap[currentUser.email] || [SUPER_ADMIN_EMAIL],
+            createdAt: new Date().toISOString(),
+            rejectionComment: ''
+        };
+
+        try {
+            const docRef = await db.collection('audit_logs').add(logData);
+            this.showToast(`New ${type} audit draft created.`);
+            return docRef.id;
+        } catch (e) {
+            console.error("Audit log creation error:", e);
+            return null;
+        }
+    },
+
+    async submitAuditToSupervisor(logId, summary, supervisorEmail) {
+        if (!db) return;
+        try {
+            await db.collection('audit_logs').doc(logId).update({
+                publicSummary: summary,
+                supervisorEmail: supervisorEmail,
+                status: 'PENDING_APPROVAL',
+                submittedAt: new Date().toISOString()
+            });
+            this.showToast("Submitted to supervisor for review.");
+            this.renderAuditHub();
+        } catch (e) {
+            console.error("Audit submission error:", e);
+        }
+    },
+
+    async approveAudit(logId) {
+        if (!db) return;
+        try {
+            const logDoc = await db.collection('audit_logs').doc(logId).get();
+            const log = logDoc.data();
+            
+            // Check self-approval restriction
+            if (currentUser.email === log.auditorEmail && !currentUser.isSuperAdmin) {
+                this.showToast("Self-approval is strictly prohibited.");
+                return;
+            }
+
+            await db.collection('audit_logs').doc(logId).update({
+                status: 'PUBLISHED',
+                approvedBy: currentUser.email,
+                approvedAt: new Date().toISOString()
+            });
+
+            this.showToast("Audit log published successfully.");
+            this.renderAuditHub();
+        } catch (e) {
+            console.error("Audit approval error:", e);
+        }
+    },
+
+    async rejectAudit(logId, comment) {
+        if (!db) return;
+        if (!comment) {
+            this.showToast("Rejection comment is required.");
+            return;
+        }
+        try {
+            await db.collection('audit_logs').doc(logId).update({
+                status: 'RETURNED',
+                rejectionComment: comment,
+                rejectedBy: currentUser.email,
+                rejectedAt: new Date().toISOString()
+            });
+            this.showToast("Log returned to auditor with comments.");
+            this.renderAuditHub();
+        } catch (e) {
+            console.error("Audit rejection error:", e);
+        }
+    },
+
+    async renderAuditHub() {
+        if (!db) return;
+        const container = document.getElementById('audit-hub-content');
+        if (!container) return;
+
+        container.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading verification queue...</div>';
+
+        const snapshot = await db.collection('audit_logs').get();
+        let logs = [];
+        snapshot.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
+        
+        // Sort by date locally to avoid index errors on new collections
+        logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        const myDrafts = logs.filter(l => l.auditorEmail === currentUser.email && (l.status === 'SYSTEM_DRAFT' || l.status === 'RETURNED'));
+        const pendingForMe = logs.filter(l => (l.supervisorEmail === currentUser.email || (l.supervisorEmails && l.supervisorEmails.includes(currentUser.email) && !l.supervisorEmail)) && l.status === 'PENDING_APPROVAL');
+
+        let html = '<div class="stats-grid" style="margin-bottom:2rem;">';
+        html += `<div class="stat-card glass-card"><h3>${myDrafts.length}</h3><p>My Pending Drafts</p></div>`;
+        html += `<div class="stat-card glass-card"><h3>${pendingForMe.length}</h3><p>Awaiting My Approval</p></div>`;
+        html += '</div>';
+
+        // --- Supervisor Queue ---
+        if (currentUser.isSupervisor) {
+            html += '<h3><i class="fa-solid fa-user-check" style="color:var(--accent-primary)"></i> Approvals Assigned to Me</h3>';
+            if (pendingForMe.length === 0) {
+                html += '<p style="color:var(--text-secondary); margin:1rem 0;">No logs currently awaiting your authorization.</p>';
+            } else {
+                pendingForMe.forEach(log => {
+                    html += `
+                        <div class="glass-card mt-3" style="border-left: 4px solid var(--accent-primary);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                <div>
+                                    <h4 style="margin:0;">${log.bizName} - ${log.type}</h4>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary);">Auditor: ${log.auditorEmail}</p>
+                                </div>
+                                <span class="cell-type cell-type-full" style="background:rgba(59,130,246,0.2);">Pending</span>
+                            </div>
+                            <div style="margin-top:1rem; padding:1rem; background:rgba(255,255,255,0.05); border-radius:var(--radius-sm);">
+                                <p style="font-weight:600; font-size:0.9rem;">Public Summary:</p>
+                                <p style="font-style:italic;">"${log.publicSummary}"</p>
+                                <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:0.5rem 0;">
+                                <p style="font-size:0.8rem; color:var(--text-secondary);">Technical Details: ${log.details}</p>
+                            </div>
+                            <div style="margin-top:1rem; display:flex; gap:0.5rem;">
+                                <button class="btn btn-primary" style="flex:1;" onclick="app.approveAudit('${log.id}')">Approve & Publish</button>
+                                <button class="btn btn-secondary" style="color:var(--text-warning); border-color:var(--text-warning);" onclick="var c=prompt('Enter rejection comment:'); if(c) app.rejectAudit('${log.id}', c)">Reject</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // --- Auditor Queue ---
+        if (currentUser.isAuditor) {
+            html += '<h3 class="mt-5"><i class="fa-solid fa-pen-nib" style="color:#81C784"></i> My Action Items</h3>';
+            if (myDrafts.length === 0) {
+                html += '<p style="color:var(--text-secondary); margin:1rem 0;">You have no active drafts or returned items.</p>';
+            } else {
+                myDrafts.forEach(log => {
+                    const isReturned = log.status === 'RETURNED';
+                    html += `
+                        <div class="glass-card mt-3" style="border-left: 4px solid ${isReturned ? 'var(--text-warning)' : '#81C784'};">
+                            <div style="display:flex; justify-content:space-between;">
+                                <div>
+                                    <h4 style="margin:0;">${log.bizName} - ${log.type}</h4>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary);">Created: ${new Date(log.createdAt).toLocaleDateString()}</p>
+                                </div>
+                                <span class="cell-type" style="background:${isReturned ? 'rgba(255,193,7,0.2)' : 'rgba(255,255,255,0.1)'}">${log.status}</span>
+                            </div>
+                            ${isReturned ? `
+                                <div style="margin-top:1rem; padding:1rem; background:rgba(211,47,47,0.1); border-radius:var(--radius-sm); border: 1px solid rgba(211,47,47,0.3);">
+                                    <p style="color:#FFCDD2; font-size:0.85rem;"><strong>Rejection Comment from ${log.rejectedBy}:</strong></p>
+                                    <p style="color:#FFF; font-size:0.9rem;">${log.rejectionComment}</p>
+                                </div>
+                            ` : ''}
+                            <div style="margin-top:1rem;">
+                                <label style="font-size:0.8rem; color:var(--text-secondary);">Public Summary (Draft for Compliance Timeline)</label>
+                                <textarea id="summary-${log.id}" class="input-modern" rows="2" style="width:100%;">${log.publicSummary || ''}</textarea>
+                                
+                                <label style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.8rem;">Target Supervisor</label>
+                                <select id="supervisor-${log.id}" class="input-modern" style="width:100%;">
+                                    ${(log.supervisorEmails || [SUPER_ADMIN_EMAIL]).map(email => `<option value="${email}">${email}</option>`).join('')}
+                                </select>
+                                
+                                <button class="btn btn-primary btn-block mt-3" onclick="app.submitAuditToSupervisor('${log.id}', document.getElementById('summary-${log.id}').value, document.getElementById('supervisor-${log.id}').value)">
+                                    Submit for Review
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        container.innerHTML = html;
+    },
+
+    async renderComplianceTimeline(targetElId, bizId) {
+        if (!db) return;
+        const container = document.getElementById(targetElId);
+        if (!container) return;
+
+        const snapshot = await db.collection('audit_logs')
+            .where('bizId', '==', bizId)
+            .where('status', '==', 'PUBLISHED')
+            .get();
+
+        const logs = [];
+        snapshot.forEach(doc => logs.push(doc.data()));
+        logs.sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt));
+
+        if (logs.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary); font-style:italic;">No verified compliance records available yet.</p>';
+            return;
+        }
+
+        let html = '<div class="compliance-timeline" style="border-left: 2px solid rgba(255,255,255,0.1); padding-left: 1.5rem; margin-top: 1rem; position: relative;">';
+        logs.forEach(log => {
+            html += `
+                <div class="timeline-item" style="margin-bottom: 2rem; position: relative;">
+                    <div style="width:12px; height:12px; background:var(--accent-success); border-radius:50%; position:absolute; left:-22px; top:5px; box-shadow: 0 0 10px var(--accent-success);"></div>
+                    <div style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:0.2rem;">${new Date(log.approvedAt).toLocaleDateString()} • Verified by ${log.approvedBy}</div>
+                    <div style="margin:0; font-size:0.95rem; line-height:1.5;">${log.publicSummary}</div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+    },
+
+
+    async toggleSupervisor(auditorEmail, supervisorEmail) {
+        if (!currentUser || !currentUser.isSuperAdmin) return;
+        if (auditorEmail === supervisorEmail) {
+            this.showToast("An auditor cannot supervise themselves.");
+            return;
+        }
+
+        let sups = supervisorMap[auditorEmail] || [];
+        if (sups.includes(supervisorEmail)) {
+            sups = sups.filter(e => e !== supervisorEmail);
+            this.showToast("Supervisor removed.");
+        } else {
+            sups.push(supervisorEmail);
+            this.showToast("Supervisor added.");
+        }
+
+        try {
+            await db.collection('supervisions').doc(auditorEmail).set({ supervisors: sups });
+            supervisorMap[auditorEmail] = sups;
+            this.renderUserRegistry();
+        } catch (e) {
+            console.error("Supervisor update error:", e);
+        }
+    },
 };
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
+
+
+
+

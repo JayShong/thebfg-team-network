@@ -634,7 +634,7 @@
                             <input type="text" id="admin-biz-founder-img" class="input-modern"
                                 placeholder="https://example.com/founder.jpg">
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
+                        <div class="form-group" id="admin-biz-type-group" style="grid-column: 1 / -1;">
                             <label>Membership Type</label>
                             <select id="admin-biz-type" class="input-modern">
                                 <option value="full">Full Member (Scored)</option>
@@ -740,6 +740,33 @@
                     <p id="admin-loading" class="hidden"
                         style="text-align: center; margin-top: 1rem; color: var(--text-warning);"><i
                             class="fa-solid fa-spinner fa-spin"></i> Processing forms, please wait...</p>
+                </div>
+
+                    <div class="stat-card glass-card feature-gradient" onclick="app.navigate('audit-hub')" style="cursor:pointer;">
+                        <i class="fa-solid fa-user-check stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Verification Hub</h3>
+                            <p>Manage Audit Approvals</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Global Registry Cards -->
+                <div class="stats-grid mt-4">
+                    <div class="stat-card glass-card feature-gradient" onclick="app.openSpreadsheet()" style="cursor:pointer;">
+                        <i class="fa-solid fa-table-columns stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>Business Registry</h3>
+                            <p style="font-size:0.8rem; color:var(--text-secondary);">Full spreadsheet view</p>
+                        </div>
+                    </div>
+                    <div id="btn-open-user-registry" class="stat-card glass-card success-gradient" onclick="app.openUserRegistry()" style="cursor:pointer; display:none;">
+                        <i class="fa-solid fa-users-gear stat-icon"></i>
+                        <div class="stat-info">
+                            <h3>User Registry</h3>
+                            <p style="font-size:0.8rem; color:var(--text-secondary);">Real-time member list</p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Initiatives Management -->
@@ -1103,6 +1130,71 @@
                     <div id="sheet-table-container" style="overflow-x:auto; max-height:65vh; overflow-y:auto;">
                         <!-- JS rendered table -->
                     </div>
+                </div>
+            </section>
+
+            <!-- Super Admin User Registry View -->
+            <section id="view-user-registry" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('admin')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Admin Portal
+                </button>
+                <div class="page-header"
+                    style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+                    <div>
+                        <h1><i class="fa-solid fa-users-viewfinder" style="color:var(--accent-success)"></i> Member Registry</h1>
+                        <p>Super Admin ΓÇö Complete user database</p>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-secondary" onclick="app.exportUsersCSV()" title="Export Users as CSV"
+                            style="border-color:var(--accent-success); color:var(--accent-success);">
+                            <i class="fa-solid fa-file-csv"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="glass-card" style="margin-bottom:1rem;">
+                    <div style="display:flex; gap:0.8rem; flex-wrap:wrap; align-items:center;">
+                        <div style="flex:1; min-width:200px;">
+                            <input type="text" id="user-sheet-search" class="input-modern"
+                                placeholder="Search by name or email..."
+                                oninput="app.renderUserRegistry()" style="width:100%;">
+                        </div>
+                        <div>
+                            <select id="user-sheet-role-filter" class="input-modern" onchange="app.renderUserRegistry()"
+                                style="min-width:160px;">
+                                <option value="all">All Roles</option>
+                                <option value="super">Super Admins</option>
+                                <option value="admin">Admins</option>
+                                <option value="auditor">Auditors</option>
+                                <option value="member">Standard Members</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top:0.5rem;">
+                        <span id="user-sheet-count" style="font-size:0.8rem; color:var(--text-secondary);"></span>
+                    </div>
+                </div>
+
+                <!-- Table Container -->
+                <div class="glass-card" style="padding:0; overflow:hidden;">
+                    <div id="user-sheet-table-container" style="overflow-x:auto; max-height:65vh; overflow-y:auto;">
+                        <!-- JS rendered table -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Auditor & Supervisor Verification Hub -->
+            <section id="view-audit-hub" class="view hidden">
+                <button class="back-btn" onclick="app.navigate('admin')">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Admin
+                </button>
+                <div class="page-header">
+                    <h1>Compliance Verification Hub</h1>
+                    <p>Auditor drafting and Supervisor approval workflow</p>
+                </div>
+                <div id="audit-hub-content">
+                    <!-- Populated by JS -->
                 </div>
             </section>
 
