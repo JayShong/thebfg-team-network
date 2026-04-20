@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is a super admin
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'jayshong@gmail.com' ||
+        request.auth.token.email in get(/databases/$(database)/documents/system/roles).data.adminEmails
+      );
+    }
+    
+    // Check if the user is an auditor or super admin
+    function isAuditor() {
+      return request.auth != null && (
+        request.auth.token.email == 'jayshong@gmail.com' ||
+        request.auth.token.email in get(/databases/$(database)/documents/system/roles).data.auditorEmails ||
+        isSuperAdmin()
+      );
+    }
+
+    // Users Collection - Protect PII by restricting reads
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // System Configurations - Only super admin can edit
+    match /system/{docId} {
+      allow read: if true; 
+      allow write: if isSuperAdmin();
+    }
+    
+    // Businesses Collection
+    match /businesses/{bizId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuditor();
+    }
+    
+    // Transactions / Logged activities
+    match /transactions/{txnId} {
+      allow read: if true;
+      // Allow user to create pending transactions if userId matches their auth uid
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Changing status to verified/returned, etc.
+      allow update, delete: if isSuperAdmin() || isAuditor();
+    }
+    
+    // Audit Logs Collection
+    match /audit_logs/{logId} {
+      allow read: if true;
+      allow write: if isAuditor() || isSuperAdmin();
+    }
+
+    // Initiatives Collection
+    match /initiatives/{initId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuditor();
+    }
+
+    // Privileges Collection
+    match /privileges/{privId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuditor();
+    }
+
+    // Supervisions Collection (Links auditors to supervisors)
+    match /supervisions/{supId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+  }
+}

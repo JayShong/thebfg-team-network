@@ -555,16 +555,15 @@ const app = {
                     if (!adminEmails.includes(SUPER_ADMIN_EMAIL)) adminEmails.unshift(SUPER_ADMIN_EMAIL);
                     if (!auditorEmails.includes(SUPER_ADMIN_EMAIL)) auditorEmails.unshift(SUPER_ADMIN_EMAIL);
                 } else {
-                    await db.collection('system').doc('roles').set({
-                        adminEmails: adminEmails,
-                        auditorEmails: auditorEmails
-                    });
+                    console.warn("System roles document not found. Root admin fallback in effect.");
                 }
 
                 // Fetch stats
                 const statsDoc = await db.collection('system').doc('stats').get();
                 if(statsDoc.exists) networkStats = statsDoc.data();
-                else await db.collection('system').doc('stats').set(networkStats); // inject default
+                else {
+                    console.warn("System stats document not found.");
+                }
                 
                 // Fetch businesses
                 const bizSnapshot = await db.collection('businesses').get();
@@ -2139,41 +2138,45 @@ const app = {
             return;
         }
 
-        if (this.scannedBusiness) {
-            if (db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-                try {
-                    await db.collection('transactions').add({
-                        type: 'purchase',
-                        bizId: this.scannedBusiness.id,
-                        userId: currentUser.id,
-                        userNickname: currentUser.name,
-                        receipt: receipt,
-                        amount: parseFloat(amount),
-                        status: 'pending',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } catch(e) { console.warn("Purchase Log failed", e); }
+        if (this.scannedBusiness && db && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            try {
+                await db.collection('transactions').add({
+                    type: 'purchase',
+                    bizId: this.scannedBusiness.id,
+                    userId: currentUser.id,
+                    userNickname: currentUser.name,
+                    receipt: receipt,
+                    amount: parseFloat(amount),
+                    status: 'pending',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                document.getElementById('receipt-input').value = '';
+                document.getElementById('amount-input').value = '';
+                
+                // Server verified, update local metrics
+                currentUser.purchases++;
+                if (!currentUser.activityLog) currentUser.activityLog = [];
+                currentUser.activityLog.push({
+                    timestamp: new Date().toISOString(),
+                    bizId: this.scannedBusiness ? this.scannedBusiness.id : 'unknown',
+                    type: 'purchase',
+                    location: this.scannedBusiness ? (this.scannedBusiness.location || '') : ''
+                });
+                networkStats.purchases++;
+                this.saveData();
+                this.renderStats();
+                this.evaluateBadges(currentUser);
+
+                this.showSuccessModal(`Purchase logged! Thank you for being part of the empathy economy!`);
+
+            } catch(e) { 
+                console.warn("Purchase Log failed", e);
+                this.showToast("Network error: Could not log purchase. Please try again.");
             }
+        } else {
+            this.showToast("Cannot log purchase offline.");
         }
-
-        document.getElementById('receipt-input').value = '';
-        document.getElementById('amount-input').value = '';
-        
-        // Update local purchase count (server reconciliation handles final verification)
-        currentUser.purchases++;
-        if (!currentUser.activityLog) currentUser.activityLog = [];
-        currentUser.activityLog.push({
-            timestamp: new Date().toISOString(),
-            bizId: this.scannedBusiness ? this.scannedBusiness.id : 'unknown',
-            type: 'purchase',
-            location: this.scannedBusiness ? (this.scannedBusiness.location || '') : ''
-        });
-        networkStats.purchases++;
-        this.saveData();
-        this.renderStats();
-        this.evaluateBadges(currentUser);
-
-        this.showSuccessModal(`Purchase logged! Thank you for being part of the empathy economy!`);
     },
 
     showToast(message) {
