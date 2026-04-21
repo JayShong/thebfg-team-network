@@ -2,11 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper to safely check if a document exists and get its data
+    function getRolesData() {
+      return exists(/databases/$(database)/documents/system/roles) 
+        ? get(/databases/$(database)/documents/system/roles).data 
+        : {"adminEmails": [], "auditorEmails": []};
+    }
+
     // Check if the user is a super admin
     function isSuperAdmin() {
       return request.auth != null && (
         request.auth.token.email == 'jayshong@gmail.com' ||
-        request.auth.token.email in get(/databases/$(database)/documents/system/roles).data.adminEmails
+        request.auth.token.email in getRolesData().adminEmails
       );
     }
     
@@ -14,7 +21,7 @@ service cloud.firestore {
     function isAuditor() {
       return request.auth != null && (
         request.auth.token.email == 'jayshong@gmail.com' ||
-        request.auth.token.email in get(/databases/$(database)/documents/system/roles).data.auditorEmails ||
+        request.auth.token.email in getRolesData().auditorEmails ||
         isSuperAdmin()
       );
     }
@@ -31,10 +38,15 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
     
-    // Businesses Collection
+    // Business Directory
     match /businesses/{bizId} {
       allow read: if true;
       allow write: if isSuperAdmin() || isAuditor();
+      
+      // Allow owners to update their own profile (restricted fields)
+      allow update: if request.auth != null && 
+                    request.auth.token.email == resource.data.ownerEmail &&
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'status', 'isVerified', 'ownerEmail', 'id']);
     }
     
     // Transactions / Logged activities
@@ -62,6 +74,30 @@ service cloud.firestore {
     match /privileges/{privId} {
       allow read: if true;
       allow write: if isSuperAdmin() || isAuditor();
+    }
+
+    // Audit Submissions Collection (Draft -> Review -> Published Workflow)
+    match /audit_submissions/{submissionId} {
+      allow read: if request.auth != null && (
+        resource.data.auditorId == request.auth.uid || 
+        isSuperAdmin() || 
+        isAuditor()
+      );
+      
+      // Allow creation of drafts for auditors
+      allow create: if request.auth != null && isAuditor() && request.resource.data.status == 'draft';
+      
+      // Update rules:
+      // - Auditor can update their own drafts
+      // - Auditor can submit for review (draft -> review)
+      // - Supervisor can update any review
+      // - Supervisor can publish (review -> published)
+      allow update: if request.auth != null && (
+        (resource.data.auditorId == request.auth.uid && resource.data.status == 'draft') ||
+        (isSuperAdmin() && resource.data.status == 'review')
+      );
+      
+      allow delete: if isSuperAdmin();
     }
 
     // Supervisions Collection (Links auditors to supervisors)

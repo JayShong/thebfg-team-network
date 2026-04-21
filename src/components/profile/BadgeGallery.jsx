@@ -1,0 +1,93 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { BADGES_CONFIG, BADGE_CATEGORIES } from '../../utils/badgeLogic';
+
+const BadgeGallery = () => {
+    const { currentUser } = useAuth();
+    const [selectedBadge, setSelectedBadge] = useState(null);
+
+    const categoryOrder = ['Seen', 'Verified', 'Valued'];
+    const userBadges = currentUser?.badges || {};
+
+    return (
+        <div style={{ marginTop: '2rem' }}>
+            {categoryOrder.map(catKey => {
+                const catInfo = BADGE_CATEGORIES[catKey];
+                const catBadges = BADGES_CONFIG.filter(b => b.category === catKey);
+                const unlockedInCat = catBadges.filter(b => userBadges[b.id]?.unlocked).length;
+
+                return (
+                    <div key={catKey} className="badge-category-section glass-card" style={{ marginBottom: '1.5rem', borderLeft: `3px solid ${catInfo.color}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', paddingBottom: '0.5rem', borderBottom: `2px solid ${catInfo.color}33` }}>
+                            <i className={`fa-solid ${catInfo.icon}`} style={{ color: catInfo.color, fontSize: '1.1rem' }}></i>
+                            <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: 0, fontSize: '1rem', color: catInfo.color }}>{catInfo.label}</h4>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{catInfo.description}</p>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 600 }}>{unlockedInCat} / {catBadges.length}</span>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem' }}>
+                            {catBadges.map(b => {
+                                const isUnlocked = userBadges[b.id]?.unlocked;
+                                const stateClass = isUnlocked ? 'unlocked' : 'locked';
+                                
+                                return (
+                                    <div 
+                                        key={b.id}
+                                        className={`badge-item ${stateClass}`} 
+                                        style={{ cursor: 'pointer', padding: '0.8rem 0.5rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}
+                                        onClick={() => setSelectedBadge(b)}
+                                    >
+                                        <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem', color: isUnlocked ? catInfo.color : 'var(--text-secondary)', opacity: isUnlocked ? 1 : 0.3 }}>
+                                            <i className={`fa-solid ${b.icon}`}></i>
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffffff', opacity: isUnlocked ? 1 : 0.5 }}>{b.title}</div>
+                                        {b.tier && (
+                                            <span style={{ fontSize: '0.55rem', display: 'inline-block', marginTop: '0.2rem', padding: '0.1rem 0.4rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
+                                                {b.tier}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })}
+
+            {/* Simulated Badge Modal inline */}
+            {selectedBadge && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+                        <button onClick={() => setSelectedBadge(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                        
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                            <div style={{ fontSize: '3.5rem', color: BADGE_CATEGORIES[selectedBadge.category].color, margin: '1rem 0' }}>
+                                <i className={`fa-solid ${selectedBadge.icon}`}></i>
+                            </div>
+                            <h2 style={{ color: '#ffffff', marginBottom: '0.2rem' }}>{selectedBadge.title}</h2>
+                            <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.8rem', borderRadius: '1rem', color: 'var(--text-secondary)' }}>
+                                {selectedBadge.category} {selectedBadge.tier ? `· ${selectedBadge.tier}` : ''}
+                            </span>
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>The Why</h4>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#ffffff', lineHeight: '1.4' }}>{selectedBadge.why}</p>
+                        </div>
+
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
+                            <h4 style={{ color: BADGE_CATEGORIES[selectedBadge.category].color, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>How to Earn</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{selectedBadge.how}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default BadgeGallery;
