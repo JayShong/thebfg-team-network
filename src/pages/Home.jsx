@@ -9,7 +9,7 @@ const Home = () => {
         purchases: 0
     });
     
-    // Personal stats mock / fetch later when global context works
+    // Global user context will populate these in V1.0
     const personalStats = { checkins: 0, purchases: 0 };
     const quantifiedImpact = { waste: 0, trees: 0, families: 0 };
 
@@ -27,8 +27,8 @@ const Home = () => {
         fetchStats();
     }, []);
 
-    // Placeholder GDP stat until live pipeline
-    const gdpPenetration = "0.0000000000%";
+    // Future goal pipeline
+    const gdpPenetration = "0%";
 
     return (
         <div style={{ width: '100%', paddingBottom: '2rem' }}>

@@ -158,7 +158,7 @@ const Admin = () => {
                         </div>
                         <div className="form-group">
                             <label>Unique ID (Slug)</label>
-                            <input type="text" className="input-modern" placeholder="e.g. greenroots-cafe" value={newBiz.id} onChange={e => setNewBiz({...newBiz, id: e.target.value})} required />
+                            <input type="text" className="input-modern" placeholder="e.g. Morning Mist Coffee" value={newBiz.id} onChange={e => setNewBiz({...newBiz, id: e.target.value})} required />
                         </div>
                         <div className="form-group">
                             <label>Industry</label>
