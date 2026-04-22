@@ -262,3 +262,48 @@ async function runImpactAggregation() {
         purchaseVolume: totalVolume
     }, { merge: true });
 }
+
+// 6. GDPR Deletion Safeguard (Callable)
+exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+    const uid = context.auth.uid;
+    const userEmail = context.auth.token.email;
+
+    console.log(`Starting GDPR deletion for user: ${uid}`);
+
+    try {
+        // 1. Anonymize Transactions (De-linking)
+        const transSnap = await db.collection('transactions').where('userId', '==', uid).get();
+        const batch = db.batch();
+        
+        transSnap.forEach(doc => {
+            // We keep the impact data (amount, waste, etc) but remove the person
+            batch.update(doc.ref, { 
+                userId: 'deleted_user',
+                userName: 'Anonymized User',
+                userEmail: 'anonymized@thebfg.team'
+            });
+        });
+
+        // 2. Delete User Announcements/Notifications
+        const annSnap = await db.collection('announcements').where('targetEmail', '==', userEmail).get();
+        annSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // 3. Delete User Profile Document
+        batch.delete(db.collection('users').doc(uid));
+
+        // 4. Commit Firestore changes
+        await batch.commit();
+
+        // 5. Delete from Firebase Authentication (Admin SDK)
+        await admin.auth().deleteUser(uid);
+
+        console.log(`GDPR deletion successful for: ${uid}`);
+        return { success: true };
+    } catch (error) {
+        console.error('GDPR deletion failed:', error);
+        throw new functions.https.HttpsError('internal', 'Deletion process failed. Please contact support.');
+    }
+});

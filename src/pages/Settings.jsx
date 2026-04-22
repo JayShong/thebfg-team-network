@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { functions } from '../services/firebase';
 
 const CAUSES_LIST = [
     "Poverty Eradication",
@@ -16,7 +17,7 @@ const CAUSES_LIST = [
 ];
 
 const Settings = () => {
-    const { currentUser, updateProfile, sendPasswordReset } = useAuth();
+    const { currentUser, updateProfile, sendPasswordReset, logout } = useAuth();
     const navigate = useNavigate();
 
     const [nickname, setNickname] = useState('');
@@ -77,6 +78,28 @@ const Settings = () => {
             } catch (err) {
                 setMessage({ text: 'Failed to send reset email: ' + err.message, type: 'error' });
             }
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        const confirm1 = window.confirm("CRITICAL: Are you sure you want to delete your account? This action is IRREVERSIBLE and will purge all your badges and personal history.");
+        if (!confirm1) return;
+
+        const confirm2 = window.prompt("To confirm deletion, please type DELETE in all caps:");
+        if (confirm2 !== "DELETE") return;
+
+        setLoading(true);
+        try {
+            const deleteFn = functions.httpsCallable('deleteuseraccount');
+            await deleteFn();
+            alert("Account successfully deleted. Your impact has been anonymized for the national mission. Goodbye.");
+            await logout();
+            navigate('/login');
+        } catch (err) {
+            console.error("Deletion failed:", err);
+            alert("Failed to delete account: " + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -174,6 +197,22 @@ const Settings = () => {
                             </label>
                         ))}
                     </div>
+                </div>
+
+                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.3s', border: '1px solid rgba(255, 68, 68, 0.3)' }}>
+                    <h3 style={{ color: '#ff4444' }}><i className="fa-solid fa-triangle-exclamation"></i> Danger Zone</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                        Irreversibly delete your account. Your personal data will be purged in compliance with GDPR, but your positive impact metrics will be safely anonymized to preserve the network's historical accuracy.
+                    </p>
+                    <button 
+                        type="button" 
+                        onClick={handleDeleteAccount} 
+                        className="btn btn-secondary" 
+                        style={{ width: 'auto', padding: '0.75rem 1.5rem', backgroundColor: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', borderColor: '#ff4444' }}
+                        disabled={loading}
+                    >
+                        <i className="fa-solid fa-trash-can"></i> Delete My Account Permanently
+                    </button>
                 </div>
 
                 <button 
