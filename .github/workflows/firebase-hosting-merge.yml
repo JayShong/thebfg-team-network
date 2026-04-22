@@ -9,11 +9,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm ci && npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseToken: '${{ secrets.FIREBASE_TOKEN }}'
-          channelId: live
-          projectId: thebfgteam-9643a
-        env:
-          FIREBASE_CLI_PREVIEWS: hostingchannels
+      # Direct deployment using Firebase CLI to avoid action input errors
+      - run: npx firebase-tools deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --project thebfgteam-9643a
