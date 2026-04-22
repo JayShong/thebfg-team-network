@@ -4,9 +4,11 @@ import useBusinesses from '../hooks/useBusinesses';
 import { db } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
 import { drawStandee } from '../utils/assetUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 const Admin = () => {
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     const { businesses, loading } = useBusinesses();
     const [networkStats, setNetworkStats] = useState({ checkins: 0, purchases: 0 });
     const [showOnboard, setShowOnboard] = useState(false);
@@ -97,42 +99,6 @@ const Admin = () => {
         );
     };
 
-    const wipeMockData = async () => {
-        const pass = window.prompt("Type 'PURGE' to confirm deletion of all mock data and system stats reset:");
-        if (pass !== 'PURGE') return;
-
-        try {
-            // 1. Reset System Stats
-            await db.collection('system').doc('stats').set({
-                checkins: 0,
-                purchases: 0,
-                purchaseVolume: 0
-            });
-
-            // 2. Clear Audit Logs
-            const logsSnap = await db.collection('audit_logs').get();
-            const logBatch = db.batch();
-            logsSnap.forEach(doc => logBatch.delete(doc.ref));
-            await logBatch.commit();
-
-            // 3. Delete Mock Businesses (ID starts with biz_)
-            const bizSnap = await db.collection('businesses').get();
-            const bizBatch = db.batch();
-            let count = 0;
-            bizSnap.forEach(doc => {
-                if (doc.id.startsWith('biz_')) {
-                    bizBatch.delete(doc.ref);
-                    count++;
-                }
-            });
-            await bizBatch.commit();
-
-            alert(`System Purged! Reset stats, cleared logs, and removed ${count} mock businesses.`);
-            window.location.reload();
-        } catch (err) {
-            alert("Purge failed: " + err.message);
-        }
-    };
 
     return (
         <div style={{ paddingBottom: '3rem' }}>
@@ -215,24 +181,6 @@ const Admin = () => {
                 )}
             </div>
 
-            {/* Maintenance & Safety Section */}
-            {currentUser?.isSuperAdmin && (
-                <div className="glass-card slide-up mt-4" style={{ background: 'rgba(244,67,54,0.02)', border: '1px solid rgba(244,67,54,0.1)' }}>
-                    <h3 style={{ color: '#f44336' }}>Maintenance & Safety</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                        Dangerous operations to reset the platform state. Use with extreme caution.
-                    </p>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <button 
-                            onClick={wipeMockData} 
-                            className="nav-btn" 
-                            style={{ background: 'rgba(244,67,54,0.1)', color: '#f44336', border: '1px solid rgba(244,67,54,0.3)', width: '100%', justifyContent: 'center' }}
-                        >
-                            <i className="fa-solid fa-trash-can"></i> Wipe Mock Data & Reset Stats
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
