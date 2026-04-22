@@ -86,10 +86,14 @@ export const AuthProvider = ({ children }) => {
                     const rolesDoc = await db.collection('system').doc('roles').get();
                     if (rolesDoc.exists) {
                         const rolesData = rolesDoc.data();
-                        if (rolesData.adminEmails?.includes(user.email)) {
-                            profile.isSuperAdmin = true;
+                        // isAdmin array contains emails of users who can manage businesses
+                        if (rolesData.isAdmin?.includes(user.email)) {
+                            profile.isAdmin = true;
+                            // For simplicity, we treat admins as superAdmins for UI access
+                            profile.isSuperAdmin = profile.isSuperAdmin || true;
                         }
-                        if (rolesData.auditorEmails?.includes(user.email)) {
+                        // isAuditor array contains emails of users who can manage impact data
+                        if (rolesData.isAuditor?.includes(user.email)) {
                             profile.isAuditor = true;
                         }
                     }

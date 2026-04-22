@@ -12,6 +12,7 @@ const BusinessProfile = () => {
     
     const [business, setBusiness] = useState(null);
     const [selectedBranch, setSelectedBranch] = useState(null);
+    const [liveAuditLog, setLiveAuditLog] = useState([]);
 
     useEffect(() => {
         if (!loading && businesses.length > 0) {
@@ -21,6 +22,21 @@ const BusinessProfile = () => {
             }
         }
     }, [id, businesses, loading]);
+
+    useEffect(() => {
+        if (!id) return;
+        const unsubscribe = db.collection('audit_logs')
+            .where('bizId', '==', id)
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(snapshot => {
+                const logs = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setLiveAuditLog(logs);
+            });
+        return () => unsubscribe();
+    }, [id]);
 
     const getNickname = (email) => {
         if (!email) return 'Operator';
@@ -297,22 +313,25 @@ const BusinessProfile = () => {
                 </div>
 
                 {/* Audit Trail */}
-                {auditLog && auditLog.length > 0 && (
+                {liveAuditLog.length > 0 && (
                     <div className="detail-section glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-list-check"></i> System Audit Trail</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                            {[...auditLog].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((entry, idx) => (
-                                <div key={idx} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent-primary)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: '700', color: 'var(--accent-primary)' }}>{entry.action}</span>
-                                        <span>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                            {liveAuditLog.map((entry, idx) => {
+                                const date = entry.timestamp?.toDate ? entry.timestamp.toDate() : new Date(entry.timestamp);
+                                return (
+                                    <div key={entry.id || idx} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent-primary)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                                            <span style={{ fontWeight: '700', color: 'var(--accent-primary)' }}>{entry.action}</span>
+                                            <span>{date.toLocaleDateString()}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem' }}>{anonymizeText(entry.details)}</div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
+                                            Operator: {entry.userNickname || getNickname(entry.user)}
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '0.85rem' }}>{anonymizeText(entry.details)}</div>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
-                                        Operator: {entry.userNickname || getNickname(entry.user)}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}

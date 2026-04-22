@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../services/firebase';
+import firebase from 'firebase/compat/app';
 import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -159,6 +160,18 @@ const BusinessPortal = () => {
                         </div>
                     </div>
 
+                    {/* Verification Queue */}
+                    <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0 }}><i className="fa-solid fa-user-check" style={{ color: '#ffb84d' }}></i> Purchase Verification Queue</h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Review and verify customer purchase logs to validate network impact.</p>
+                            </div>
+                        </div>
+
+                        <PendingVerifications bizId={selectedBiz.id} />
+                    </div>
+
                     <div className="glass-card">
                         <h3>Public Narrative</h3>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
@@ -187,6 +200,106 @@ const BusinessPortal = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const PendingVerifications = ({ bizId }) => {
+    const [pending, setPending] = useState([]);
+    const [processing, setProcessing] = useState(null);
+    const { currentUser } = useAuth();
+
+    useEffect(() => {
+        if (!bizId) return;
+        const unsubscribe = db.collection('transactions')
+            .where('bizId', '==', bizId)
+            .where('status', '==', 'pending')
+            .where('type', '==', 'purchase')
+            .onSnapshot(snap => {
+                setPending(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        return () => unsubscribe();
+    }, [bizId]);
+
+    const handleVerify = async (trans, isApproved) => {
+        setProcessing(trans.id);
+        try {
+            const batch = db.batch();
+            const transRef = db.collection('transactions').doc(trans.id);
+            const bizRef = db.collection('businesses').doc(bizId);
+            const userRef = db.collection('users').doc(trans.userId);
+            const statsRef = db.collection('system').doc('stats');
+
+            if (isApproved) {
+                const amount = parseFloat(trans.amount) || 0;
+                
+                batch.update(transRef, { status: 'verified', verifiedAt: new Date().toISOString(), verifiedBy: currentUser.email });
+                batch.update(bizRef, {
+                    purchasesCount: firebase.firestore.FieldValue.increment(1),
+                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
+                });
+                batch.update(userRef, {
+                    purchases: firebase.firestore.FieldValue.increment(1),
+                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
+                });
+                batch.update(statsRef, {
+                    purchases: firebase.firestore.FieldValue.increment(1),
+                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
+                });
+
+                // Log to Audit Trail
+                const logRef = db.collection('audit_logs').doc();
+                batch.set(logRef, {
+                    bizId,
+                    action: 'PURCHASE_VERIFIED',
+                    details: `Purchase of RM ${amount} by ${trans.userNickname} verified by Founder.`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentUser.email,
+                    userNickname: currentUser.nickname || currentUser.email.split('@')[0]
+                });
+            } else {
+                batch.update(transRef, { status: 'rejected', rejectedAt: new Date().toISOString(), rejectedBy: currentUser.email });
+            }
+
+            await batch.commit();
+        } catch (e) {
+            console.error("Verification failed:", e);
+            alert("Verification failed. See console.");
+        } finally {
+            setProcessing(null);
+        }
+    };
+
+    if (pending.length === 0) return <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '1rem' }}>No pending purchases to verify.</p>;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {pending.map(t => (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}>
+                    <div>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>RM {parseFloat(t.amount).toLocaleString()}</p>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Logged by {t.userNickname} on {new Date(t.timestamp).toLocaleDateString()}</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                            disabled={processing === t.id}
+                            onClick={() => handleVerify(t, false)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
+                        >
+                            Reject
+                        </button>
+                        <button 
+                            disabled={processing === t.id}
+                            onClick={() => handleVerify(t, true)}
+                            className="btn btn-primary" 
+                            style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', background: '#4caf50', border: 'none' }}
+                        >
+                            {processing === t.id ? '...' : 'Approve'}
+                        </button>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };

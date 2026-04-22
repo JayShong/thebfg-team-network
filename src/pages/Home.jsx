@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 const Home = () => {
     const { currentUser } = useAuth();
@@ -12,33 +13,88 @@ const Home = () => {
         purchaseVolume: 0,
         gdpPenetration: "0.01%"
     });
-    
-    // Live user stats from context
-    const personalStats = { 
-        checkins: currentUser?.checkins || 0, 
-        purchases: currentUser?.purchases || 0 
-    };
 
-    // Derived Impact Logic (Approximate multipliers for Alpha)
-    const quantifiedImpact = { 
-        waste: Math.floor((currentUser?.purchaseVolume || 0) * 0.12), // 120g per RM spent
-        trees: Math.floor((currentUser?.purchaseVolume || 0) / 150),   // 1 tree per RM150
-        families: Math.floor((currentUser?.checkins || 0) / 10)       // 1 family supported per 10 checkins
-    };
+    const [quantifiedImpact, setQuantifiedImpact] = useState({ waste: 0, trees: 0, families: 0 });
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchData = async () => {
             try {
-                const doc = await db.collection('system').doc('stats').get();
-                if (doc.exists) {
-                    setStats(prev => ({...prev, ...doc.data()}));
-                }
+                // 1. Fetch Global Stats
+                const statsDoc = await db.collection('system').doc('stats').get();
+                if (statsDoc.exists) setStats(prev => ({...prev, ...statsDoc.data()}));
+
+                if (!currentUser) return;
+
+                // 2. Fetch Businesses & Transactions for Impact Calculation
+                const [bizSnap, transSnap] = await Promise.all([
+                    db.collection('businesses').get(),
+                    db.collection('transactions')
+                        .where('userId', '==', currentUser.uid)
+                        .where('type', '==', 'purchase')
+                        .get()
+                ]);
+
+                const businesses = bizSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const bizPurchases = {};
+                
+                transSnap.forEach(doc => {
+                    const t = doc.data();
+                    // We only count verified purchases for impact
+                    if (t.status === 'verified' || t.status === 'approved') {
+                        bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
+                    }
+                });
+
+                let waste = 0;
+                let trees = 0;
+                let families = 0;
+
+                Object.keys(bizPurchases).forEach(bizId => {
+                    const biz = businesses.find(b => b.id === bizId);
+                    if (biz && biz.status !== 'expired') {
+                        // 1 employee / job = 1 family supported (Legacy rule)
+                        families += (parseInt(biz.impactJobs) || 0);
+
+                        let latestRev = 0;
+                        let latestWaste = 0;
+                        let latestTrees = 0;
+
+                        if (biz.yearlyAssessments) {
+                            // Extract latest year metrics
+                            const assessments = Array.isArray(biz.yearlyAssessments) 
+                                ? biz.yearlyAssessments 
+                                : Object.values(biz.yearlyAssessments);
+
+                            assessments.forEach(ya => {
+                                const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                                if (rev > latestRev) {
+                                    latestRev = rev;
+                                    latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                                    latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                                }
+                            });
+                        }
+
+                        if (latestRev > 0) {
+                            const proportion = bizPurchases[bizId] / latestRev;
+                            waste += (proportion * latestWaste);
+                            trees += (proportion * latestTrees);
+                        }
+                    }
+                });
+
+                setQuantifiedImpact({
+                    waste: waste % 1 !== 0 ? parseFloat(waste.toFixed(2)) : waste,
+                    trees: Math.round(trees),
+                    families: families
+                });
+
             } catch (e) {
-                console.warn("Failed retrieving system stats");
+                console.warn("Impact sync failed:", e);
             }
         };
-        fetchStats();
-    }, []);
+        fetchData();
+    }, [currentUser]);
 
     const gdpPenetration = stats.gdpPenetration || "0%";
 
@@ -108,14 +164,14 @@ const Home = () => {
                     <i className="fa-solid fa-location-dot stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Check-ins</h3>
-                        <p className="stat-value">{personalStats.checkins}</p>
+                        <p className="stat-value">{currentUser?.checkins || 0}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card highlight-border" style={{ borderTopColor: 'var(--accent-success)' }}>
                     <i className="fa-solid fa-receipt stat-icon" style={{ color: 'var(--accent-success)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Purchases</h3>
-                        <p className="stat-value">{personalStats.purchases}</p>
+                        <p className="stat-value">{currentUser?.purchases || 0}</p>
                     </div>
                 </div>
             </div>
@@ -128,7 +184,7 @@ const Home = () => {
                 <div style={{ marginBottom: '1rem', marginTop: '0.5rem' }}>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Based on your verified spending, you have indirectly contributed to these ISO53001-audited outcomes across our Conviction Network.</p>
                     <p style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)', fontStyle: 'italic', marginTop: '0.4rem' }}>
-                        <i className="fa-solid fa-clock"></i> Deployment expected by June 2027.
+                        <i className="fa-solid fa-clock"></i> Deployment expected by {PLATFORM_CONFIG.IMPACT_ROADMAP_DATE}.
                     </p>
                 </div>
 

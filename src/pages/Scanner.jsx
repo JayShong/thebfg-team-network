@@ -74,40 +74,75 @@ const Scanner = () => {
             const batch = db.batch();
             const transactionRef = db.collection('transactions').doc();
             
-            // 1. Create Transaction Entry
             batch.set(transactionRef, {
                 type: 'checkin',
                 bizId: scannedBusiness.id,
                 bizName: scannedBusiness.name,
                 userId: currentUser.uid,
-                userNickname: currentUser.name || 'Anonymous',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'verified' // Check-ins are auto-verified
             });
 
-            // 2. Increment Business Stats
-            const bizRef = db.collection('businesses').doc(scannedBusiness.id);
-            batch.update(bizRef, { 
+            batch.update(db.collection('businesses').doc(scannedBusiness.id), { 
                 checkinsCount: firebase.firestore.FieldValue.increment(1) 
             });
 
-            // 3. Increment User Stats
-            const userRef = db.collection('users').doc(currentUser.uid);
-            batch.update(userRef, {
+            batch.update(db.collection('users').doc(currentUser.uid), {
                 checkins: firebase.firestore.FieldValue.increment(1)
             });
 
-            // 4. Increment System Stats
-            const systemRef = db.collection('system').doc('stats');
-            batch.update(systemRef, {
+            batch.update(db.collection('system').doc('stats'), {
                 checkins: firebase.firestore.FieldValue.increment(1)
             });
 
             await batch.commit();
             setIsSuccess(true);
             setScannedBusiness(null);
+            
+            // Evaluate Badges
+            const { evaluateBadges } = await import('../utils/badgeEngine');
+            const unlocked = await evaluateBadges(currentUser);
+            if (unlocked?.length > 0) {
+                alert(`🏆 Achievement Unlocked: ${unlocked.join(', ')}`);
+            }
         } catch(e) {
             console.error(e);
-            alert("Network Error: Could not log check-in.");
+            alert("Network Error: Could not log activity.");
+        }
+    };
+
+    const submitPurchase = async () => {
+        if (!currentUser) return;
+        const amountStr = prompt("Enter the total purchase amount (RM):", "0");
+        const amount = parseFloat(amountStr);
+        
+        if (isNaN(amount) || amount <= 0) {
+            alert("Please enter a valid amount.");
+            return;
+        }
+
+        try {
+            await db.collection('transactions').add({
+                type: 'purchase',
+                bizId: scannedBusiness.id,
+                bizName: scannedBusiness.name,
+                userId: currentUser.uid,
+                userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
+                amount: amount,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'pending' // Purchases require founder verification
+            });
+
+            setIsSuccess(true);
+            setScannedBusiness(null);
+            
+            // Evaluate Badges (some badges might count pending purchases or total counts)
+            const { evaluateBadges } = await import('../utils/badgeEngine');
+            await evaluateBadges(currentUser);
+        } catch(e) {
+            console.error(e);
+            alert("Failed to log purchase.");
         }
     };
 
@@ -175,6 +210,10 @@ const Scanner = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <button onClick={submitCheckin} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--primary)' }}>
                             <i className="fa-solid fa-check"></i> Found Them (Check-In)
+                        </button>
+
+                        <button onClick={submitPurchase} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
+                            <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
                         </button>
                         
                         <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>

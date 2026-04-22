@@ -122,49 +122,64 @@ const Admin = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '0.8rem' }}>
                     {currentUser?.isSuperAdmin && (
-                        <button 
-                            onClick={async () => {
-                                if (!window.confirm("Reconcile global statistics? This will recount all users, businesses, and transactions.")) return;
-                                try {
-                                    // 1. Businesses
-                                    const bizSnap = await db.collection('businesses').get();
-                                    const bizCount = bizSnap.size;
-                                    
-                                    // 2. Consumers
-                                    const userSnap = await db.collection('users').get();
-                                    const userCount = userSnap.size;
-                                    
-                                    // 3. Transactions
-                                    const transSnap = await db.collection('transactions').get();
-                                    let checkins = 0;
-                                    let purchases = 0;
-                                    let volume = 0;
-                                    transSnap.forEach(doc => {
-                                        const d = doc.data();
-                                        if (d.type === 'checkin') checkins++;
-                                        if (d.type === 'purchase') { purchases++; volume += (d.amount || 0); }
-                                    });
+                        <>
+                            <button 
+                                onClick={async () => {
+                                    const { PLATFORM_CONFIG } = await import('../config/platformConfig');
+                                    if (!window.confirm("Reconcile global statistics? This will recount all users, businesses, and transactions.")) return;
+                                    try {
+                                        const bizSnap = await db.collection('businesses').get();
+                                        const userSnap = await db.collection('users').get();
+                                        const transSnap = await db.collection('transactions').get();
+                                        
+                                        let checkins = 0;
+                                        let purchases = 0;
+                                        let volume = 0;
+                                        let totalRevenue = 0;
 
-                                    await db.collection('system').doc('stats').set({
-                                        consumers: userCount,
-                                        businesses: bizCount,
-                                        checkins: checkins,
-                                        purchases: purchases,
-                                        purchaseVolume: volume,
-                                        gdpPenetration: "0.01%"
-                                    }, { merge: true });
+                                        bizSnap.forEach(doc => {
+                                            const biz = doc.data();
+                                            if (biz.status !== 'expired' && biz.yearlyAssessments) {
+                                                let latestRev = 0;
+                                                const assessments = Array.isArray(biz.yearlyAssessments) ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
+                                                assessments.forEach(ya => {
+                                                    const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                                                    if (rev > latestRev) latestRev = rev;
+                                                });
+                                                totalRevenue += latestRev;
+                                            }
+                                        });
 
-                                    alert("Statistics Reconciled!");
-                                    window.location.reload();
-                                } catch (e) {
-                                    alert("Reconciliation failed: " + e.message);
-                                }
-                            }}
-                            className="nav-btn" 
-                            style={{ fontSize: '0.85rem', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)' }}
-                        >
-                            <i className="fa-solid fa-sync"></i> Reconcile Stats
-                        </button>
+                                        transSnap.forEach(doc => {
+                                            const d = doc.data();
+                                            if (d.type === 'checkin') checkins++;
+                                            if (d.type === 'purchase') { purchases++; volume += (parseFloat(d.amount) || 0); }
+                                        });
+
+                                        const penetration = (totalRevenue / PLATFORM_CONFIG.NOMINAL_GDP_MY_RM) * 100;
+
+                                        await db.collection('system').doc('stats').set({
+                                            consumers: userSnap.size,
+                                            businesses: bizSnap.size,
+                                            checkins: checkins,
+                                            purchases: purchases,
+                                            purchaseVolume: volume,
+                                            gdpPenetration: penetration.toFixed(10) + '%'
+                                        }, { merge: true });
+
+                                        alert("Statistics Reconciled!");
+                                        window.location.reload();
+                                    } catch (e) {
+                                        alert("Reconciliation failed: " + e.message);
+                                    }
+                                }}
+                                className="nav-btn" 
+                                style={{ fontSize: '0.85rem', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)' }}
+                            >
+                                <i className="fa-solid fa-sync"></i> Reconcile Stats
+                            </button>
+                            <RoleManager />
+                        </>
                     )}
                     <button onClick={() => setShowOnboard(!showOnboard)} className="nav-btn active" style={{ fontSize: '0.85rem' }}>
                         <i className="fa-solid fa-plus-circle"></i> Onboard Merchant
@@ -239,6 +254,70 @@ const Admin = () => {
                 )}
             </div>
 
+        </div>
+    );
+};
+
+const RoleManager = () => {
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState('isAdmin');
+    const [roles, setRoles] = useState({});
+
+    useEffect(() => {
+        const unsubscribe = db.collection('system').doc('roles').onSnapshot(doc => {
+            if (doc.exists) setRoles(doc.data());
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleUpdate = async (isRemoving = false) => {
+        if (!email.includes('@')) return alert("Enter a valid email.");
+        try {
+            const cleanEmail = email.trim().toLowerCase();
+            const currentRoleList = roles[role] || [];
+            let updatedList;
+            
+            if (isRemoving) {
+                updatedList = currentRoleList.filter(e => e !== cleanEmail);
+            } else {
+                if (currentRoleList.includes(cleanEmail)) return alert("Already has this role.");
+                updatedList = [...currentRoleList, cleanEmail];
+            }
+
+            await db.collection('system').doc('roles').update({
+                [role]: updatedList
+            });
+            setEmail('');
+            alert(`Role ${isRemoving ? 'removed' : 'assigned'} successfully.`);
+        } catch (e) {
+            alert("Role update failed: " + e.message);
+        }
+    };
+
+    return (
+        <div className="glass-card mt-4" style={{ textAlign: 'left', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <h4 style={{ margin: '0 0 1rem' }}><i className="fa-solid fa-users-gear"></i> Network Role Management</h4>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                <input 
+                    type="email" 
+                    className="input-modern" 
+                    style={{ flex: 1, minWidth: '200px' }} 
+                    placeholder="user@example.com" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                />
+                <select className="input-modern" value={role} onChange={e => setRole(e.target.value)}>
+                    <option value="isAdmin">Admin</option>
+                    <option value="isAuditor">Auditor</option>
+                </select>
+                <button className="nav-btn active" onClick={() => handleUpdate(false)}>Add</button>
+                <button className="nav-btn" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleUpdate(true)}>Remove</button>
+            </div>
+            
+            <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: '0.5rem 0' }}><strong>Current Admins:</strong> {(roles.isAdmin || []).join(', ') || 'None'}</p>
+                <p style={{ margin: '0.5rem 0' }}><strong>Current Auditors:</strong> {(roles.isAuditor || []).join(', ') || 'None'}</p>
+            </div>
         </div>
     );
 };
