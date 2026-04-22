@@ -59,9 +59,12 @@ service cloud.firestore {
     }
     
     // Audit Logs Collection
-    match /audit_logs/{logId} {
+    match /compliance_logs/{logId} {
       allow read: if true;
-      allow write: if isAuditor() || isSuperAdmin();
+      allow create: if isAuditor() || isSuperAdmin();
+      // Auditors can edit until approved. Once approved, it is locked.
+      allow update: if (isAuditor() || isSuperAdmin()) && resource.data.status != 'approved';
+      allow delete: if isSuperAdmin();
     }
 
     // Announcements Collection

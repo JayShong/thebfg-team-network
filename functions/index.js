@@ -1,5 +1,6 @@
-const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const functions = require('firebase-functions');
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -147,3 +148,117 @@ exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (
     }
     return null;
 });
+
+// 4. Role Management Safeguard (Callable)
+exports.managerole = functions.https.onCall(async (data, context) => {
+    // 1. Verify Requester is Admin
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    
+    const adminSnap = await db.collection('system').doc('roles').get();
+    const adminEmails = adminSnap.data()?.isAdmin || [];
+    const rootAdmin = 'jayshong@gmail.com';
+    
+    if (context.auth.token.email !== rootAdmin && !adminEmails.includes(context.auth.token.email)) {
+        throw new functions.https.HttpsError('permission-denied', 'Only admins can manage roles.');
+    }
+
+    const { targetEmail, roleField, action } = data;
+    const cleanEmail = targetEmail.trim().toLowerCase();
+
+    // 2. Safeguard: Verify User Exists
+    const userSnap = await db.collection('users').where('email', '==', cleanEmail).get();
+    if (userSnap.empty) {
+        throw new functions.https.HttpsError('not-found', `No registered user found with email ${cleanEmail}.`);
+    }
+
+    // 3. Update Roles
+    const currentList = adminSnap.data()?.[roleField] || [];
+    let updatedList;
+
+    if (action === 'assign') {
+        if (currentList.includes(cleanEmail)) return { message: 'Already assigned.' };
+        updatedList = [...currentList, cleanEmail];
+    } else {
+        updatedList = currentList.filter(e => e !== cleanEmail);
+    }
+
+    await db.collection('system').doc('roles').update({ [roleField]: updatedList });
+    
+    // 4. Log Action
+    await db.collection('system').doc('audit_trail').collection('logs').add({
+        action: `${action}_role`,
+        target: cleanEmail,
+        role: roleField,
+        performedBy: context.auth.token.email,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true };
+});
+
+// 5. Institutional Impact Aggregator
+// Triggers on any business update to recalculate global totals
+exports.aggregatenetworkimpact = onDocumentCreated('businesses/{bizId}', async (event) => {
+    return runImpactAggregation();
+});
+
+exports.onbusinessupdated = onDocumentUpdated('businesses/{bizId}', async (event) => {
+    return runImpactAggregation();
+});
+
+async function runImpactAggregation() {
+    console.log('Running Global Impact Aggregation...');
+    const bizSnap = await db.collection('businesses').get();
+    const transSnap = await db.collection('transactions').where('type', '==', 'purchase').get();
+
+    let totalWaste = 0;
+    let totalTrees = 0;
+    let totalFamilies = 0;
+    let totalVolume = 0;
+
+    // 1. Calculate Global Purchase Volume and proportions
+    const bizPurchases = {};
+    transSnap.forEach(doc => {
+        const t = doc.data();
+        if (t.status === 'verified' || t.status === 'approved') {
+            const amount = parseFloat(t.amount) || 0;
+            totalVolume += amount;
+            bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + amount;
+        }
+    });
+
+    // 2. Aggregate Impact based on business assessments
+    bizSnap.forEach(doc => {
+        const biz = doc.data();
+        totalFamilies += (parseInt(biz.impactJobs) || 0);
+
+        if (bizPurchases[doc.id]) {
+            let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+            const assessments = Array.isArray(biz.yearlyAssessments) 
+                ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
+
+            assessments.forEach(ya => {
+                const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                if (rev > latestRev) {
+                    latestRev = rev;
+                    latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                    latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                }
+            });
+
+            if (latestRev > 0) {
+                const proportion = bizPurchases[doc.id] / latestRev;
+                totalWaste += (proportion * latestWaste);
+                totalTrees += (proportion * latestTrees);
+            }
+        }
+    });
+
+    // 3. Update Global Stats
+    return db.collection('system').doc('stats').set({
+        totalWaste: Math.round(totalWaste),
+        totalTrees: Math.round(totalTrees),
+        totalFamilies: totalFamilies,
+        purchaseVolume: totalVolume
+    }, { merge: true });
+}

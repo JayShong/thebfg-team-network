@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useBusinesses from '../hooks/useBusinesses';
-import { db } from '../services/firebase';
+import { db, auth, functions } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
 import { drawStandee } from '../utils/assetUtils';
 import { useAuth } from '../contexts/AuthContext';
@@ -525,38 +525,26 @@ const RoleManager = () => {
         if (!window.confirm(`Are you sure you want to ${action} the ${roleField} role for ${targetEmail}?`)) return;
 
         try {
-            const cleanEmail = targetEmail.trim().toLowerCase();
-            
-            // Verification logic as per User requirement
-            const userCheck = await db.collection('users').where('email', '==', cleanEmail).get();
-            if (userCheck.empty) {
-                return alert(`Verification Failed: No user found with email ${cleanEmail}. Please ensure the user has registered on the platform first.`);
-            }
-
-            const currentList = roles[roleField] || [];
-            let updatedList;
-            
-            if (isRemoving) {
-                updatedList = currentList.filter(e => e !== cleanEmail);
-            } else {
-                if (currentList.includes(cleanEmail)) return alert("User already has this role.");
-                updatedList = [...currentList, cleanEmail];
-            }
-
-            await db.collection('system').doc('roles').update({
-                [roleField]: updatedList
+            setLoading(true);
+            const manageRoleFn = functions.httpsCallable('managerole');
+            const result = await manageRoleFn({
+                targetEmail,
+                roleField,
+                action: isRemoving ? 'remove' : 'assign'
             });
 
-            // Notify user via newsreel if assigning
-            if (!isRemoving) {
-                await db.collection('announcements').add({
-                    message: `Congratulations! You have been granted ${roleField} privileges. Access your new tools in the sidebar.`,
-                    type: 'success',
-                    status: 'active',
-                    targetEmail: cleanEmail,
-                    createdAt: new Date().toISOString()
-                });
+            if (result.data.success) {
+                alert(`Successfully ${isRemoving ? 'removed' : 'assigned'} ${roleField} role.`);
+            } else if (result.data.message) {
+                alert(result.data.message);
             }
+        } catch (e) {
+            console.error("Role update failed:", e);
+            alert(e.message || "Failed to update role. Ensure the user is registered.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
             // Log the administrative action
             await db.collection('system').doc('audit_trail').collection('logs').add({
