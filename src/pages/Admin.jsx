@@ -5,6 +5,7 @@ import { db } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
 import { drawStandee } from '../utils/assetUtils';
 import { useAuth } from '../contexts/AuthContext';
+import firebase from 'firebase/compat/app';
 
 const Admin = () => {
     const navigate = useNavigate();
@@ -30,14 +31,26 @@ const Admin = () => {
         e.preventDefault();
         if (!newBiz.id || !newBiz.name) return alert("ID and Name are mandatory.");
         try {
-            await db.collection('businesses').doc(newBiz.id).set({
+            const batch = db.batch();
+            const bizRef = db.collection('businesses').doc(newBiz.id);
+            
+            batch.set(bizRef, {
                 ...newBiz,
                 status: 'active',
                 isVerified: false,
-                checkins: 0,
-                purchases: 0,
+                checkinsCount: 0,
+                purchasesCount: 0,
+                purchaseVolume: 0,
                 createdAt: new Date().toISOString()
             });
+
+            // Update System Stats
+            const statsRef = db.collection('system').doc('stats');
+            batch.update(statsRef, {
+                businesses: firebase.firestore.FieldValue.increment(1)
+            });
+
+            await batch.commit();
             setShowOnboard(false);
             setNewBiz({ id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '' });
             alert("Merchant successfully onboarded!");

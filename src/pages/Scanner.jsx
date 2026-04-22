@@ -71,18 +71,38 @@ const Scanner = () => {
         if (!currentUser) return;
 
         try {
-            await db.collection('transactions').add({
+            const batch = db.batch();
+            const transactionRef = db.collection('transactions').doc();
+            
+            // 1. Create Transaction Entry
+            batch.set(transactionRef, {
                 type: 'checkin',
                 bizId: scannedBusiness.id,
+                bizName: scannedBusiness.name,
                 userId: currentUser.uid,
                 userNickname: currentUser.name || 'Anonymous',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Reconcile standard business stats
-            let newCount = (scannedBusiness.checkinsCount || 0) + 1;
-            await db.collection('businesses').doc(scannedBusiness.id).set({ checkinsCount: newCount }, {merge:true});
+            // 2. Increment Business Stats
+            const bizRef = db.collection('businesses').doc(scannedBusiness.id);
+            batch.update(bizRef, { 
+                checkinsCount: firebase.firestore.FieldValue.increment(1) 
+            });
 
+            // 3. Increment User Stats
+            const userRef = db.collection('users').doc(currentUser.uid);
+            batch.update(userRef, {
+                checkins: firebase.firestore.FieldValue.increment(1)
+            });
+
+            // 4. Increment System Stats
+            const systemRef = db.collection('system').doc('stats');
+            batch.update(systemRef, {
+                checkins: firebase.firestore.FieldValue.increment(1)
+            });
+
+            await batch.commit();
             setIsSuccess(true);
             setScannedBusiness(null);
         } catch(e) {

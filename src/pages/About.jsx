@@ -1,6 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '../services/firebase';
 
 const About = () => {
+    const [stats, setStats] = useState({ gdpPenetration: '0%' });
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const doc = await db.collection('system').doc('stats').get();
+                if (doc.exists) setStats(prev => ({...prev, ...doc.data()}));
+            } catch (e) {
+                console.warn("Failed retrieving system stats for About page");
+            }
+        };
+        fetchStats();
+    }, []);
+
+    const progressWidth = stats.gdpPenetration || "0%";
     return (
         <div style={{ paddingBottom: '3rem' }}>
             {/* National Mission Hero */}
@@ -23,7 +39,7 @@ const About = () => {
                         <span>Phase 1</span>
                     </div>
                     <div style={{ height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', overflow: 'hidden' }}>
-                        <div style={{ width: '12%', height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent-success))', borderRadius: '6px' }}></div>
+                        <div style={{ width: progressWidth, height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent-success))', borderRadius: '6px' }}></div>
                     </div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.8rem' }}>
                         <i className="fa-solid fa-circle-info"></i> Your check-ins and verified purchases build the data infrastructure for this national goal.

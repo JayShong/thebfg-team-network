@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../services/firebase';
+import firebase from 'firebase/compat/app';
 
 const AuthContext = createContext();
 
@@ -116,13 +117,24 @@ export const AuthProvider = ({ children }) => {
 
     const signup = async (email, password) => {
         const credential = await auth.createUserWithEmailAndPassword(email, password);
-        await db.collection('users').doc(credential.user.uid).set({
+        const batch = db.batch();
+        const userRef = db.collection('users').doc(credential.user.uid);
+        const statsRef = db.collection('system').doc('stats');
+
+        batch.set(userRef, {
             email: email,
             name: email.split('@')[0], // Extract nickname
             purchases: 0,
             checkins: 0,
+            purchaseVolume: 0,
             created_at: new Date().toISOString()
         });
+
+        batch.update(statsRef, {
+            consumers: firebase.firestore.FieldValue.increment(1)
+        });
+
+        await batch.commit();
     };
 
     const continueAsGuest = () => {

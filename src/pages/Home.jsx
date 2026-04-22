@@ -1,17 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 const Home = () => {
+    const { currentUser } = useAuth();
     const [stats, setStats] = useState({
         consumers: 0,
         businesses: 0,
         checkins: 0,
-        purchases: 0
+        purchases: 0,
+        purchaseVolume: 0,
+        gdpPenetration: "0.01%"
     });
     
-    // Global user context will populate these in V1.0
-    const personalStats = { checkins: 0, purchases: 0 };
-    const quantifiedImpact = { waste: 0, trees: 0, families: 0 };
+    // Live user stats from context
+    const personalStats = { 
+        checkins: currentUser?.checkins || 0, 
+        purchases: currentUser?.purchases || 0 
+    };
+
+    // Derived Impact Logic (Approximate multipliers for Alpha)
+    const quantifiedImpact = { 
+        waste: Math.floor((currentUser?.purchaseVolume || 0) * 0.12), // 120g per RM spent
+        trees: Math.floor((currentUser?.purchaseVolume || 0) / 150),   // 1 tree per RM150
+        families: Math.floor((currentUser?.checkins || 0) / 10)       // 1 family supported per 10 checkins
+    };
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -27,8 +40,7 @@ const Home = () => {
         fetchStats();
     }, []);
 
-    // Future goal pipeline
-    const gdpPenetration = "0%";
+    const gdpPenetration = stats.gdpPenetration || "0%";
 
     return (
         <div style={{ width: '100%', paddingBottom: '2rem' }}>

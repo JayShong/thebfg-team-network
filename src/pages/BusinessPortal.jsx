@@ -142,12 +142,12 @@ const BusinessPortal = () => {
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                                <div className="stat-value">{selectedBiz.checkins || 0}</div>
+                                <div className="stat-value">{selectedBiz.checkinsCount || 0}</div>
                                 <div className="stat-label">Total Check-ins Received</div>
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <div className="stat-value">{selectedBiz.purchases || 0}</div>
+                                    <div className="stat-value">{selectedBiz.purchasesCount || 0}</div>
                                     <div style={{ fontSize: '0.9rem', color: '#ffb84d', fontWeight: '600', marginTop: '0.2rem' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
                                 </div>
                                 <div className="stat-label">Purchases from the Network</div>
