@@ -91,12 +91,39 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // C. Trigger Global Impact Aggregation
-        return runImpactAggregation();
+        // C. Trigger Global Impact Aggregation (Check-ins only for now)
+        if (txn.type === 'checkin') {
+            return runImpactAggregation();
+        }
+        return null;
     } catch (e) {
         console.error("Sentinel processing failed:", e);
         return null;
     }
+});
+
+// 3.1 Verification Trigger (Move Pending to Verified Stats)
+exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    // Triggered only when a purchase is verified by a merchant
+    if (before.status === 'pending' && after.status === 'verified') {
+        console.log(`Purchase verified for ${after.bizId}. Updating network stats.`);
+        
+        // 1. Update Global Stats Document (Real-time bump)
+        const statsRef = db.collection('system').doc('stats');
+        const amount = parseFloat(after.amount) || 0;
+        
+        await statsRef.set({
+            purchases: admin.firestore.FieldValue.increment(1),
+            purchaseVolume: admin.firestore.FieldValue.increment(amount)
+        }, { merge: true });
+
+        // 2. Trigger Full Impact Recount (for waste/trees/families)
+        return runImpactAggregation();
+    }
+    return null;
 });
 
 exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (event) => {

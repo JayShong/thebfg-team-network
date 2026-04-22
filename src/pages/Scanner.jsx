@@ -15,6 +15,7 @@ const Scanner = () => {
     const [tutorialStep, setTutorialStep] = useState(0);
     const [isSuccess, setIsSuccess] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Sentinel State
     const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
@@ -22,6 +23,15 @@ const Scanner = () => {
 
     useEffect(() => {
         if (!currentUser) return;
+        
+        // Globally Flagged Blocking
+        if (currentUser.isFlagged) {
+            setLockoutTimer(999999); // Indefinite lockout for flagged identities
+            setError('You have been naughty. Contact Jason at our Facebook page for help: https://www.facebook.com/groups/thebfg.team');
+            setScanning(false);
+            return;
+        }
+
         // Sync Sentinel State from Firestore
         const unsub = db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').onSnapshot(doc => {
             if (doc.exists) {
@@ -90,7 +100,8 @@ const Scanner = () => {
     };
 
     const submitCheckin = async () => {
-        if (!currentUser || !scannedBusiness) return;
+        if (!currentUser || !scannedBusiness || isSubmitting) return;
+        setIsSubmitting(true);
 
         const today = new Date().toISOString().split('T')[0];
         const lastCheckinDate = sentinelState.lastCheckins?.[scannedBusiness.id];
@@ -153,6 +164,8 @@ const Scanner = () => {
         } catch(e) {
             console.error(e);
             alert("Network Error: Could not log activity.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -161,8 +174,9 @@ const Scanner = () => {
     const [receiptId, setReceiptId] = useState('');
 
     const submitPurchase = async () => {
-        if (!currentUser || !amount) return;
+        if (!currentUser || !amount || isSubmitting) return;
         const finalAmount = parseFloat(amount);
+        setIsSubmitting(true);
         
         if (isNaN(finalAmount) || finalAmount <= 0) {
             alert("Please enter a valid amount.");
@@ -202,6 +216,8 @@ const Scanner = () => {
         } catch(e) {
             console.error(e);
             alert("Failed to log purchase.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -313,8 +329,8 @@ const Scanner = () => {
                                         style={{ width: '100%', marginBottom: '1.5rem' }}
                                     />
                                 </div>
-                                <button onClick={submitPurchase} className="btn btn-success" style={{ width: '100%' }}>
-                                    Confirm & Log Impact
+                                <button onClick={submitPurchase} disabled={isSubmitting} className="btn btn-success" style={{ width: '100%' }}>
+                                    {isSubmitting ? 'Logging Impact...' : 'Confirm & Log Impact'}
                                 </button>
                                 <button onClick={() => setPurchaseForm(false)} style={{ width: '100%', background: 'none', border: 'none', padding: '1rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
                                     <i className="fa-solid fa-arrow-left"></i> Back to selection
@@ -322,11 +338,11 @@ const Scanner = () => {
                             </div>
                         ) : (
                             <>
-                                <button onClick={submitCheckin} className="btn btn-primary" style={{ width: '100%' }}>
-                                    <i className="fa-solid fa-check"></i> Found Them (Check-In)
+                                <button onClick={submitCheckin} disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
+                                    {isSubmitting ? 'Verifying...' : <><i className="fa-solid fa-check"></i> Found Them (Check-In)</>}
                                 </button>
  
-                                <button onClick={() => setPurchaseForm(true)} className="btn btn-success" style={{ width: '100%' }}>
+                                <button onClick={() => setPurchaseForm(true)} disabled={isSubmitting} className="btn btn-success" style={{ width: '100%' }}>
                                     <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
                                 </button>
                                 

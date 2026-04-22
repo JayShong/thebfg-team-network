@@ -97,15 +97,17 @@ const AuditHub = () => {
 
     return (
         <div style={{ paddingBottom: '3rem' }}>
-            <div className="page-header" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <i className="fa-solid fa-clipboard-check fa-2x" style={{ color: '#4caf50' }}></i>
-                <div>
-                    <h2 style={{ margin: 0 }}>Verification Hub</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ISO53001 Compliance Workflow</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginTop: '0.4rem', fontStyle: 'italic' }}>
-                        <i className="fa-solid fa-circle-info"></i> The actual auditing process occurs off-platform. This dashboard monitors milestones and publishing.
-                    </p>
+            <div className="page-header" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <i className="fa-solid fa-clipboard-check fa-2x" style={{ color: '#4caf50' }}></i>
+                    <div>
+                        <h2 style={{ margin: 0 }}>Verification Hub</h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ISO53001 Compliance Workflow</p>
+                    </div>
                 </div>
+                <button onClick={() => window.history.back()} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                    <i className="fa-solid fa-arrow-left"></i> Back
+                </button>
             </div>
 
             <div className="stats-grid" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>

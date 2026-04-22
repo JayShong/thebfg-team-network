@@ -94,7 +94,12 @@ const BusinessPortal = () => {
 
             <div className="page-header" style={{ display: 'flex', alignItems: 'center', marginTop: '1rem', gap: '10px' }}>
                 <i className="fa-solid fa-briefcase fa-2x" style={{color: 'var(--primary)'}}></i>
-                <h2>{isSupportMode ? 'Support Workspace' : 'Merchant Portal'}</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h2 style={{ margin: 0 }}>{isSupportMode ? 'Support Workspace' : 'Business Dashboard'}</h2>
+                    <button onClick={() => navigate('/profile')} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                        <i className="fa-solid fa-arrow-left"></i> Back
+                    </button>
+                </div>
             </div>
             
             {myBusinesses.length > 1 && (

@@ -100,9 +100,8 @@ export const AuthProvider = ({ children }) => {
                 };
 
                 // Admin/Merchant Assistant UI Access
-                if (profile.isMerchantAssistant) {
-                    profile.isSuperAdmin = profile.isSuperAdmin || true;
-                }
+                // Removed: isSuperAdmin leak for Merchant Assistants. 
+                // Each portal is now strictly partitioned by specific role flags.
 
                 setCurrentUser(profile);
                 fetchRecentActivity(); // This now calls fetchPendingAudits as well
