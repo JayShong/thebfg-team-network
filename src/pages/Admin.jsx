@@ -265,33 +265,61 @@ const Admin = () => {
 
 const RoleManager = () => {
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('isAdmin');
-    const [roles, setRoles] = useState({});
+    const [roles, setRoles] = useState({ isAdmin: [], isAuditor: [] });
+    const [userRegistry, setUserRegistry] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const unsubscribe = db.collection('system').doc('roles').onSnapshot(doc => {
             if (doc.exists) setRoles(doc.data());
+            setLoading(false);
         });
+        
+        // Fetch all users for the registry lookup
+        const fetchUsers = async () => {
+            try {
+                const snap = await db.collection('users').limit(100).get();
+                setUserRegistry(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) {
+                console.warn("Failed to fetch user registry");
+            }
+        };
+        fetchUsers();
+
         return () => unsubscribe();
     }, []);
 
-    const handleUpdate = async (isRemoving = false) => {
-        if (!email.includes('@')) return alert("Enter a valid email.");
+    const handleUpdate = async (targetEmail, roleField, isRemoving = false) => {
+        if (!targetEmail || !targetEmail.includes('@')) return alert("Enter a valid email.");
+        
+        const action = isRemoving ? 'remove' : 'assign';
+        if (!window.confirm(`Are you sure you want to ${action} the ${roleField} role for ${targetEmail}?`)) return;
+
         try {
-            const cleanEmail = email.trim().toLowerCase();
-            const currentRoleList = roles[role] || [];
+            const cleanEmail = targetEmail.trim().toLowerCase();
+            const currentList = roles[roleField] || [];
             let updatedList;
             
             if (isRemoving) {
-                updatedList = currentRoleList.filter(e => e !== cleanEmail);
+                updatedList = currentList.filter(e => e !== cleanEmail);
             } else {
-                if (currentRoleList.includes(cleanEmail)) return alert("Already has this role.");
-                updatedList = [...currentRoleList, cleanEmail];
+                if (currentList.includes(cleanEmail)) return alert("User already has this role.");
+                updatedList = [...currentList, cleanEmail];
             }
 
             await db.collection('system').doc('roles').update({
-                [role]: updatedList
+                [roleField]: updatedList
             });
+
+            // Log the administrative action
+            await db.collection('system').doc('audit_trail').collection('logs').add({
+                action: `${action}_role`,
+                target: cleanEmail,
+                role: roleField,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                performedBy: 'Super Admin'
+            });
+
             setEmail('');
             alert(`Role ${isRemoving ? 'removed' : 'assigned'} successfully.`);
         } catch (e) {
@@ -299,29 +327,99 @@ const RoleManager = () => {
         }
     };
 
-    return (
-        <div className="glass-card mt-4" style={{ textAlign: 'left', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <h4 style={{ margin: '0 0 1rem' }}><i className="fa-solid fa-users-gear"></i> Network Role Management</h4>
-            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+    if (loading) return <div style={{ textAlign: 'center', padding: '1rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>;
+
+    const RoleSection = ({ title, icon, color, roleField, emails, description }) => (
+        <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1.5rem', borderLeft: `4px solid ${color}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <i className={`fa-solid ${icon}`} style={{ color }}></i>
+                    <h4 style={{ margin: 0 }}>{title}</h4>
+                </div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{description}</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <input 
                     type="email" 
                     className="input-modern" 
-                    style={{ flex: 1, minWidth: '200px' }} 
-                    placeholder="user@example.com" 
+                    style={{ flex: 1 }} 
+                    placeholder="Enter email to add..." 
                     value={email} 
                     onChange={e => setEmail(e.target.value)} 
+                    onKeyPress={(e) => e.key === 'Enter' && handleUpdate(email, roleField, false)}
                 />
-                <select className="input-modern" value={role} onChange={e => setRole(e.target.value)}>
-                    <option value="isAdmin">Admin</option>
-                    <option value="isAuditor">Auditor</option>
-                </select>
-                <button className="nav-btn active" onClick={() => handleUpdate(false)}>Add</button>
-                <button className="nav-btn" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleUpdate(true)}>Remove</button>
+                <button className="nav-btn active" style={{ background: color }} onClick={() => handleUpdate(email, roleField, false)}>
+                    <i className="fa-solid fa-user-plus"></i> Add
+                </button>
             </div>
-            
-            <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                <p style={{ margin: '0.5rem 0' }}><strong>Current Admins:</strong> {(roles.isAdmin || []).join(', ') || 'None'}</p>
-                <p style={{ margin: '0.5rem 0' }}><strong>Current Auditors:</strong> {(roles.isAuditor || []).join(', ') || 'None'}</p>
+
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', padding: '0.8rem' }}>
+                {emails.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>No users assigned to this role.</p>
+                ) : (
+                    emails.map(e => (
+                        <div key={e} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <span style={{ fontSize: '0.85rem' }}>{e}</span>
+                            {e !== 'jayshong@gmail.com' && (
+                                <button 
+                                    onClick={() => handleUpdate(e, roleField, true)} 
+                                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer' }}
+                                    title="Remove Role"
+                                >
+                                    <i className="fa-solid fa-trash-can"></i>
+                                </button>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+
+    return (
+        <div style={{ marginTop: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+                <i className="fa-solid fa-users-gear fa-lg" style={{ color: 'var(--primary)' }}></i>
+                <h3 style={{ margin: 0 }}>Identity & Access Management</h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <RoleSection 
+                    title="Admins" 
+                    icon="fa-shield-halved" 
+                    color="var(--primary)" 
+                    roleField="isAdmin" 
+                    emails={roles.isAdmin || []}
+                    description="Can onboard and manage businesses"
+                />
+                <RoleSection 
+                    title="Auditors" 
+                    icon="fa-clipboard-check" 
+                    color="var(--accent-success)" 
+                    roleField="isAuditor" 
+                    emails={roles.isAuditor || []}
+                    description="Can verify and edit impact metrics"
+                />
+            </div>
+
+            {/* Quick User Registry (Commercial Grade) */}
+            <div className="glass-card mt-4" style={{ padding: '1rem' }}>
+                <h4 style={{ margin: '0 0 1rem', fontSize: '0.9rem' }}><i className="fa-solid fa-address-book"></i> User Registry Lookup</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem', maxHeight: '150px', overflowY: 'auto', padding: '0.5rem' }}>
+                    {userRegistry.map(u => (
+                        <div 
+                            key={u.id} 
+                            onClick={() => setEmail(u.email)}
+                            style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', border: '1px solid transparent' }}
+                            onMouseOver={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                            onMouseOut={e => e.currentTarget.style.borderColor = 'transparent'}
+                        >
+                            <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.nickname || 'Unknown'}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{u.email}</div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
