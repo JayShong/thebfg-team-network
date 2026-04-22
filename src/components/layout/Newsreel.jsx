@@ -38,16 +38,18 @@ const Newsreel = () => {
         }
 
         // 2. Live Platform Announcements
-        announcements.forEach(a => {
-            queue.push({
-                text: `📣 ${a.message}`,
-                type: a.type || 'info',
-                action: a.link ? () => {
-                    if (a.link.startsWith('http')) window.open(a.link, '_blank');
-                    else navigate(a.link);
-                } : null
+        announcements
+            .filter(a => !a.targetEmail || a.targetEmail === currentUser?.email)
+            .forEach(a => {
+                queue.push({
+                    text: `📣 ${a.message}`,
+                    type: a.type || 'info',
+                    action: a.link ? () => {
+                        if (a.link.startsWith('http')) window.open(a.link, '_blank');
+                        else navigate(a.link);
+                    } : null
+                });
             });
-        });
 
         // 2. Personal Status Message
         if (isGuest) {

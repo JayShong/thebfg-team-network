@@ -19,86 +19,128 @@ const Home = () => {
 
     const [quantifiedImpact, setQuantifiedImpact] = useState({ waste: 0, trees: 0, families: 0 });
     const [personalStats, setPersonalStats] = useState({ checkins: 0, purchases: 0 });
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [needsSync, setNeedsSync] = useState(false);
+
+    const syncStats = async (liveData) => {
+        setIsSyncing(true);
+        try {
+            await db.collection('system').doc('stats').set(liveData, { merge: true });
+            setStats(prev => ({ ...prev, ...liveData }));
+            setNeedsSync(false);
+            alert("System statistics synchronized successfully.");
+        } catch (error) {
+            console.error("Sync failed:", error);
+            alert("Failed to synchronize statistics.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // 1. Fetch Global Stats (Baseline from stats doc)
+                // 1. Fetch the cached stats (Always available to everyone)
                 const statsDoc = await db.collection('system').doc('stats').get();
-                if (statsDoc.exists) setStats(prev => ({...prev, ...statsDoc.data()}));
+                let currentStats = statsDoc.exists ? statsDoc.data() : { ...stats };
+                setStats(currentStats);
 
-                if (!currentUser) return;
+                // 2. If Admin, perform LIVE query to verify integrity
+                if (currentUser && currentUser.isSuperAdmin) {
+                    const [userCountSnap, bizCountSnap, checkinSnap, purchaseSnap] = await Promise.all([
+                        db.collection('users').get(),
+                        db.collection('businesses').get(),
+                        db.collection('transactions').where('type', '==', 'checkin').get(),
+                        db.collection('transactions').where('type', '==', 'purchase').get()
+                    ]);
 
-                // 2. Fetch Businesses & ALL Transactions for this user
-                const [bizSnap, transSnap] = await Promise.all([
-                    db.collection('businesses').get(),
-                    db.collection('transactions')
-                        .where('userId', '==', currentUser.uid)
-                        .get()
-                ]);
+                    const liveStats = {
+                        consumers: userCountSnap.size,
+                        businesses: bizCountSnap.size,
+                        checkins: checkinSnap.size,
+                        purchases: purchaseSnap.size
+                    };
 
-                const businesses = bizSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // Calculate Real-time Personal Totals (Ensures no double counting)
-                let userCheckins = 0;
-                let userPurchases = 0;
-                const bizPurchases = {}; // For quantified impact (Verified Only)
-                
-                transSnap.forEach(doc => {
-                    const t = doc.data();
-                    if (t.type === 'checkin') userCheckins++;
-                    if (t.type === 'purchase') {
-                        userPurchases++;
-                        // For institutional impact calculation, we only count verified contributions
-                        if (t.status === 'verified' || t.status === 'approved') {
-                            bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
-                        }
+                    // Check if sync is needed
+                    if (liveStats.consumers !== currentStats.consumers || 
+                        liveStats.businesses !== currentStats.businesses ||
+                        liveStats.checkins !== currentStats.checkins ||
+                        liveStats.purchases !== currentStats.purchases) {
+                        setNeedsSync(true);
+                        // Update local state to show live data to admin immediately
+                        setStats(prev => ({ ...prev, ...liveStats }));
                     }
-                });
+                }
 
-                // Update local stats for the "Your Impact" section
-                setPersonalStats({ checkins: userCheckins, purchases: userPurchases });
+                // 3. Fetch Personal Stats (Only if logged in)
+                if (currentUser) {
+                    const [bizSnap, transSnap] = await Promise.all([
+                        db.collection('businesses').get(),
+                        db.collection('transactions')
+                            .where('userId', '==', currentUser.uid)
+                            .get()
+                    ]);
 
-                let waste = 0;
-                let trees = 0;
-                let families = 0;
-
-                Object.keys(bizPurchases).forEach(bizId => {
-                    const biz = businesses.find(b => b.id === bizId);
-                    if (biz && biz.status !== 'expired') {
-                        families += (parseInt(biz.impactJobs) || 0);
-                        let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-
-                        if (biz.yearlyAssessments) {
-                            const assessments = Array.isArray(biz.yearlyAssessments) 
-                                ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
-
-                            assessments.forEach(ya => {
-                                const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                                if (rev > latestRev) {
-                                    latestRev = rev;
-                                    latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                                    latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
-                                }
-                            });
+                    const businesses = bizSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    let userCheckins = 0;
+                    let userPurchases = 0;
+                    const bizPurchases = {};
+                    
+                    transSnap.forEach(doc => {
+                        const t = doc.data();
+                        if (t.type === 'checkin') userCheckins++;
+                        if (t.type === 'purchase') {
+                            userPurchases++;
+                            if (t.status === 'verified' || t.status === 'approved') {
+                                bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
+                            }
                         }
+                    });
 
-                        if (latestRev > 0) {
-                            const proportion = bizPurchases[bizId] / latestRev;
-                            waste += (proportion * latestWaste);
-                            trees += (proportion * latestTrees);
+                    setPersonalStats({ checkins: userCheckins, purchases: userPurchases });
+
+                    let waste = 0;
+                    let trees = 0;
+                    let families = 0;
+
+                    Object.keys(bizPurchases).forEach(bizId => {
+                        const biz = businesses.find(b => b.id === bizId);
+                        if (biz && biz.status !== 'expired') {
+                            families += (parseInt(biz.impactJobs) || 0);
+                            let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+
+                            if (biz.yearlyAssessments) {
+                                const assessments = Array.isArray(biz.yearlyAssessments) 
+                                    ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
+
+                                assessments.forEach(ya => {
+                                    const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                                    if (rev > latestRev) {
+                                        latestRev = rev;
+                                        latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                                        latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                                    }
+                                });
+                            }
+
+                            if (latestRev > 0) {
+                                const proportion = bizPurchases[bizId] / latestRev;
+                                waste += (proportion * latestWaste);
+                                trees += (proportion * latestTrees);
+                            }
                         }
-                    }
-                });
+                    });
 
-                setQuantifiedImpact({
-                    waste: waste % 1 !== 0 ? parseFloat(waste.toFixed(2)) : waste,
-                    trees: Math.round(trees),
-                    families: families
-                });
+                    setQuantifiedImpact({
+                        waste: waste % 1 !== 0 ? parseFloat(waste.toFixed(2)) : waste,
+                        trees: Math.round(trees),
+                        families: families
+                    });
+                }
 
             } catch (e) {
-                console.warn("Impact sync failed:", e);
+                console.warn("Dashboard data fetch failed:", e);
             }
         };
         fetchData();
@@ -108,9 +150,27 @@ const Home = () => {
 
     return (
         <div style={{ width: '100%', paddingBottom: '2rem' }}>
-            <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Dashboard</h1>
-                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Conviction Network impact overview</p>
+            <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Dashboard</h1>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Conviction Network impact overview</p>
+                </div>
+                {needsSync && (
+                    <button 
+                        onClick={() => syncStats({ 
+                            consumers: stats.consumers, 
+                            businesses: stats.businesses, 
+                            checkins: stats.checkins, 
+                            purchases: stats.purchases 
+                        })}
+                        disabled={isSyncing}
+                        className="btn"
+                        style={{ background: 'var(--accent)', color: 'white', fontSize: '0.8rem', padding: '0.5rem 1rem' }}
+                    >
+                        {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-sync"></i>}
+                        <span style={{ marginLeft: '8px' }}>Sync Stats</span>
+                    </button>
+                )}
             </div>
 
             <div className="glass-card" style={{ marginBottom: '2rem', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))', borderColor: 'rgba(139, 92, 246, 0.3)' }}>
@@ -127,28 +187,28 @@ const Home = () => {
                     <i className="fa-solid fa-users stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Consumers</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{stats.consumers.toLocaleString()}</p>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.consumers || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-store stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Businesses</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{stats.businesses.toLocaleString()}</p>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.businesses || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card feature-gradient">
                     <i className="fa-solid fa-location-dot stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Total Check-ins</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{stats.checkins.toLocaleString()}</p>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.checkins || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card success-gradient">
                     <i className="fa-solid fa-receipt stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-success)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Total Purchases</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{stats.purchases.toLocaleString()}</p>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.purchases || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card" style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
@@ -191,26 +251,30 @@ const Home = () => {
                 </div>
             </div>
 
-            <div className="page-header mt-4" style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Impact</h2>
-            </div>
-            
-            <div className="stats-grid personal">
-                <div className="stat-card glass-card highlight-border">
-                    <i className="fa-solid fa-location-dot stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
-                    <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Check-ins</h3>
-                        <p className="stat-value">{personalStats.checkins}</p>
+            {currentUser && (
+                <>
+                    <div className="page-header mt-4" style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Impact</h2>
                     </div>
-                </div>
-                <div className="stat-card glass-card highlight-border" style={{ borderTopColor: 'var(--accent-success)' }}>
-                    <i className="fa-solid fa-receipt stat-icon" style={{ color: 'var(--accent-success)' }}></i>
-                    <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Purchases</h3>
-                        <p className="stat-value">{personalStats.purchases}</p>
+                    
+                    <div className="stats-grid personal">
+                        <div className="stat-card glass-card highlight-border">
+                            <i className="fa-solid fa-location-dot stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Check-ins</h3>
+                                <p className="stat-value">{personalStats.checkins}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card glass-card highlight-border" style={{ borderTopColor: 'var(--accent-success)' }}>
+                            <i className="fa-solid fa-receipt stat-icon" style={{ color: 'var(--accent-success)' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Purchases</h3>
+                                <p className="stat-value">{personalStats.purchases}</p>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
 };

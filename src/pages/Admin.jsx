@@ -199,8 +199,6 @@ const Admin = () => {
                         title="Reconcile Stats" 
                         onClick={async () => {
                             if (!window.confirm("Reconcile global statistics? This will recount all users, businesses, and transactions.")) return;
-                            // NOTE: Purchases are counted immediately upon logging but verification status remains 'pending' 
-                            // until Business Owners review them in their portals. Admins do not approve receipts.
                             try {
                                 const bizSnap = await db.collection('businesses').get();
                                 const userSnap = await db.collection('users').get();
@@ -370,7 +368,6 @@ const BusinessEditor = ({ biz, onClose }) => {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            // Automatic Membership Logic: If any score field has a value, it's a Full Member
             const hasScore = data.score.s || data.score.e || data.score.c || data.score.soc || data.score.env;
             const membershipType = hasScore ? 'full' : 'affiliate';
 
@@ -399,7 +396,6 @@ const BusinessEditor = ({ biz, onClose }) => {
                 <form onSubmit={handleSave}>
                     <div style={{ marginBottom: '1.5rem' }}>
                         <h4 style={{ color: '#4CAF50', marginBottom: '0.8rem' }}><i className="fa-solid fa-clipboard-check"></i> TheBFG.Team Paradigm Score (A-D)</h4>
-                        <p style={{ fontSize: '0.75rem', color: '#81C784', marginBottom: '1rem' }}><i className="fa-solid fa-lock"></i> Auditor role required to edit scores.</p>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem' }}>
                             {[
                                 { key: 's', label: 'Shareholder' },
@@ -511,26 +507,14 @@ const InitiativesManager = () => {
 const RoleManager = () => {
     const [email, setEmail] = useState('');
     const [roles, setRoles] = useState({ isAdmin: [], isAuditor: [] });
-    const [userRegistry, setUserRegistry] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { currentUser } = useAuth();
 
     useEffect(() => {
         const unsubscribe = db.collection('system').doc('roles').onSnapshot(doc => {
             if (doc.exists) setRoles(doc.data());
             setLoading(false);
         });
-        
-        // Fetch all users for the registry lookup
-        const fetchUsers = async () => {
-            try {
-                const snap = await db.collection('users').limit(100).get();
-                setUserRegistry(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            } catch (e) {
-                console.warn("Failed to fetch user registry");
-            }
-        };
-        fetchUsers();
-
         return () => unsubscribe();
     }, []);
 
@@ -542,6 +526,13 @@ const RoleManager = () => {
 
         try {
             const cleanEmail = targetEmail.trim().toLowerCase();
+            
+            // Verification logic as per User requirement
+            const userCheck = await db.collection('users').where('email', '==', cleanEmail).get();
+            if (userCheck.empty) {
+                return alert(`Verification Failed: No user found with email ${cleanEmail}. Please ensure the user has registered on the platform first.`);
+            }
+
             const currentList = roles[roleField] || [];
             let updatedList;
             
@@ -556,23 +547,34 @@ const RoleManager = () => {
                 [roleField]: updatedList
             });
 
+            // Notify user via newsreel if assigning
+            if (!isRemoving) {
+                await db.collection('announcements').add({
+                    message: `Congratulations! You have been granted ${roleField} privileges. Access your new tools in the sidebar.`,
+                    type: 'success',
+                    status: 'active',
+                    targetEmail: cleanEmail,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
             // Log the administrative action
             await db.collection('system').doc('audit_trail').collection('logs').add({
                 action: `${action}_role`,
                 target: cleanEmail,
                 role: roleField,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                performedBy: 'Super Admin'
+                performedBy: currentUser?.email || 'Super Admin'
             });
 
             setEmail('');
-            alert(`Role ${isRemoving ? 'removed' : 'assigned'} successfully.`);
+            alert(`Identity Verified. Role ${isRemoving ? 'removed' : 'assigned'} successfully.`);
         } catch (e) {
-            alert("Role update failed: " + e.message);
+            alert("Administrative update failed: " + e.message);
         }
     };
 
-    if (loading) return <div style={{ textAlign: 'center', padding: '1rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>;
+    if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
     const RoleSection = ({ title, icon, color, roleField, emails, description }) => (
         <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1.5rem', borderLeft: `4px solid ${color}` }}>
@@ -646,25 +648,6 @@ const RoleManager = () => {
                     emails={roles.isAuditor || []}
                     description="Can verify and edit impact metrics"
                 />
-            </div>
-
-            {/* Quick User Registry (Commercial Grade) */}
-            <div className="glass-card mt-4" style={{ padding: '1rem' }}>
-                <h4 style={{ margin: '0 0 1rem', fontSize: '0.9rem' }}><i className="fa-solid fa-address-book"></i> User Registry Lookup</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem', maxHeight: '150px', overflowY: 'auto', padding: '0.5rem' }}>
-                    {userRegistry.map(u => (
-                        <div 
-                            key={u.id} 
-                            onClick={() => setEmail(u.email)}
-                            style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', border: '1px solid transparent' }}
-                            onMouseOver={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-                            onMouseOut={e => e.currentTarget.style.borderColor = 'transparent'}
-                        >
-                            <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.nickname || 'Unknown'}</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{u.email}</div>
-                        </div>
-                    ))}
-                </div>
             </div>
         </div>
     );

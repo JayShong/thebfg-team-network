@@ -5,7 +5,22 @@ Version 0.95 marks a major milestone: the platform has now achieved full feature
 
 ---
 
-## 1. Heritage UI Restoration
+## 1. Confidence Building & Data Integrity
+The Home Dashboard is the heartbeat of the platform, designed to build confidence in the network for both members and guests.
+
+### Confidence Building
+- **Social Proof**: By showing real-time counts of consumers and businesses, we demonstrate that the network is "alive and well".
+- **Impact Transparency**: Guests can see the quantified impact (waste diverted, trees planted) immediately, encouraging them to join the mission.
+
+### Data Integrity & "No Double Counting"
+To satisfy the requirement for absolute accuracy without sacrificing security:
+1. **Live Source of Truth**: Administrators perform live queries against the database to verify counts.
+2. **Public Cache**: Guests see a cached version from `system/stats` to protect user privacy (emails) and ensure performance.
+3. **Admin Sync**: If the live database count differs from the cached display, an admin can "Sync" the system with a single click, updating the public stats from the latest verified records.
+
+---
+
+## 2. Heritage UI Restoration
 We have meticulously restored the visual identity of the original BFG vision:
 - **Paradigm Score Breakdown**: Reverted to the horizontal monospace breakdown on Business Profiles for technical transparency.
 - **Quantified Impact Dashboard**: Restored the distinctive orange gradient and the **ALPHA / WIP** status tag on the main dashboard.

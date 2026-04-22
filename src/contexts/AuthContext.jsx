@@ -67,7 +67,24 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
                 // Fetch full profile from DB
-                const userDoc = await db.collection('users').doc(user.uid).get();
+                let userDoc = await db.collection('users').doc(user.uid).get();
+                
+                // AUTO-PROVISIONING: If user exists in Auth but not in Firestore (e.g. legacy or failed signup)
+                // we create a default profile now to ensure they are counted in the Network Impact.
+                if (!userDoc.exists) {
+                    console.log("Auto-provisioning profile for:", user.email);
+                    const defaultProfile = {
+                        email: user.email,
+                        name: user.email.split('@')[0], // Fallback nickname
+                        purchases: 0,
+                        checkins: 0,
+                        purchaseVolume: 0,
+                        created_at: new Date().toISOString()
+                    };
+                    await db.collection('users').doc(user.uid).set(defaultProfile);
+                    userDoc = await db.collection('users').doc(user.uid).get();
+                }
+
                 // Hardcoded Root Admin Fallback
                 const ROOT_ADMIN_EMAIL = 'jayshong@gmail.com';
                 
