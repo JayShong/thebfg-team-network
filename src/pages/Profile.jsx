@@ -98,6 +98,11 @@ const Profile = () => {
                                 <i className="fa-solid fa-clipboard-check"></i> Auditor
                             </span>
                         )}
+                        {displayUser.isMerchantAssistant && (
+                            <span style={{ background: '#3b82f6', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
+                                <i className="fa-solid fa-user-tag"></i> Merchant Assistant
+                            </span>
+                        )}
                         {displayUser.isGuest && (
                             <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
                                 <i className="fa-solid fa-ghost"></i> Guest Explorer
@@ -166,26 +171,35 @@ const Profile = () => {
                         </div>
                     ) : (
                         <>
-                            {(displayUser.isSuperAdmin || displayUser.isAuditor) && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                    <button onClick={() => navigate('/admin')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-users-gear"></i> Admin Portal
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {displayUser.isSuperAdmin && (
+                                    <button onClick={() => navigate('/admin')} className="btn btn-secondary" style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}>
+                                        <i className="fa-solid fa-crown"></i> Governance Portal
                                     </button>
+                                )}
+
+                                {(displayUser.isSuperAdmin || displayUser.isMerchantAssistant) && (
+                                    <button onClick={() => navigate('/merchant-portal')} className="btn btn-secondary">
+                                        <i className="fa-solid fa-user-tag"></i> Merchant Portal
+                                    </button>
+                                )}
+
+                                {(displayUser.isSuperAdmin || displayUser.isAuditor) && (
                                     <button onClick={() => navigate('/audit-hub')} className="btn btn-secondary">
                                         <i className="fa-solid fa-clipboard-check"></i> Audit Hub
                                     </button>
-                                </div>
-                            )}
-                            
-                            {isOwner && (
-                                <button onClick={() => navigate('/business-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
-                                    <i className="fa-solid fa-store"></i> My Business Portal
-                                </button>
-                            )}
+                                )}
+                                
+                                {isOwner && (
+                                    <button onClick={() => navigate('/business-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
+                                        <i className="fa-solid fa-store"></i> My Business Portal
+                                    </button>
+                                )}
 
-                            <button onClick={logout} className="btn btn-secondary" style={{ border: '1px solid rgba(255,87,87,0.3)', color: '#ff5757' }}>
-                                <i className="fa-solid fa-right-from-bracket"></i> Sign Out
-                            </button>
+                                <button onClick={logout} className="btn btn-secondary" style={{ border: '1px solid rgba(255,87,87,0.3)', color: '#ff5757' }}>
+                                    <i className="fa-solid fa-right-from-bracket"></i> Sign Out
+                                </button>
+                            </div>
                         </>
                     )}
                 </div>

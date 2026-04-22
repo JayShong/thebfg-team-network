@@ -24,7 +24,7 @@ const BusinessPortal = () => {
         founderImg: ''
     });
 
-    const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor) && adminEditId;
+    const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isMerchantAssistant) && adminEditId;
 
     useEffect(() => {
         if (businesses.length > 0) {

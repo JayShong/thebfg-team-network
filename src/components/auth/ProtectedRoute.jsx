@@ -21,6 +21,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
  
     // 2. Check for Authenticated User Roles
     if (currentUser) {
+        if (requiredRole === 'superadmin' && !currentUser.isSuperAdmin) {
+            return <RestrictedAccess requiredRole="Superadmin Governance" />;
+        }
+
         if (requiredRole === 'merchant' && !currentUser.isSuperAdmin && !currentUser.isMerchantAssistant) {
             return <RestrictedAccess requiredRole="Merchant Assistant" />;
         }

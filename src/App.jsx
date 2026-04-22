@@ -13,6 +13,7 @@ import Privileges from './pages/Privileges';
 import Home from './pages/Home';
 import About from './pages/About';
 import Admin from './pages/Admin';
+import MerchantPortal from './pages/MerchantPortal';
 import AuditHub from './pages/AuditHub';
 import BusinessPortal from './pages/BusinessPortal';
 import Settings from './pages/Settings';
@@ -51,10 +52,15 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Merchant & Auditor Routes */}
+        {/* Merchant, Auditor & Governance Routes */}
         <Route path="/admin" element={
-          <ProtectedRoute requiredRole="merchant">
+          <ProtectedRoute requiredRole="superadmin">
             <Admin />
+          </ProtectedRoute>
+        } />
+        <Route path="/merchant-portal" element={
+          <ProtectedRoute requiredRole="merchant">
+            <MerchantPortal />
           </ProtectedRoute>
         } />
         <Route path="/audit-hub" element={
