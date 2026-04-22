@@ -219,8 +219,13 @@ export const BADGES_CONFIG = [
 ];
 
 
+import scannerImg from '../assets/tutorial/scanner.png';
+import recognitionImg from '../assets/tutorial/recognition.png';
+import purchaseImg from '../assets/tutorial/purchase.png';
+import successImg from '../assets/tutorial/success.png';
+
 // NOTE: These images are actual app screenshots. Please recapture and update them 
-// in public/assets/tutorial/ whenever the UI for the Scanner, Purchase Form, 
+// in src/assets/tutorial/ whenever the UI for the Scanner, Purchase Form, 
 // or Success screen is modified to maintain visual consistency.
 export const TUTORIAL_STEPS = [
     {
@@ -228,28 +233,28 @@ export const TUTORIAL_STEPS = [
         icon: "fa-qrcode",
         text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to start.",
         color: "#3B82F6",
-        image: "/assets/tutorial/scanner.png?v=2"
+        image: scannerImg
     },
     {
         title: "Step 2: Selection",
         icon: "fa-hand-pointer",
         text: "Support them by checking in, or record your support by logging a purchase.",
         color: "#10B981",
-        image: "/assets/tutorial/recognition.png?v=2"
+        image: recognitionImg
     },
     {
         title: "Step 3: Log Purchase",
         icon: "fa-receipt",
         text: "When logging a purchase, enter the Receipt ID and the Total Amount (RM) from your bill.",
         color: "#F59E0B",
-        image: "/assets/tutorial/purchase.png?v=2"
+        image: purchaseImg
     },
     {
         title: "Step 4: Success!",
         icon: "fa-certificate",
         text: "Thank you for contributing to the growth of the empathy economy. Your activity is now securely recorded.",
         color: "#8B5CF6",
-        image: "/assets/tutorial/success.png?v=2"
+        image: successImg
     }
 ];
 

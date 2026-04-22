@@ -17,6 +17,9 @@ const Newsreel = () => {
             .where('status', '==', 'active')
             .onSnapshot(snap => {
                 setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }, err => {
+                console.warn("Announcements sub failed:", err);
+                setAnnouncements([]);
             });
         return () => unsubscribe();
     }, []);
