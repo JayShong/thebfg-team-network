@@ -187,8 +187,8 @@ const Admin = () => {
             
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
                 <div>
-                    <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0 }}>Admin Portal</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Manage the Conviction Network</p>
+                    <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0 }}>Merchant Portal</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Merchant Assistant Support Dashboard</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.5rem' }}>
                     <button className="icon-btn" title="Business Spreadsheet" style={{ color: 'var(--accent-success)', borderColor: 'rgba(16,185,129,0.3)' }}><i className="fa-solid fa-table-columns"></i></button>
@@ -506,41 +506,47 @@ const InitiativesManager = () => {
 
 const RoleManager = () => {
     const [email, setEmail] = useState('');
-    const [roles, setRoles] = useState({ isAdmin: [], isAuditor: [] });
+    const [merchantEmails, setMerchantEmails] = useState([]);
+    const [complianceEmails, setComplianceEmails] = useState([]);
     const [loading, setLoading] = useState(true);
     const { currentUser } = useAuth();
 
     useEffect(() => {
-        const unsubscribe = db.collection('system').doc('roles').onSnapshot(doc => {
-            if (doc.exists) setRoles(doc.data());
+        // Fetch Merchant Assistant Roles
+        const unsubMerchant = db.doc('system/merchant_roles').onSnapshot(doc => {
+            if (doc.exists) setMerchantEmails(doc.data().emails || []);
             setLoading(false);
-        });
-        return () => unsubscribe();
+        }, err => console.warn("Merchant roles restricted:", err.message));
+
+        // Fetch Compliance Roles
+        const unsubCompliance = db.doc('system/compliance_roles').onSnapshot(doc => {
+            if (doc.exists) setComplianceEmails(doc.data().emails || []);
+        }, err => console.warn("Compliance roles restricted:", err.message));
+
+        return () => { unsubMerchant(); unsubCompliance(); };
     }, []);
 
-    const handleUpdate = async (targetEmail, roleField, isRemoving = false) => {
+    const handleUpdate = async (targetEmail, roleType, isRemoving = false) => {
         if (!targetEmail || !targetEmail.includes('@')) return alert("Enter a valid email.");
         
         const action = isRemoving ? 'remove' : 'assign';
-        if (!window.confirm(`Are you sure you want to ${action} the ${roleField} role for ${targetEmail}?`)) return;
+        if (!window.confirm(`Are you sure you want to ${action} the ${roleType} role for ${targetEmail}?`)) return;
 
         try {
             setLoading(true);
             const manageRoleFn = functions.httpsCallable('managerole');
             const result = await manageRoleFn({
                 targetEmail,
-                roleField,
+                roleType,
                 action: isRemoving ? 'remove' : 'assign'
             });
 
             if (result.data.success) {
-                alert(`Successfully ${isRemoving ? 'removed' : 'assigned'} ${roleField} role.`);
-            } else if (result.data.message) {
-                alert(result.data.message);
+                alert(`Successfully updated ${roleType} profile.`);
+                setEmail('');
             }
         } catch (e) {
-            console.error("Role update failed:", e);
-            alert(e.message || "Failed to update role. Ensure the user is registered.");
+            alert(e.message || "Administrative update failed.");
         } finally {
             setLoading(false);
         }
@@ -596,30 +602,41 @@ const RoleManager = () => {
         </div>
     );
 
+    const isSuper = currentUser?.email === 'jayshong@gmail.com';
+    const isMA = currentUser?.isMerchantAssistant;
+    const isAudit = currentUser?.isAuditor;
+
     return (
         <div style={{ marginTop: '2rem' }}>
             <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 0.5rem' }}><i className="fa-solid fa-users-gear" style={{ color: 'var(--accent-primary)' }}></i> Role Management</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Only the Super Admin (<strong>jayshong@gmail.com</strong>) can assign and remove roles.</p>
+                <h3 style={{ margin: '0 0 0.5rem' }}><i className="fa-solid fa-users-gear" style={{ color: 'var(--accent-primary)' }}></i> Partitioned Staff Management</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Manage specific departmental access controls.</p>
             </div>
-
+ 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <RoleSection 
-                    title="Admins" 
-                    icon="fa-shield-halved" 
-                    color="var(--primary)" 
-                    roleField="isAdmin" 
-                    emails={roles.isAdmin || []}
-                    description="Can onboard and manage businesses"
-                />
-                <RoleSection 
-                    title="Auditors" 
-                    icon="fa-clipboard-check" 
-                    color="var(--accent-success)" 
-                    roleField="isAuditor" 
-                    emails={roles.isAuditor || []}
-                    description="Can verify and edit impact metrics"
-                />
+                {/* Merchant Assistants List - Visible to MAs and Superadmin */}
+                {(isMA || isSuper) && (
+                    <RoleSection 
+                        title="Merchant Assistants" 
+                        icon="fa-user-tag" 
+                        color="var(--primary)" 
+                        roleField="merchant" 
+                        emails={merchantEmails}
+                        description="Can onboard and support businesses"
+                    />
+                )}
+                
+                {/* Compliance List - Visible to Auditors and Superadmin */}
+                {(isAudit || isSuper) && (
+                    <RoleSection 
+                        title="Auditors & Supervisors" 
+                        icon="fa-shield-halved" 
+                        color="var(--accent-success)" 
+                        roleField="compliance" 
+                        emails={complianceEmails}
+                        description="Can verify and publish impact metrics"
+                    />
+                )}
             </div>
         </div>
     );

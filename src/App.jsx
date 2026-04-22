@@ -51,9 +51,9 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Admin & Auditor Routes */}
+        {/* Merchant & Auditor Routes */}
         <Route path="/admin" element={
-          <ProtectedRoute requiredRole="admin">
+          <ProtectedRoute requiredRole="merchant">
             <Admin />
           </ProtectedRoute>
         } />
@@ -63,7 +63,7 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/business-portal" element={
-          <ProtectedRoute requiredRole="admin">
+          <ProtectedRoute requiredRole="merchant">
             <BusinessPortal />
           </ProtectedRoute>
         } />

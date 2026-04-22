@@ -43,90 +43,25 @@ exports.onbusinessdeleted = onDocumentDeleted('businesses/{bizId}', async (event
 
 const { BADGES_CONFIG, evaluateTier } = require('./badgeEngine');
 
-// 3. Transaction Triggers (Check-ins & Purchases + Badge Engine)
+// 3. Transaction Triggers (Sanitized Feed & Impact Aggregation)
 exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (event) => {
     const txn = event.data.data();
-    const userId = txn.userId;
-    if (!userId) return null;
+    if (!txn.userId) return null;
 
-    const statsUpdates = {};
+    // A. Create Sanitized Public Activity for Newsreel
+    const uName = (txn.userNickname || txn.userName || 'Explorer').substring(0, 15);
+    const bName = (txn.bizName || 'Business').substring(0, 20);
     
-    // A. Update Global Stats
-    if (txn.type === 'checkin') {
-        statsUpdates.checkins = admin.firestore.FieldValue.increment(1);
-    } else if (txn.type === 'purchase') {
-        statsUpdates.purchases = admin.firestore.FieldValue.increment(1);
-        const amount = parseFloat(txn.amount) || 0;
-        if (amount > 0) {
-            statsUpdates.purchaseVolume = admin.firestore.FieldValue.increment(amount);
-        }
-    }
+    await db.collection('public_activity').add({
+        text: txn.type === 'purchase' 
+            ? `💳 ${uName} supported ${bName}` 
+            : `📍 ${uName} checked-in at ${bName}`,
+        type: 'activity',
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
 
-    if (Object.keys(statsUpdates).length > 0) {
-        await db.collection('system').doc('stats').set(statsUpdates, { merge: true });
-    }
-
-    // B. Badge & Tier Engine Evaluation
-    try {
-        const userRef = db.collection('users').doc(userId);
-        const [userDoc, transSnap] = await Promise.all([
-            userRef.get(),
-            db.collection('transactions').where('userId', '==', userId).get()
-        ]);
-
-        if (!userDoc.exists) return null;
-
-        const userData = userDoc.data();
-        const logs = transSnap.docs.map(doc => doc.data());
-        const currentBadges = userData.badges || {};
-        const newlyUnlocked = [];
-
-        // Check each badge condition
-        BADGES_CONFIG.forEach(badge => {
-            if (!currentBadges[badge.id] && badge.condition(userData, logs)) {
-                currentBadges[badge.id] = {
-                    unlocked: true,
-                    date: new Date().toISOString(),
-                    title: badge.title
-                };
-                newlyUnlocked.push(badge);
-            }
-        });
-
-        if (newlyUnlocked.length > 0) {
-            const newTier = evaluateTier(currentBadges);
-            const userUpdates = { badges: currentBadges };
-            
-            if (newTier !== userData.tier) {
-                userUpdates.tier = newTier;
-                // Add tier upgrade announcement
-                await db.collection('announcements').add({
-                    message: `Incredible! You have ascended to the ${newTier} Tier. Your commitment to the empathy economy is recognized.`,
-                    type: 'success',
-                    status: 'active',
-                    targetEmail: userData.email,
-                    createdAt: new Date().toISOString()
-                });
-            }
-
-            await userRef.update(userUpdates);
-
-            // Notify for each new badge
-            for (const badge of newlyUnlocked) {
-                await db.collection('announcements').add({
-                    message: `Badge Unlocked: "${badge.title}"! You earned this for being a ${badge.category} contributor to the network.`,
-                    type: 'badge',
-                    status: 'active',
-                    targetEmail: userData.email,
-                    createdAt: new Date().toISOString()
-                });
-            }
-        }
-    } catch (e) {
-        console.error("Badge Engine Error:", e);
-    }
-
-    return null;
+    // B. Trigger Global Impact Aggregation (Source of Truth)
+    return runImpactAggregation();
 });
 
 exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (event) => {
@@ -149,30 +84,34 @@ exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (
     return null;
 });
 
-// 4. Role Management Safeguard (Callable)
+// 4. Partitioned Role Management (Callable)
 exports.managerole = functions.https.onCall(async (data, context) => {
-    // 1. Verify Requester is Admin
+    // 1. Verify Requester
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
-    
-    const adminSnap = await db.collection('system').doc('roles').get();
-    const adminEmails = adminSnap.data()?.isAdmin || [];
-    const rootAdmin = 'jayshong@gmail.com';
-    
-    if (context.auth.token.email !== rootAdmin && !adminEmails.includes(context.auth.token.email)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can manage roles.');
-    }
+    const requesterEmail = context.auth.token.email;
+    const isRoot = requesterEmail === 'jayshong@gmail.com';
 
-    const { targetEmail, roleField, action } = data;
+    const { targetEmail, roleType, action } = data; // roleType: 'merchant' or 'compliance'
     const cleanEmail = targetEmail.trim().toLowerCase();
+    const docPath = roleType === 'merchant' ? 'system/merchant_roles' : 'system/compliance_roles';
 
-    // 2. Safeguard: Verify User Exists
-    const userSnap = await db.collection('users').where('email', '==', cleanEmail).get();
-    if (userSnap.empty) {
-        throw new functions.https.HttpsError('not-found', `No registered user found with email ${cleanEmail}.`);
+    // 2. Authorization Rules
+    if (!isRoot) {
+        // Merchant Assistants can ONLY manage other Merchant Assistants
+        if (roleType === 'merchant') {
+            const maSnap = await db.doc('system/merchant_roles').get();
+            if (!maSnap.data()?.emails?.includes(requesterEmail)) {
+                throw new functions.https.HttpsError('permission-denied', 'Unauthorized.');
+            }
+        } else {
+            throw new functions.https.HttpsError('permission-denied', 'Only Superadmins can manage Compliance roles.');
+        }
     }
 
     // 3. Update Roles
-    const currentList = adminSnap.data()?.[roleField] || [];
+    const roleRef = db.doc(docPath);
+    const roleSnap = await roleRef.get();
+    const currentList = roleSnap.data()?.emails || [];
     let updatedList;
 
     if (action === 'assign') {
@@ -182,14 +121,20 @@ exports.managerole = functions.https.onCall(async (data, context) => {
         updatedList = currentList.filter(e => e !== cleanEmail);
     }
 
-    await db.collection('system').doc('roles').update({ [roleField]: updatedList });
+    await roleRef.set({ emails: updatedList }, { merge: true });
     
-    // 4. Log Action
+    // 4. Sync Role Flags to User Document (Optimizes client-side RBAC)
+    const userSnap = await db.collection('users').where('email', '==', cleanEmail).get();
+    if (!userSnap.empty) {
+        const flagField = roleType === 'merchant' ? 'isMerchantAssistant' : 'isAuditor';
+        await userSnap.docs[0].ref.update({ [flagField]: action === 'assign' });
+    }
+
+    // 5. Log Action
     await db.collection('system').doc('audit_trail').collection('logs').add({
-        action: `${action}_role`,
+        action: `${action}_${roleType}_role`,
         target: cleanEmail,
-        role: roleField,
-        performedBy: context.auth.token.email,
+        performedBy: requesterEmail,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -277,10 +222,11 @@ exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
         const batch = db.batch();
         
         transSnap.forEach(doc => {
-            // We keep the impact data (amount, waste, etc) but remove the person
+            // Irreversible Anonymization
             batch.update(doc.ref, { 
                 userId: 'deleted_user',
                 userName: 'Anonymized User',
+                userNickname: 'Anonymized',
                 userEmail: 'anonymized@thebfg.team'
             });
         });

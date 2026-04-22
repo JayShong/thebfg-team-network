@@ -9,110 +9,107 @@ service cloud.firestore {
         : {"adminEmails": [], "auditorEmails": []};
     }
 
-    // Check if the user is a super admin
+    // Helper to check for Super Admin
     function isSuperAdmin() {
+      return request.auth != null && request.auth.token.email == 'jayshong@gmail.com';
+    }
+
+    // Role partitioning helpers
+    function isMerchantAssistant() {
       return request.auth != null && (
-        request.auth.token.email == 'jayshong@gmail.com' ||
-        request.auth.token.email in getRolesData().adminEmails
+        isSuperAdmin() || 
+        request.auth.token.email in get(/databases/$(database)/documents/system/merchant_roles).data.emails
       );
     }
     
-    // Check if the user is an auditor or super admin
     function isAuditor() {
       return request.auth != null && (
-        request.auth.token.email == 'jayshong@gmail.com' ||
-        request.auth.token.email in getRolesData().auditorEmails ||
-        isSuperAdmin()
+        isSuperAdmin() || 
+        request.auth.token.email in get(/databases/$(database)/documents/system/compliance_roles).data.emails
       );
     }
 
-    // Users Collection - Protect PII by restricting reads
+    // Users Collection - Protect PII & Role Fields
     match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isMerchantAssistant() || isAuditor());
+      // Prevent self-promotion: Users cannot change their own roles
+      allow update: if request.auth != null && request.auth.uid == userId && 
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isAuditor', 'isMerchantAssistant', 'isSuperAdmin']);
+      allow create: if request.auth != null && request.auth.uid == userId;
     }
     
-    // System Configurations - Only super admin can edit
-    match /system/{docId} {
-      allow read: if true; 
+    // Role Documents - Partitioned Visibility
+    match /system/merchant_roles {
+      allow read: if isMerchantAssistant() || isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+    match /system/compliance_roles {
+      allow read: if isAuditor() || isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+    match /system/stats {
+      allow read: if true;
       allow write: if isSuperAdmin();
     }
     
     // Business Directory
     match /businesses/{bizId} {
       allow read: if true;
-      allow write: if isSuperAdmin() || isAuditor();
-      
-      // Allow owners to update their own profile (restricted fields)
+      allow write: if isMerchantAssistant() || isAuditor();
       allow update: if request.auth != null && 
                     request.auth.token.email == resource.data.ownerEmail &&
                     !request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'status', 'isVerified', 'ownerEmail', 'id']);
     }
     
-    // Transactions / Logged activities
+    // Transactions - Private Data
     match /transactions/{txnId} {
-      allow read: if true;
-      // Allow user to create pending transactions if userId matches their auth uid
+      // Only owners, merchant assistants (for support), or auditors can see raw transaction data
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId || 
+        isMerchantAssistant() || 
+        isAuditor()
+      );
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      // Changing status to verified/returned, etc.
-      allow update, delete: if isSuperAdmin() || isAuditor();
+      allow update, delete: if isMerchantAssistant() || isAuditor();
+    }
+
+    // Newsreel / Public Activity Feed
+    match /public_activity/{actId} {
+      allow read: if true;
+      allow write: if false; // System only via Cloud Functions
     }
     
-    // Audit Logs Collection
+    // Audit Logs
     match /compliance_logs/{logId} {
       allow read: if true;
       allow create: if isAuditor() || isSuperAdmin();
-      // Auditors can edit until approved. Once approved, it is locked.
       allow update: if (isAuditor() || isSuperAdmin()) && resource.data.status != 'approved';
       allow delete: if isSuperAdmin();
     }
 
-    // Announcements Collection
+    // Announcements
     match /announcements/{announcementId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isMerchantAssistant() || isAuditor();
     }
 
-    // Initiatives Collection
-    match /initiatives/{initId} {
-      allow read: if true;
-      allow write: if isSuperAdmin() || isAuditor();
-    }
+    // Initiatives, Privileges, Supervisions
+    match /initiatives/{initId} { allow read: if true; allow write: if isMerchantAssistant() || isAuditor(); }
+    match /privileges/{privId} { allow read: if true; allow write: if isMerchantAssistant() || isAuditor(); }
+    match /supervisions/{supId} { allow read: if true; allow write: if isSuperAdmin(); }
 
-    // Privileges Collection
-    match /privileges/{privId} {
-      allow read: if true;
-      allow write: if isSuperAdmin() || isAuditor();
-    }
-
-    // Audit Submissions Collection (Draft -> Review -> Published Workflow)
+    // Institutional Audit Workflow
     match /audit_submissions/{submissionId} {
       allow read: if request.auth != null && (
         resource.data.auditorId == request.auth.uid || 
-        isSuperAdmin() || 
-        isAuditor()
+        isSuperAdmin() || isAuditor()
       );
-      
-      // Allow creation of drafts for auditors
       allow create: if request.auth != null && isAuditor() && request.resource.data.status == 'draft';
-      
-      // Update rules:
-      // - Auditor can update their own drafts
-      // - Auditor can submit for review (draft -> review)
-      // - Supervisor can update any review
-      // - Supervisor can publish (review -> published)
       allow update: if request.auth != null && (
         (resource.data.auditorId == request.auth.uid && resource.data.status == 'draft') ||
         (isSuperAdmin() && resource.data.status == 'review')
       );
-      
       allow delete: if isSuperAdmin();
-    }
-
-    // Supervisions Collection (Links auditors to supervisors)
-    match /supervisions/{supId} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
     }
   }
 }

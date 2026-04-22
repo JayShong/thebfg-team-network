@@ -42,8 +42,8 @@ export const AuthProvider = ({ children }) => {
 
     const fetchRecentActivity = async () => {
         try {
-            // Pull activities
-            const snapshot = await db.collection('transactions')
+            // Pull sanitized public activities for newsreel
+            const snapshot = await db.collection('public_activity')
                 .orderBy('timestamp', 'desc')
                 .limit(20)
                 .get();
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
             // Also pull pending audits for supervisors
             await fetchPendingAudits();
         } catch (e) {
-            console.error("Failed to pull recent activity:", e);
+            console.error("Failed to pull newsreel activity:", e);
         }
     };
 
@@ -92,30 +92,16 @@ export const AuthProvider = ({ children }) => {
                     uid: user.uid,
                     email: user.email,
                     isSuperAdmin: user.email === ROOT_ADMIN_EMAIL,
-                    isAuditor: user.email === ROOT_ADMIN_EMAIL,
+                    isAuditor: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isAuditor,
+                    isMerchantAssistant: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isMerchantAssistant,
                     purchases: 0,
                     checkins: 0,
-                    ...userDoc.data() // Merge existing data
+                    ...userDoc.data()
                 };
 
-                // Merge real roles from FireStore System roles config (overrides primary)
-                try {
-                    const rolesDoc = await db.collection('system').doc('roles').get();
-                    if (rolesDoc.exists) {
-                        const rolesData = rolesDoc.data();
-                        // isAdmin array contains emails of users who can manage businesses
-                        if (rolesData.isAdmin?.includes(user.email)) {
-                            profile.isAdmin = true;
-                            // For simplicity, we treat admins as superAdmins for UI access
-                            profile.isSuperAdmin = profile.isSuperAdmin || true;
-                        }
-                        // isAuditor array contains emails of users who can manage impact data
-                        if (rolesData.isAuditor?.includes(user.email)) {
-                            profile.isAuditor = true;
-                        }
-                    }
-                } catch(e) {
-                    console.warn("Dynamic roles unavailable, using static fallback.");
+                // Admin/Merchant Assistant UI Access
+                if (profile.isMerchantAssistant) {
+                    profile.isSuperAdmin = profile.isSuperAdmin || true;
                 }
 
                 setCurrentUser(profile);

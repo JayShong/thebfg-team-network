@@ -72,39 +72,13 @@ const Newsreel = () => {
             });
         }
 
-        // 3. Activity Feed (The 20 pulled transactions)
+        // 3. Activity Feed (Sanitized Public Activities)
         recentActivity.forEach(act => {
-            // Defensive mapping for inconsistent legacy field names
-            const uName = act.userNickname || act.userName || act.user_name || act.name || 'Explorer';
-            const bName = act.bizName || act.business_name || act.biz_name || 'Business';
-            
-            // Handle Firestore Timestamp vs ISO String
-            let timeStr = "";
-            try {
-                const dateObj = act.timestamp?.seconds 
-                    ? new Date(act.timestamp.seconds * 1000) 
-                    : (act.timestamp ? new Date(act.timestamp) : null);
-                
-                if (dateObj && !isNaN(dateObj.getTime())) {
-                    timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                }
-            } catch (e) {
-                console.warn("Invalid date for activity:", act.timestamp);
-            }
-
-            if (act.type === 'purchase') {
-                queue.push({
-                    text: `💳 ${uName} supported ${bName} ${timeStr ? `@ ${timeStr}` : ''}`,
-                    type: 'activity',
-                    action: () => navigate(`/directory`)
-                });
-            } else {
-                queue.push({
-                    text: `📍 ${uName} checked-in at ${bName} ${timeStr ? `@ ${timeStr}` : ''}`,
-                    type: 'activity',
-                    action: () => navigate(`/directory`)
-                });
-            }
+            queue.push({
+                text: act.text || "Momentum in the network...",
+                type: act.type || 'activity',
+                action: () => navigate(`/directory`)
+            });
         });
 
         return queue;

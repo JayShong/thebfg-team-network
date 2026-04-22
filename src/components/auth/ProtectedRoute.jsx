@@ -11,27 +11,25 @@ import RestrictedAccess from '../../pages/RestrictedAccess';
  */
 const ProtectedRoute = ({ children, requiredRole }) => {
     const { currentUser, isGuest } = useAuth();
-
+ 
     // 1. Check for Guest Access
     if (isGuest) {
-        // Guests can only access the Directory, About, and Public Profiles.
-        // If they try to access Admin or Audit sections, show restricted access.
-        if (requiredRole === 'admin' || requiredRole === 'auditor') {
-            return <RestrictedAccess requiredRole={requiredRole === 'admin' ? 'Administrative' : 'Auditor'} />;
+        if (requiredRole === 'merchant' || requiredRole === 'auditor') {
+            return <RestrictedAccess requiredRole={requiredRole === 'merchant' ? 'Merchant Assistant' : 'Auditor'} />;
         }
     }
-
+ 
     // 2. Check for Authenticated User Roles
     if (currentUser) {
-        if (requiredRole === 'admin' && !currentUser.isSuperAdmin && !currentUser.isAdmin) {
-            return <RestrictedAccess requiredRole="Administrative" />;
+        if (requiredRole === 'merchant' && !currentUser.isSuperAdmin && !currentUser.isMerchantAssistant) {
+            return <RestrictedAccess requiredRole="Merchant Assistant" />;
         }
-
+ 
         if (requiredRole === 'auditor' && !currentUser.isSuperAdmin && !currentUser.isAuditor) {
             return <RestrictedAccess requiredRole="Auditor" />;
         }
     }
-
+ 
     // If no role is required or user meets the requirements, render the children
     return children;
 };
