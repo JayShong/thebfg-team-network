@@ -114,12 +114,15 @@ const Scanner = () => {
         }
     };
 
+    const [purchaseForm, setPurchaseForm] = useState(false);
+    const [amount, setAmount] = useState('');
+    const [receiptId, setReceiptId] = useState('');
+
     const submitPurchase = async () => {
-        if (!currentUser) return;
-        const amountStr = prompt("Enter the total purchase amount (RM):", "0");
-        const amount = parseFloat(amountStr);
+        if (!currentUser || !amount) return;
+        const finalAmount = parseFloat(amount);
         
-        if (isNaN(amount) || amount <= 0) {
+        if (isNaN(finalAmount) || finalAmount <= 0) {
             alert("Please enter a valid amount.");
             return;
         }
@@ -133,15 +136,18 @@ const Scanner = () => {
                 bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
                 userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
-                amount: amount,
+                amount: finalAmount,
+                receiptId: receiptId || 'N/A',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 status: 'pending' // Purchases require founder verification
             });
 
             setIsSuccess(true);
             setScannedBusiness(null);
+            setPurchaseForm(false);
+            setAmount('');
+            setReceiptId('');
             
-            // Evaluate Badges (some badges might count pending purchases or total counts)
             const { evaluateBadges } = await import('../utils/badgeEngine');
             await evaluateBadges(currentUser);
         } catch(e) {
@@ -212,17 +218,53 @@ const Scanner = () => {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <button onClick={submitCheckin} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--primary)' }}>
-                            <i className="fa-solid fa-check"></i> Found Them (Check-In)
-                        </button>
+                        {purchaseForm ? (
+                            <div className="slide-up">
+                                <h4 style={{ marginBottom: '1rem', color: 'var(--accent-success)' }}><i className="fa-solid fa-receipt"></i> Log Purchase Details</h4>
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Amount (RM)</label>
+                                    <input 
+                                        type="number" 
+                                        className="input-modern" 
+                                        placeholder="0.00" 
+                                        value={amount} 
+                                        onChange={(e) => setAmount(e.target.value)} 
+                                        style={{ width: '100%', marginBottom: '1rem' }}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Receipt / Bill ID (Optional)</label>
+                                    <input 
+                                        type="text" 
+                                        className="input-modern" 
+                                        placeholder="e.g. INV-12345" 
+                                        value={receiptId} 
+                                        onChange={(e) => setReceiptId(e.target.value)} 
+                                        style={{ width: '100%', marginBottom: '1.5rem' }}
+                                    />
+                                </div>
+                                <button onClick={submitPurchase} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
+                                    Confirm & Log Impact
+                                </button>
+                                <button onClick={() => setPurchaseForm(false)} style={{ width: '100%', background: 'none', border: 'none', padding: '1rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                                    <i className="fa-solid fa-arrow-left"></i> Back to selection
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <button onClick={submitCheckin} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--primary)' }}>
+                                    <i className="fa-solid fa-check"></i> Found Them (Check-In)
+                                </button>
 
-                        <button onClick={submitPurchase} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
-                            <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
-                        </button>
-                        
-                        <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
-                            Not right? Scan again
-                        </button>
+                                <button onClick={() => setPurchaseForm(true)} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
+                                    <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
+                                </button>
+                                
+                                <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                    Not right? Scan again
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
