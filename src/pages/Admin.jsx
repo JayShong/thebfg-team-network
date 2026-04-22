@@ -546,22 +546,6 @@ const RoleManager = () => {
         }
     };
 
-            // Log the administrative action
-            await db.collection('system').doc('audit_trail').collection('logs').add({
-                action: `${action}_role`,
-                target: cleanEmail,
-                role: roleField,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                performedBy: currentUser?.email || 'Super Admin'
-            });
-
-            setEmail('');
-            alert(`Identity Verified. Role ${isRemoving ? 'removed' : 'assigned'} successfully.`);
-        } catch (e) {
-            alert("Administrative update failed: " + e.message);
-        }
-    };
-
     if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
     const RoleSection = ({ title, icon, color, roleField, emails, description }) => (
