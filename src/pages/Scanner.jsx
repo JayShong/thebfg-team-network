@@ -161,20 +161,41 @@ const Scanner = () => {
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
                         {successMsg || "Your activity has been securely recorded. Thank you for supporting the Empathy Economy."}
                     </p>
-                    <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); setManualId(''); }} className="nav-btn active" style={{ background: 'var(--primary)', width: '100%', justifyContent: 'center' }}>
+                    <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); setManualId(''); }} className="btn btn-primary" style={{ marginTop: '1rem' }}>
                         Scan Another
                     </button>
                 </div>
             ) : !scannedBusiness ? (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '1rem', marginBottom: '1.5rem' }}>
-                        <h2 style={{ color: 'var(--primary)', margin: 0 }}>Scanner</h2>
+                        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Scanner</h1>
                         <button 
                             onClick={() => { setShowTutorial(true); setTutorialStep(0); }} 
-                            className="nav-btn" 
-                            style={{ fontSize: '0.8rem', padding: '0.4rem 1rem' }}
+                            style={{ 
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid var(--glass-border)',
+                                borderRadius: 'var(--radius-full)',
+                                padding: '0.6rem 1.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                cursor: 'pointer',
+                                transition: 'var(--transition)',
+                                color: 'var(--text-primary)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)'
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                            }}
                         >
-                            <i className="fa-solid fa-circle-question"></i> Tutorial
+                            <i className="fa-solid fa-circle-question" style={{ color: 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '1px' }}>TUTORIAL</span>
                         </button>
                     </div>
 
@@ -236,20 +257,20 @@ const Scanner = () => {
                                         style={{ width: '100%', marginBottom: '1.5rem' }}
                                     />
                                 </div>
-                                <button onClick={submitPurchase} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
+                                <button onClick={submitPurchase} className="btn btn-success" style={{ width: '100%' }}>
                                     Confirm & Log Impact
                                 </button>
-                                <button onClick={() => setPurchaseForm(false)} style={{ width: '100%', background: 'none', border: 'none', padding: '1rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                                <button onClick={() => setPurchaseForm(false)} style={{ width: '100%', background: 'none', border: 'none', padding: '1rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
                                     <i className="fa-solid fa-arrow-left"></i> Back to selection
                                 </button>
                             </div>
                         ) : (
                             <>
-                                <button onClick={submitCheckin} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--primary)' }}>
+                                <button onClick={submitCheckin} className="btn btn-primary" style={{ width: '100%' }}>
                                     <i className="fa-solid fa-check"></i> Found Them (Check-In)
                                 </button>
-
-                                <button onClick={() => setPurchaseForm(true)} className="nav-btn active" style={{ width: '100%', justifyContent: 'center', background: 'var(--accent-success)' }}>
+ 
+                                <button onClick={() => setPurchaseForm(true)} className="btn btn-success" style={{ width: '100%' }}>
                                     <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
                                 </button>
                                 
@@ -303,16 +324,16 @@ const Scanner = () => {
                             {tutorialStep < TUTORIAL_STEPS.length - 1 ? (
                                 <button 
                                     onClick={() => setTutorialStep(tutorialStep + 1)} 
-                                    className="nav-btn active" 
-                                    style={{ background: TUTORIAL_STEPS[tutorialStep].color, border: 'none', padding: '0.5rem 1.5rem' }}
+                                    className="btn btn-primary" 
+                                    style={{ background: TUTORIAL_STEPS[tutorialStep].color, border: 'none', padding: '0.6rem 1.5rem', width: 'auto' }}
                                 >
                                     Next <i className="fa-solid fa-arrow-right"></i>
                                 </button>
                             ) : (
                                 <button 
                                     onClick={() => setShowTutorial(false)} 
-                                    className="nav-btn active" 
-                                    style={{ background: 'var(--primary)', border: 'none', padding: '0.5rem 1.5rem' }}
+                                    className="btn btn-primary" 
+                                    style={{ padding: '0.6rem 1.5rem', width: 'auto' }}
                                 >
                                     Got it!
                                 </button>
