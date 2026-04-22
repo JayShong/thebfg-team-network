@@ -43,25 +43,60 @@ exports.onbusinessdeleted = onDocumentDeleted('businesses/{bizId}', async (event
 
 const { BADGES_CONFIG, evaluateTier } = require('./badgeEngine');
 
-// 3. Transaction Triggers (Sanitized Feed & Impact Aggregation)
+// 3. Transaction Triggers (Sanitized Feed & The Sentinel)
 exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (event) => {
     const txn = event.data.data();
     if (!txn.userId) return null;
+    const today = new Date().toISOString().split('T')[0];
 
-    // A. Create Sanitized Public Activity for Newsreel
-    const uName = (txn.userNickname || txn.userName || 'Explorer').substring(0, 15);
-    const bName = (txn.bizName || 'Business').substring(0, 20);
-    
-    await db.collection('public_activity').add({
-        text: txn.type === 'purchase' 
-            ? `💳 ${uName} supported ${bName}` 
-            : `📍 ${uName} checked-in at ${bName}`,
-        type: 'activity',
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+        // A. The Sentinel: Background Verification
+        // Check for 1-per-day limit violation for this business
+        const dailyQuery = await db.collection('transactions')
+            .where('userId', '==', txn.userId)
+            .where('bizId', '==', txn.bizId)
+            .where('type', '==', 'checkin')
+            .orderBy('timestamp', 'desc')
+            .limit(5)
+            .get();
 
-    // B. Trigger Global Impact Aggregation (Source of Truth)
-    return runImpactAggregation();
+        const duplicates = dailyQuery.docs.filter(doc => {
+            if (doc.id === event.params.txnId) return false;
+            const ts = doc.data().timestamp;
+            if (!ts) return false;
+            const d = ts.toDate().toISOString().split('T')[0];
+            return d === today;
+        });
+
+        if (duplicates.length > 0) {
+            console.warn(`Sentinel: Rule violation detected for ${txn.userId}. Flagging user.`);
+            await db.collection('users').doc(txn.userId).update({ 
+                isFlagged: true,
+                flagReason: `Daily limit bypass at ${txn.bizName || txn.bizId}`
+            });
+            // Mark transaction as suspect
+            await event.data.ref.update({ status: 'flagged_by_sentinel' });
+            return null;
+        }
+
+        // B. Create Sanitized Public Activity for Newsreel
+        const uName = (txn.userNickname || txn.userName || 'Explorer').substring(0, 15);
+        const bName = (txn.bizName || 'Business').substring(0, 20);
+        
+        await db.collection('public_activity').add({
+            text: txn.type === 'purchase' 
+                ? `💳 ${uName} supported ${bName}` 
+                : `📍 ${uName} checked-in at ${bName}`,
+            type: 'activity',
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // C. Trigger Global Impact Aggregation
+        return runImpactAggregation();
+    } catch (e) {
+        console.error("Sentinel processing failed:", e);
+        return null;
+    }
 });
 
 exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (event) => {
@@ -252,4 +287,29 @@ exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
         console.error('GDPR deletion failed:', error);
         throw new functions.https.HttpsError('internal', 'Deletion process failed. Please contact support.');
     }
+});
+
+// 7. Sentinel Governance (Superadmin Only)
+exports.clearidentityflag = functions.https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.email !== 'jayshong@gmail.com') {
+        throw new functions.https.HttpsError('permission-denied', 'Superadmin access required.');
+    }
+    const { targetUserId } = data;
+    await db.collection('users').doc(targetUserId).update({
+        isFlagged: false,
+        flagReason: admin.firestore.FieldValue.delete()
+    });
+    return { success: true };
+});
+
+exports.resetlockout = functions.https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.email !== 'jayshong@gmail.com') {
+        throw new functions.https.HttpsError('permission-denied', 'Superadmin access required.');
+    }
+    const { targetUserId } = data;
+    await db.collection('users').doc(targetUserId).collection('sentinel').doc('state').set({
+        lockoutUntil: null,
+        spamAttempts: {}
+    }, { merge: true });
+    return { success: true };
 });

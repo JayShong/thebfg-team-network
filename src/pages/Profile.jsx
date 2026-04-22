@@ -221,32 +221,52 @@ const Profile = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                                 {history.map(item => {
                                     const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
-                                    const bizName = businesses.find(b => b.id === item.bizId)?.name || 'Unknown Business';
+                                    const bizName = item.bizName || 'Unknown Business';
                                     const isPurchase = item.type === 'purchase';
+                                    const isPending = item.status === 'pending';
                                     
                                     return (
-                                        <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-                                                <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: isPurchase ? 'rgba(255,184,77,0.1)' : 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <i className={`fa-solid ${isPurchase ? 'fa-receipt' : 'fa-location-dot'}`} style={{ color: isPurchase ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
+                                        <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                                                    <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: isPurchase ? 'rgba(255,184,77,0.1)' : 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <i className={`fa-solid ${isPurchase ? 'fa-receipt' : 'fa-location-dot'}`} style={{ color: isPurchase ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{bizName}</div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{date.toLocaleDateString()} • {isPurchase ? 'Purchase' : 'Check-in'}</div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{bizName}</div>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{date.toLocaleDateString()} • {isPurchase ? 'Purchase' : 'Check-in'}</div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
+                                                    <div style={{ 
+                                                        fontSize: '0.6rem', 
+                                                        color: item.status === 'verified' ? '#4caf50' : (isPending ? '#ffb84d' : 'var(--text-secondary)'),
+                                                        textTransform: 'uppercase',
+                                                        fontWeight: 'bold',
+                                                        marginTop: '2px'
+                                                    }}>
+                                                        {item.status || 'verified'}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
-                                                <div style={{ 
-                                                    fontSize: '0.6rem', 
-                                                    color: item.status === 'verified' ? '#4caf50' : (item.status === 'pending' ? '#ffb84d' : 'var(--text-secondary)'),
-                                                    textTransform: 'uppercase',
-                                                    fontWeight: 'bold',
-                                                    marginTop: '2px'
-                                                }}>
-                                                    {item.status || 'verified'}
+
+                                            {isPurchase && isPending && (
+                                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newAmount = prompt("Enter corrected amount (RM):", item.amount);
+                                                            if (newAmount && !isNaN(newAmount)) {
+                                                                db.collection('transactions').doc(item.id).update({ amount: parseFloat(newAmount) })
+                                                                    .catch(e => alert("Update failed: " + e.message));
+                                                            }
+                                                        }}
+                                                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <i className="fa-solid fa-pen"></i> Edit Amount
+                                                    </button>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     );
                                 })}

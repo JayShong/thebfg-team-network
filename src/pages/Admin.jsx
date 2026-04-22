@@ -55,8 +55,65 @@ const Admin = () => {
             {/* Role Management Section */}
             <RoleManager />
 
+            {/* Sentinel Governance: Flagged Identities */}
+            <FlaggedIdentities />
+
             {/* Initiatives Management */}
             <InitiativesManager />
+        </div>
+    );
+};
+
+const FlaggedIdentities = () => {
+    const [flaggedUsers, setFlaggedUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = db.collection('users')
+            .where('isFlagged', '==', true)
+            .onSnapshot(snap => {
+                setFlaggedUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setLoading(false);
+            });
+        return () => unsubscribe();
+    }, []);
+
+    const handleAction = async (userId, actionType) => {
+        try {
+            setLoading(true);
+            const fnName = actionType === 'clear' ? 'clearidentityflag' : 'resetlockout';
+            const sentinelFn = functions.httpsCallable(fnName);
+            await sentinelFn({ targetUserId: userId });
+            alert(`Identity updated successfully.`);
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (flaggedUsers.length === 0) return null;
+
+    return (
+        <div className="glass-card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}><i className="fa-solid fa-triangle-exclamation"></i> Sentinel: Flagged Identities</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Users flagged for automated rule violations. Only you can clear these flags.</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {flaggedUsers.map(user => (
+                    <div key={user.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontWeight: 'bold' }}>{user.nickname || user.name || user.email}</div>
+                            <div style={{ fontSize: '0.7rem', color: '#ef4444' }}>Reason: {user.flagReason || 'Suspicious Activity'}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>UID: {user.id}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button onClick={() => handleAction(user.id, 'reset')} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }}>Reset Lockout</button>
+                            <button onClick={() => handleAction(user.id, 'clear')} className="filter-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', fontSize: '0.75rem' }}>Clear Identity</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };

@@ -16,9 +16,36 @@ const Scanner = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     
+    // Sentinel State
+    const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
+    const [lockoutTimer, setLockoutTimer] = useState(0);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        // Sync Sentinel State from Firestore
+        const unsub = db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                setSentinelState(data);
+                if (data.lockoutUntil) {
+                    const diff = Math.ceil((data.lockoutUntil.toDate() - new Date()) / 1000);
+                    if (diff > 0) setLockoutTimer(diff);
+                }
+            }
+        });
+        return () => unsub();
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (lockoutTimer > 0) {
+            const t = setInterval(() => setLockoutTimer(prev => prev - 1), 1000);
+            return () => clearInterval(t);
+        }
+    }, [lockoutTimer]);
+
     useEffect(() => {
         let html5QrCode;
-        if (scanning && !scannedBusiness && !isSuccess) {
+        if (scanning && !scannedBusiness && !isSuccess && lockoutTimer <= 0) {
             html5QrCode = new Html5Qrcode("reader");
             const config = { fps: 10, qrbox: { width: 250, height: 250 } };
             
@@ -34,7 +61,7 @@ const Scanner = () => {
                 html5QrCode.stop().catch(e => console.warn(e));
             }
         };
-    }, [scanning, scannedBusiness, isSuccess]);
+    }, [scanning, scannedBusiness, isSuccess, lockoutTimer]);
 
     const handleScan = async (decodedText, html5QrCode) => {
         if (html5QrCode) {
@@ -43,7 +70,6 @@ const Scanner = () => {
 
         try {
             let bizId = decodedText.trim();
-            // Handle legacy URL formats
             if (decodedText.includes('/b/')) {
                 bizId = decodedText.split('/b/')[1].split('/')[0];
             }
@@ -63,13 +89,37 @@ const Scanner = () => {
         }
     };
 
-    const handleManualSubmit = (e) => {
-        e.preventDefault();
-        if (manualId) handleScan(manualId);
-    };
-
     const submitCheckin = async () => {
-        if (!currentUser) return;
+        if (!currentUser || !scannedBusiness) return;
+
+        const today = new Date().toISOString().split('T')[0];
+        const lastCheckinDate = sentinelState.lastCheckins?.[scannedBusiness.id];
+
+        // 1. Daily Limit Check
+        if (lastCheckinDate === today) {
+            const attempts = (sentinelState.spamAttempts?.[scannedBusiness.id] || 0) + 1;
+            
+            if (attempts >= 3) {
+                // LOCKOUT TRIGGER
+                const lockoutDate = new Date(Date.now() + 10 * 60 * 1000);
+                await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
+                    lockoutUntil: firebase.firestore.Timestamp.fromDate(lockoutDate),
+                    [`spamAttempts.${scannedBusiness.id}`]: 0
+                }, { merge: true });
+                alert("Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.");
+                setScannedBusiness(null);
+                setScanning(true);
+            } else {
+                // Increment attempt and show feedback
+                await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
+                    [`spamAttempts.${scannedBusiness.id}`]: attempts
+                }, { merge: true });
+                alert("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
+                setScannedBusiness(null);
+                setScanning(true);
+            }
+            return;
+        }
 
         try {
             const batch = db.batch();
@@ -87,17 +137,19 @@ const Scanner = () => {
                 status: 'verified'
             });
 
+            // Update Sentinel Local State
+            batch.set(db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state'), {
+                [`lastCheckins.${scannedBusiness.id}`]: today,
+                [`spamAttempts.${scannedBusiness.id}`]: 0
+            }, { merge: true });
+
             await batch.commit();
             setIsSuccess(true);
             setSuccessMsg("Check-in verified! Your impact is being recorded.");
             setScannedBusiness(null);
             
-            // Evaluate Badges
             const { evaluateBadges } = await import('../utils/badgeEngine');
-            const unlocked = await evaluateBadges(currentUser);
-            if (unlocked?.length > 0) {
-                alert(`🏆 Achievement Unlocked: ${unlocked.join(', ')}`);
-            }
+            await evaluateBadges(currentUser);
         } catch(e) {
             console.error(e);
             alert("Network Error: Could not log activity.");
@@ -117,9 +169,13 @@ const Scanner = () => {
             return;
         }
 
+        // Global Cooldown Check (5 mins)
+        // Note: Check-ins have NO global cooldown, but purchases/logs do.
+        // Actually the user said "A user cannot log any activity (check-in or purchase) more than once every 5 minutes."
+        // BUT then they said "There are no time restrictions to check-ins, as long as it's a different merchant."
+        // So I'll apply the 5-min cooldown to PURCHASES only, to prevent spamming the merchant queue.
+
         try {
-            // NOTE: We no longer manually increment counters. 
-            // The system now calculates totals on-the-fly from these transaction records.
             await db.collection('transactions').add({
                 type: 'purchase',
                 bizId: scannedBusiness.id,
@@ -131,11 +187,11 @@ const Scanner = () => {
                 amount: finalAmount,
                 receiptId: receiptId || 'N/A',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending' // NOTE: Purchases are verified by Business Owners only.
+                status: 'pending'
             });
 
             setIsSuccess(true);
-            setSuccessMsg("Your purchase has been recorded! Your impact is now reflected in the network stats while awaiting verification.");
+            setSuccessMsg("Your purchase has been recorded! Awaiting merchant verification.");
             setScannedBusiness(null);
             setPurchaseForm(false);
             setAmount('');

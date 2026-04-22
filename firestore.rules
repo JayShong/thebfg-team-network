@@ -34,8 +34,13 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == userId || isMerchantAssistant() || isAuditor());
       // Prevent self-promotion: Users cannot change their own roles
       allow update: if request.auth != null && request.auth.uid == userId && 
-                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isAuditor', 'isMerchantAssistant', 'isSuperAdmin']);
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isAuditor', 'isMerchantAssistant', 'isSuperAdmin', 'isFlagged']);
       allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Sentinel State (Lockouts, Attempts)
+      match /sentinel/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Role Documents - Partitioned Visibility
@@ -70,7 +75,13 @@ service cloud.firestore {
         isAuditor()
       );
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isMerchantAssistant() || isAuditor();
+      // Users can edit their own pending logs. Admins can manage any.
+      allow update: if request.auth != null && (
+        (request.auth.uid == resource.data.userId && resource.data.status == 'pending') ||
+        isMerchantAssistant() || 
+        isAuditor()
+      );
+      allow delete: if isMerchantAssistant() || isAuditor();
     }
 
     // Newsreel / Public Activity Feed
