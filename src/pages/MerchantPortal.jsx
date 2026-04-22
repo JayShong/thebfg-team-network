@@ -18,7 +18,10 @@ const MerchantPortal = () => {
     const { businesses, loading } = useBusinesses();
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [newBiz, setNewBiz] = useState({ id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '' });
+    const [newBiz, setNewBiz] = useState({ 
+        id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '',
+        founderImg: '', shopfrontImg: ''
+    });
     const [editingBiz, setEditingBiz] = useState(null);
 
     useEffect(() => {
@@ -62,7 +65,10 @@ const MerchantPortal = () => {
             });
 
             await batch.commit();
-            setNewBiz({ id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '' });
+            setNewBiz({ 
+                id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '',
+                founderImg: '', shopfrontImg: ''
+            });
             alert("Merchant successfully onboarded!");
         } catch (err) {
             alert("Onboarding failed: " + err.message);
@@ -187,8 +193,31 @@ const MerchantPortal = () => {
                         <label>Location (City/State)</label>
                         <input type="text" className="input-modern" value={newBiz.location} onChange={e => setNewBiz({...newBiz, location: e.target.value})} placeholder="e.g. Kuala Lumpur" />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-                        <i className="fa-solid fa-plus"></i> Finalize Onboarding
+                    <div className="form-group">
+                        <label>Founder Photo (URL)</label>
+                        <input type="url" className="input-modern" value={newBiz.founderImg} onChange={e => setNewBiz({...newBiz, founderImg: e.target.value})} placeholder="https://..." />
+                    </div>
+                    <div className="form-group">
+                        <label>Shopfront Photo (URL)</label>
+                        <input type="url" className="input-modern" value={newBiz.shopfrontImg} onChange={e => setNewBiz({...newBiz, shopfrontImg: e.target.value})} placeholder="https://..." />
+                    </div>
+                    <button 
+                        type="submit" 
+                        className="nav-btn" 
+                        style={{ 
+                            gridColumn: '1 / -1', 
+                            marginTop: '2rem',
+                            background: 'rgba(0,0,0,0.2)',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--accent-success)',
+                            color: 'var(--accent-success)',
+                            height: '60px',
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            fontWeight: '700'
+                        }}
+                    >
+                        <i className="fa-solid fa-plus-circle"></i> Finalize Onboarding
                     </button>
                 </form>
             </div>

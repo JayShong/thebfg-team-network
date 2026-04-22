@@ -162,12 +162,38 @@ const AuditHub = () => {
                                             <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,0.1)', margin: '0.8rem 0' }} />
                                             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Details: {log.details || 'Baseline Assessment'}</p>
                                         </div>
-                                        <div style={{ marginTop: '1.2rem', display: 'flex', gap: '0.5rem' }}>
-                                            <button className="nav-btn active" style={{ flex: 1, justifyContent: 'center', background: 'var(--accent-success)' }} onClick={() => approveAudit(log)}>
-                                                Approve & Publish
+                                        <div style={{ marginTop: '1.2rem', display: 'flex', gap: '0.8rem' }}>
+                                            <button 
+                                                className="nav-btn" 
+                                                style={{ 
+                                                    flex: 1, 
+                                                    justifyContent: 'center', 
+                                                    height: '50px',
+                                                    borderRadius: 'var(--radius-full)',
+                                                    background: 'rgba(0,0,0,0.2)',
+                                                    border: '1px solid var(--accent-success)',
+                                                    color: 'var(--accent-success)',
+                                                    fontWeight: '700'
+                                                }} 
+                                                onClick={() => approveAudit(log)}
+                                            >
+                                                <i className="fa-solid fa-check-double"></i> Approve & Publish
                                             </button>
-                                            <button className="nav-btn" style={{ flex: 1, justifyContent: 'center', background: 'rgba(244,67,54,0.1)', color: '#f44336', border: '1px solid #f4433633' }} onClick={() => rejectAudit(log)}>
-                                                Reject
+                                            <button 
+                                                className="nav-btn" 
+                                                style={{ 
+                                                    flex: 1, 
+                                                    justifyContent: 'center', 
+                                                    height: '50px',
+                                                    borderRadius: 'var(--radius-full)',
+                                                    background: 'rgba(255, 67, 54, 0.05)',
+                                                    border: '1px solid #f44336',
+                                                    color: '#f44336',
+                                                    fontWeight: '700'
+                                                }} 
+                                                onClick={() => rejectAudit(log)}
+                                            >
+                                                <i className="fa-solid fa-xmark"></i> Reject
                                             </button>
                                         </div>
                                     </div>

@@ -226,7 +226,23 @@ const InitiativesManager = () => {
             </div>
             <form onSubmit={saveInit} style={{ marginTop: '1.5rem' }}>
                 <input type="text" className="input-modern" placeholder="New Initiative Title" value={newInit.title} onChange={e => setNewInit({...newInit, title: e.target.value})} required />
-                <button type="submit" className="nav-btn active" style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center' }}>Publish Initiative</button>
+                <button 
+                    type="submit" 
+                    className="nav-btn" 
+                    style={{ 
+                        marginTop: '1rem', 
+                        width: '100%', 
+                        justifyContent: 'center',
+                        height: '55px',
+                        borderRadius: 'var(--radius-full)',
+                        background: 'rgba(0,0,0,0.2)',
+                        border: '1px solid var(--accent-primary)',
+                        color: 'var(--accent-primary)',
+                        fontWeight: '700'
+                    }}
+                >
+                    <i className="fa-solid fa-plus-circle"></i> Publish Initiative
+                </button>
             </form>
         </div>
     );

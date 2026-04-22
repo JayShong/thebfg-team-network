@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
+import { db } from '../services/firebase';
 
 const BusinessProfile = () => {
     const { id } = useParams();
@@ -16,7 +17,7 @@ const BusinessProfile = () => {
 
     useEffect(() => {
         if (!loading && businesses.length > 0) {
-            const found = businesses.find(b => b.id === id);
+            const found = businesses.find(b => b.id?.toLowerCase() === id?.toLowerCase());
             if (found) {
                 setBusiness(found);
             }
@@ -86,7 +87,6 @@ const BusinessProfile = () => {
         website,
         googleMapsUrl,
         videoUrl,
-        impactStatement,
         impactWaste,
         impactJobs,
         yearlyAssessments,
@@ -97,6 +97,7 @@ const BusinessProfile = () => {
         expiryDate
     } = business;
 
+    const purposeStatement = business.purposeStatement || business.impactStatement;
     const isExpired = status === 'expired';
     const scoreStr = typeof score === 'object' && score ? `${score.s}${score.e}${score.c}${score.soc}${score.env}` : (score || '---');
 
@@ -192,15 +193,14 @@ const BusinessProfile = () => {
                     </div>
                 )}
 
-                {/* ISO53001 Impact Section */}
-                {(impactStatement || impactWaste || impactJobs) && (
+                {/* Purpose Statement Section */}
+                {(purposeStatement || impactWaste || impactJobs) && (
                     <div className="detail-section glass-card" style={{ padding: '1.5rem', background: 'linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0,0,0,0.4))' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <h3 style={{ margin: 0 }}>ISO53001 Impact</h3>
-                            <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.1)', padding: '0.25rem 0.6rem', borderRadius: '1rem', fontWeight: '600' }}>AUDITED</span>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <h3 style={{ margin: 0 }}>Purpose Statement</h3>
                         </div>
                         <p style={{ fontSize: '0.95rem', fontStyle: 'italic', marginBottom: '1.25rem', color: 'rgba(255,255,255,0.8)' }}>
-                            "{impactStatement || 'The social and environmental commitments of this business are currently under audit.'}"
+                            "{purposeStatement || 'The purpose and environmental commitments of this business are currently under audit.'}"
                         </p>
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             {impactWaste && (

@@ -21,7 +21,10 @@ const BusinessPortal = () => {
         website: '',
         contact: '',
         shopfrontImg: '',
-        founderImg: ''
+        founderImg: '',
+        googleMapsUrl: '',
+        videoUrl: '',
+        purposeStatement: ''
     });
 
     const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isMerchantAssistant) && adminEditId;
@@ -49,9 +52,12 @@ const BusinessPortal = () => {
         setFormData({
             story: biz.story || '',
             website: biz.website || '',
-            contact: biz.contact || '',
+            contact: biz.contact || biz.ownerEmail || '',
             shopfrontImg: biz.shopfrontImg || '',
-            founderImg: biz.founderImg || ''
+            founderImg: biz.founderImg || '',
+            googleMapsUrl: biz.googleMapsUrl || '',
+            videoUrl: biz.videoUrl || '',
+            purposeStatement: biz.purposeStatement || ''
         });
     };
 
@@ -81,36 +87,62 @@ const BusinessPortal = () => {
     }
 
     return (
-        <div style={{ paddingBottom: '2rem' }}>
+        <div style={{ paddingBottom: '3rem' }}>
+            <button 
+                className="nav-btn" 
+                onClick={() => navigate('/profile')} 
+                style={{ 
+                    marginBottom: '1.5rem', 
+                    borderRadius: 'var(--radius-full)', 
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    padding: '0.6rem 1.2rem',
+                    fontSize: '0.85rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+            >
+                <i className="fa-solid fa-arrow-left"></i> Back to Profile
+            </button>
+
             {isSupportMode && (
-                <div style={{ background: 'rgba(255,184,77,0.1)', border: '1px solid #ffb84d33', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <i className="fa-solid fa-handshake-angle" style={{ color: '#ffb84d', fontSize: '1.2rem' }}></i>
+                <div className="glass-card" style={{ background: 'rgba(255,184,77,0.1)', border: '1px solid rgba(255,184,77,0.2)', padding: '1.2rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'rgba(255,184,77,0.2)', width: '45px', height: '45px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="fa-solid fa-handshake-angle" style={{ color: '#ffb84d', fontSize: '1.4rem' }}></i>
+                    </div>
                     <div>
-                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold', color: '#ffb84d' }}>Administrative Support Mode</p>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>You are assisting with the profile of <strong>{selectedBiz?.name}</strong>.</p>
+                        <h4 style={{ margin: 0, color: '#ffb84d', fontSize: '1rem' }}>Administrative Support Mode</h4>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Assisting: <strong>{selectedBiz?.name}</strong> (Staff Workspace)</p>
                     </div>
                 </div>
             )}
 
-            <div className="page-header" style={{ display: 'flex', alignItems: 'center', marginTop: '1rem', gap: '10px' }}>
-                <i className="fa-solid fa-briefcase fa-2x" style={{color: 'var(--primary)'}}></i>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h2 style={{ margin: 0 }}>{isSupportMode ? 'Support Workspace' : 'Business Dashboard'}</h2>
-                    <button onClick={() => navigate('/profile')} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
-                        <i className="fa-solid fa-arrow-left"></i> Back
-                    </button>
+            <div className="page-header" style={{ marginBottom: '2.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'var(--primary)', width: '50px', height: '50px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className={`fa-solid ${selectedBiz?.industry === 'F&B' ? 'fa-utensils' : selectedBiz?.industry === 'Retail' ? 'fa-bag-shopping' : 'fa-briefcase'}`} style={{ color: 'white', fontSize: '1.5rem' }}></i>
+                    </div>
+                    <div>
+                        <h1 style={{ fontSize: '2.4rem', fontWeight: '800', margin: 0 }}>
+                            {selectedBiz ? selectedBiz.name : 'Business Dashboard'}
+                        </h1>
+                        <p style={{ color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '0.85rem', marginTop: '4px' }}>
+                            {isSupportMode ? 'Support Workspace (Staff)' : 'Business Management Portal'}
+                        </p>
+                    </div>
                 </div>
             </div>
             
-            {myBusinesses.length > 1 && (
-                <div style={{ marginBottom: '2rem', marginTop: '1rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Select Managed Property:</label>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+            {myBusinesses.length > 1 && !isSupportMode && (
+                <div className="glass-card" style={{ marginBottom: '2rem', padding: '1rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Switch Managed Property:</label>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                         {myBusinesses.map(b => (
                             <button 
                                 key={b.id} 
                                 onClick={() => handleSelectBiz(b)}
                                 className={`filter-btn ${selectedBiz?.id === b.id ? 'active' : ''}`}
+                                style={{ fontSize: '0.85rem' }}
                             >
                                 {b.name}
                             </button>
@@ -124,8 +156,11 @@ const BusinessPortal = () => {
                     <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <div>
-                                <h3 style={{ margin: 0 }}>Material Generation</h3>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Generated branded physical assets for the location.</p>
+                                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <i className="fa-solid fa-qrcode" style={{ color: 'var(--accent-primary)' }}></i>
+                                    Material Generation
+                                </h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Branded physical assets for the location.</p>
                             </div>
                             
                             <div style={{ display: 'none' }}>
@@ -178,8 +213,11 @@ const BusinessPortal = () => {
                     </div>
 
                     <div className="glass-card">
-                        <h3>Public Narrative</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <i className="fa-solid fa-feather-pointed" style={{ color: 'var(--primary)' }}></i>
+                            Public Narrative
+                        </h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
                         
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             <div className="form-group">
@@ -198,8 +236,68 @@ const BusinessPortal = () => {
                                 </div>
                             </div>
 
-                            <button type="submit" disabled={isSaving} className="nav-btn active" style={{ marginTop: '1rem', background: 'var(--primary)', justifyContent: 'center' }}>
-                                {isSaving ? 'Updating...' : 'Save Profile Changes'}
+                            <div className="form-group">
+                                <label>Public Purpose Statement</label>
+                                <input type="text" className="input-modern" value={formData.purposeStatement} onChange={(e) => setFormData({...formData, purposeStatement: e.target.value})} placeholder="Describe your business' core mission..." />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label>Founder Photo (URL)</label>
+                                    <input type="url" className="input-modern" value={formData.founderImg} onChange={(e) => setFormData({...formData, founderImg: e.target.value})} placeholder="https://..." />
+                                </div>
+                                <div className="form-group">
+                                    <label>Shopfront Banner (URL)</label>
+                                    <input type="url" className="input-modern" value={formData.shopfrontImg} onChange={(e) => setFormData({...formData, shopfrontImg: e.target.value})} placeholder="https://..." />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label>Google Maps Pin (URL)</label>
+                                    <input type="url" className="input-modern" value={formData.googleMapsUrl} onChange={(e) => setFormData({...formData, googleMapsUrl: e.target.value})} placeholder="https://goo.gl/maps/..." />
+                                </div>
+                                <div className="form-group">
+                                    <label>Narrative Video (YouTube/Vimeo URL)</label>
+                                    <input type="url" className="input-modern" value={formData.videoUrl} onChange={(e) => setFormData({...formData, videoUrl: e.target.value})} placeholder="https://youtube.com/..." />
+                                </div>
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={isSaving} 
+                                className="nav-btn" 
+                                style={{ 
+                                    marginTop: '2rem', 
+                                    background: 'rgba(0,0,0,0.2)', 
+                                    width: '100%', 
+                                    justifyContent: 'center',
+                                    height: '65px',
+                                    borderRadius: 'var(--radius-full)',
+                                    border: '1px solid var(--accent-primary)',
+                                    color: 'var(--accent-primary)',
+                                    fontSize: '1.1rem',
+                                    fontWeight: '700',
+                                    transition: 'all 0.3s ease',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                    e.currentTarget.style.transform = 'scale(1.02)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                            >
+                                {isSaving ? (
+                                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Synchronizing...</>
+                                ) : (
+                                    <><i className="fa-solid fa-floppy-disk"></i> Finalize Profile Changes</>
+                                )}
                             </button>
                         </form>
                     </div>
@@ -274,22 +372,38 @@ const PendingVerifications = ({ bizId }) => {
                         <p style={{ margin: 0, fontWeight: 'bold' }}>RM {parseFloat(t.amount).toLocaleString()}</p>
                         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Logged by {t.userNickname} on {new Date(t.timestamp).toLocaleDateString()}</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.8rem' }}>
                         <button 
                             disabled={processing === t.id}
                             onClick={() => handleVerify(t, false)}
-                            className="btn btn-secondary" 
-                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
+                            className="nav-btn" 
+                            style={{ 
+                                padding: '0.6rem 1.2rem', 
+                                fontSize: '0.85rem', 
+                                borderRadius: 'var(--radius-full)',
+                                background: 'rgba(255, 77, 77, 0.05)',
+                                border: '1px solid #ff4d4d',
+                                color: '#ff4d4d',
+                                fontWeight: '700'
+                            }}
                         >
-                            Reject
+                            <i className="fa-solid fa-xmark"></i> Reject
                         </button>
                         <button 
                             disabled={processing === t.id}
                             onClick={() => handleVerify(t, true)}
-                            className="btn btn-primary" 
-                            style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', background: '#4caf50', border: 'none' }}
+                            className="nav-btn" 
+                            style={{ 
+                                padding: '0.6rem 1.5rem', 
+                                fontSize: '0.85rem', 
+                                borderRadius: 'var(--radius-full)',
+                                background: 'rgba(76, 175, 80, 0.05)',
+                                border: '1px solid #4caf50',
+                                color: '#4caf50',
+                                fontWeight: '700'
+                            }}
                         >
-                            {processing === t.id ? '...' : 'Approve'}
+                            {processing === t.id ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-check"></i> Approve</>}
                         </button>
                     </div>
                 </div>

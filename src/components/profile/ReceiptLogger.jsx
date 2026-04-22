@@ -48,19 +48,27 @@ const ReceiptLogger = ({ businesses }) => {
     };
 
     return (
-        <div className="glass-card slide-up" style={{ marginTop: '1rem' }}>
-            <h3 style={{ color: '#ffffff' }}><i className="fa-solid fa-receipt" style={{color: 'var(--primary)'}}></i> Log a Purchase</h3>
-            <p style={{color: 'var(--text-secondary)', marginBottom: '1.5rem'}}>
-                Submit your receipts from Conviction Network businesses to earn Economic Force badges.
+        <div className="glass-card slide-up" style={{ 
+            marginTop: '1.5rem', 
+            background: 'linear-gradient(145deg, rgba(59, 130, 246, 0.1), rgba(0,0,0,0.4))',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            padding: '1.8rem'
+        }}>
+            <h3 style={{ color: '#ffffff', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <i className="fa-solid fa-receipt" style={{color: 'var(--accent-secondary)'}}></i> 
+                Log a Purchase
+            </h3>
+            <p style={{color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.8rem', lineHeight: '1.5'}}>
+                Submit your receipts from Conviction Network businesses to earn Economic Force badges and support the mission.
             </p>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="search-bar">
-                    <i className="fa-solid fa-store" style={{color: 'var(--text-secondary)'}}></i>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                <div className="search-bar" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                    <i className="fa-solid fa-store" style={{color: 'var(--accent-secondary)', marginLeft: '12px'}}></i>
                     <select 
                         value={bizId}
                         onChange={(e) => setBizId(e.target.value)}
-                        style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.5rem'}}
+                        style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.8rem', fontSize: '0.9rem'}}
                     >
                         <option value="" style={{color: '#000'}}>Select Business...</option>
                         {businesses?.map(b => (
@@ -69,45 +77,67 @@ const ReceiptLogger = ({ businesses }) => {
                     </select>
                 </div>
 
-                <div className="search-bar">
-                    <i className="fa-solid fa-hashtag" style={{color: 'var(--text-secondary)'}}></i>
-                    <input 
-                        type="text" 
-                        placeholder="Receipt Number" 
-                        value={receipt}
-                        onChange={(e) => setReceipt(e.target.value)}
-                        style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.5rem'}}
-                    />
-                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.8rem' }}>
+                    <div className="search-bar" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                        <i className="fa-solid fa-hashtag" style={{color: 'var(--text-secondary)', marginLeft: '12px'}}></i>
+                        <input 
+                            type="text" 
+                            placeholder="Receipt #" 
+                            value={receipt}
+                            onChange={(e) => setReceipt(e.target.value)}
+                            style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.8rem', fontSize: '0.9rem'}}
+                        />
+                    </div>
 
-                <div className="search-bar">
-                    <span style={{color: 'var(--text-secondary)', paddingLeft: '0.5rem'}}>RM</span>
-                    <input 
-                        type="number" 
-                        step="0.01"
-                        placeholder="0.00" 
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.5rem'}}
-                    />
+                    <div className="search-bar" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                        <span style={{color: 'var(--accent-success)', paddingLeft: '12px', fontWeight: '800', fontSize: '0.8rem'}}>RM</span>
+                        <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="0.00" 
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            style={{width: '100%', background: 'none', border: 'none', color: '#ffffff', outline: 'none', padding: '0.8rem', fontSize: '0.9rem', fontWeight: '700'}}
+                        />
+                    </div>
                 </div>
 
                 {message.text && (
-                    <div style={{
-                        color: message.type === 'error' ? 'var(--accent)' : 'var(--primary)', 
-                        textAlign: 'center', fontSize: '0.9rem'
+                    <div className="slide-up" style={{
+                        padding: '0.8rem',
+                        borderRadius: '8px',
+                        background: message.type === 'error' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: message.type === 'error' ? '#f87171' : '#34d399', 
+                        textAlign: 'center', 
+                        fontSize: '0.85rem',
+                        border: `1px solid ${message.type === 'error' ? 'rgba(244, 67, 54, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
                     }}>
-                        {message.text}
+                        <i className={`fa-solid ${message.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i> {message.text}
                     </div>
                 )}
 
                 <button 
                     type="submit" 
-                    className="nav-btn active" 
+                    className="nav-btn" 
                     disabled={isSubmitting}
-                    style={{width: '100%', justifyContent: 'center', background: 'var(--primary)', color: '#ffffff'}}
+                    style={{
+                        width: '100%', 
+                        justifyContent: 'center', 
+                        height: '55px',
+                        borderRadius: 'var(--radius-full)',
+                        background: 'rgba(0,0,0,0.2)',
+                        border: '1px solid var(--accent-secondary)',
+                        color: 'var(--accent-secondary)',
+                        fontSize: '1rem',
+                        fontWeight: '700',
+                        marginTop: '0.5rem'
+                    }}
                 >
-                    {isSubmitting ? 'Submitting...' : 'Log Purchase'}
+                    {isSubmitting ? (
+                        <><i className="fa-solid fa-spinner fa-spin"></i> Processing...</>
+                    ) : (
+                        <><i className="fa-solid fa-cloud-upload"></i> Submit for Verification</>
+                    )}
                 </button>
             </form>
         </div>
