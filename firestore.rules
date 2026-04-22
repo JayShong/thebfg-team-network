@@ -64,6 +64,12 @@ service cloud.firestore {
       allow write: if isAuditor() || isSuperAdmin();
     }
 
+    // Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // Initiatives Collection
     match /initiatives/{initId} {
       allow read: if true;

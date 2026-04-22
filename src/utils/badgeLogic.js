@@ -228,28 +228,28 @@ export const TUTORIAL_STEPS = [
         icon: "fa-qrcode",
         text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to start.",
         color: "#3B82F6",
-        image: "assets/tutorial/scanner.png?v=2"
+        image: "/assets/tutorial/scanner.png?v=2"
     },
     {
         title: "Step 2: Selection",
-        icon: "fa-location-dot",
-        text: "Support them by checking In. If you have bought anything, log the purchase.",
+        icon: "fa-hand-pointer",
+        text: "Support them by checking in, or record your support by logging a purchase.",
         color: "#10B981",
-        image: "assets/tutorial/recognition.png?v=6"
+        image: "/assets/tutorial/recognition.png?v=2"
     },
     {
-        title: "Step 3: Log a Purchase",
+        title: "Step 3: Log Purchase",
         icon: "fa-receipt",
         text: "When logging a purchase, enter the Receipt ID and the Total Amount (RM) from your bill.",
         color: "#F59E0B",
-        image: "assets/tutorial/purchase.png?v=6"
+        image: "/assets/tutorial/purchase.png?v=2"
     },
     {
         title: "Step 4: Success!",
         icon: "fa-certificate",
-        text: "A successful registration results in a green confirmation card. Your activity is now securely recorded in our database.",
+        text: "Thank you for contributing to the growth of the empathy economy. Your activity is now securely recorded.",
         color: "#8B5CF6",
-        image: "assets/tutorial/success.png?v=6"
+        image: "/assets/tutorial/success.png?v=2"
     }
 ];
 
