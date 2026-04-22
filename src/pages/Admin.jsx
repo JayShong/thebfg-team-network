@@ -7,6 +7,11 @@ import { drawStandee } from '../utils/assetUtils';
 import { useAuth } from '../contexts/AuthContext';
 import firebase from 'firebase/compat/app';
 
+/**
+ * FUTURE ROADMAP:
+ * Automated POS CSV bulk uploads are planned for future phases to streamline receipt verification.
+ * Currently, the system relies on manual cross-referencing against merchant POS exports.
+ */
 const Admin = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();

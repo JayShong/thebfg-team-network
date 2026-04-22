@@ -11,6 +11,9 @@ export const PLATFORM_CONFIG = {
     // Alpha/Beta Status
     IS_ALPHA: true,
     
+    // Default Supervisors for Audits
+    DEFAULT_SUPERVISORS: ['jayshong@gmail.com'],
+
     // Role Definitions
     ROLES: {
         SUPER_ADMIN: 'isSuperAdmin',

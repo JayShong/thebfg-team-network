@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 const AuditHub = () => {
     const { currentUser } = useAuth();
@@ -101,6 +102,9 @@ const AuditHub = () => {
                 <div>
                     <h2 style={{ margin: 0 }}>Verification Hub</h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ISO53001 Compliance Workflow</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                        <i className="fa-solid fa-circle-info"></i> The actual auditing process occurs off-platform. This dashboard monitors milestones and publishing.
+                    </p>
                 </div>
             </div>
 
@@ -143,7 +147,12 @@ const AuditHub = () => {
                                                 <h4 style={{ margin: 0 }}>{log.bizName}</h4>
                                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Auditor: {log.auditorEmail}</p>
                                             </div>
-                                            <span className="tier-badge" style={{ background: 'rgba(59,130,246,0.2)', color: 'var(--accent-primary)' }}>Pending</span>
+                                            <span className="tier-badge" style={{ 
+                                                background: log.status === 'VERIFICATION_STARTED' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.2)', 
+                                                color: log.status === 'VERIFICATION_STARTED' ? '#F59E0B' : 'var(--accent-primary)' 
+                                            }}>
+                                                {log.status === 'VERIFICATION_STARTED' ? 'Audit in Progress' : 'Pending Approval'}
+                                            </span>
                                         </div>
                                         <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                             <p style={{ fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Public Summary:</p>
@@ -201,7 +210,7 @@ const AuditHub = () => {
                                                 
                                                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Select Supervisor</label>
                                                 <select id={`sup-${log.id}`} className="input-modern" style={{ width: '100%', marginBottom: '1rem' }}>
-                                                    {(log.supervisorEmails || ['jayshong@gmail.com']).map(email => (
+                                                    {(log.supervisorEmails || PLATFORM_CONFIG.DEFAULT_SUPERVISORS).map(email => (
                                                         <option key={email} value={email}>{email}</option>
                                                     ))}
                                                 </select>

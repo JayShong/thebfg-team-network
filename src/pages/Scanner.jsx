@@ -78,10 +78,12 @@ const Scanner = () => {
                 type: 'checkin',
                 bizId: scannedBusiness.id,
                 bizName: scannedBusiness.name,
+                bizIndustry: scannedBusiness.industry || 'Unknown',
+                bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
                 userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'verified' // Check-ins are auto-verified
+                status: 'verified'
             });
 
             batch.update(db.collection('businesses').doc(scannedBusiness.id), { 
@@ -127,6 +129,8 @@ const Scanner = () => {
                 type: 'purchase',
                 bizId: scannedBusiness.id,
                 bizName: scannedBusiness.name,
+                bizIndustry: scannedBusiness.industry || 'Unknown',
+                bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
                 userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
                 amount: amount,

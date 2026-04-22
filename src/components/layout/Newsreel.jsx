@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { db } from '../../services/firebase';
 
 const Newsreel = () => {
     const { currentUser, isGuest, logout, recentActivity, pendingApprovalCount } = useAuth();
@@ -9,6 +10,16 @@ const Newsreel = () => {
     const [index, setIndex] = useState(0);
     const [displayMessage, setDisplayMessage] = useState("");
     const [clickAction, setClickAction] = useState(null);
+    const [announcements, setAnnouncements] = useState([]);
+
+    useEffect(() => {
+        const unsubscribe = db.collection('announcements')
+            .where('status', '==', 'active')
+            .onSnapshot(snap => {
+                setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        return () => unsubscribe();
+    }, []);
 
     // Build the queue of messages to rotate through
     const getRotationQueue = () => {
@@ -22,6 +33,18 @@ const Newsreel = () => {
                 action: () => navigate('/audit-hub')
             });
         }
+
+        // 2. Live Platform Announcements
+        announcements.forEach(a => {
+            queue.push({
+                text: `📣 ${a.message}`,
+                type: a.type || 'info',
+                action: a.link ? () => {
+                    if (a.link.startsWith('http')) window.open(a.link, '_blank');
+                    else navigate(a.link);
+                } : null
+            });
+        });
 
         // 2. Personal Status Message
         if (isGuest) {
@@ -99,7 +122,7 @@ const Newsreel = () => {
         }, 8000); // 8 second rotation
 
         return () => clearInterval(interval);
-    }, [index, recentActivity, pendingApprovalCount, isGuest, currentUser]);
+    }, [index, recentActivity, pendingApprovalCount, isGuest, currentUser, announcements]);
 
     if (queue.length === 0) return <div className="newsreel hidden"></div>;
 

@@ -121,7 +121,10 @@ const BusinessProfile = () => {
                 {shopfrontImg ? (
                     <img src={shopfrontImg} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))' }}></div>
+                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem' }}>
+                        <i className="fa-solid fa-camera fa-2x" style={{ color: 'rgba(255,255,255,0.1)' }}></i>
+                        <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' }}>Photo coming soon</span>
+                    </div>
                 )}
                 {isExpired && (
                     <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(244, 67, 54, 0.9)', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '2rem', fontSize: '0.75rem', fontWeight: 'bold', backdropFilter: 'blur(4px)' }}>
@@ -163,20 +166,22 @@ const BusinessProfile = () => {
                 )}
 
                 {/* Founder's Conviction Section */}
-                <div className="detail-section glass-card" style={{ padding: '1.5rem' }}>
-                    <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <i className="fa-solid fa-heart" style={{ color: 'var(--accent-primary)' }}></i> Founder's Conviction
-                    </h3>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem' }}>
-                        {founderImg && (
-                            <img src={founderImg} alt={founder} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent-primary)' }} />
-                        )}
-                        <div>
-                            <p style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--text-primary)' }}>{founder}</p>
-                            <p style={{ marginTop: '0.5rem', fontStyle: 'italic', color: 'var(--text-secondary)', lineHeight: '1.6' }}>"{story}"</p>
+                {(founder || story || founderImg) && (
+                    <div className="detail-section glass-card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <i className="fa-solid fa-heart" style={{ color: 'var(--accent-primary)' }}></i> Founder's Conviction
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem' }}>
+                            {founderImg && (
+                                <img src={founderImg} alt={founder} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent-primary)' }} />
+                            )}
+                            <div>
+                                <p style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--text-primary)' }}>{founder || 'Founder'}</p>
+                                {story && <p style={{ marginTop: '0.5rem', fontStyle: 'italic', color: 'var(--text-secondary)', lineHeight: '1.6' }}>"{story}"</p>}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* ISO53001 Impact Section */}
                 {(impactStatement || impactWaste || impactJobs) && (
@@ -271,10 +276,12 @@ const BusinessProfile = () => {
                                 <a href={website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: '600' }}>{website}</a>
                             </p>
                         )}
-                        <p style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                            <i className="fa-solid fa-location-dot" style={{ width: '20px', color: '#ef4444', marginTop: '3px' }}></i>
-                            <span style={{ color: 'var(--text-primary)' }}>{selectedBranch ? selectedBranch.address : location}</span>
-                        </p>
+                        {(selectedBranch?.address || location) && (
+                            <p style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                                <i className="fa-solid fa-location-dot" style={{ width: '20px', color: '#ef4444', marginTop: '3px' }}></i>
+                                <span style={{ color: 'var(--text-primary)' }}>{selectedBranch ? selectedBranch.address : location}</span>
+                            </p>
+                        )}
                         
                         {/* Maps Link - User Requested free external URL */}
                         <a 

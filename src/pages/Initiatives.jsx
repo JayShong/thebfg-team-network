@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import InitiativeCard from '../components/initiatives/InitiativeCard';
 
+/**
+ * FUTURE ROADMAP:
+ * Joining or contributing to campaigns directly through the platform is planned for a future release.
+ * Currently, user participation is inferred by general network activity (check-ins/purchases).
+ */
 const Initiatives = () => {
     const [initiatives, setInitiatives] = useState([]);
     const [loading, setLoading] = useState(true);
