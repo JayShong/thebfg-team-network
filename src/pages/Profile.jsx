@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import useBusinesses from '../hooks/useBusinesses';
 import AuthModal from '../components/auth/AuthModal';
 import ReceiptLogger from '../components/profile/ReceiptLogger';
+import { db } from '../services/firebase';
 
 const Profile = () => {
     const { currentUser, isGuest, logout } = useAuth();
@@ -14,6 +15,25 @@ const Profile = () => {
     // Detect if current user is an owner of any business
     const ownedBusinesses = businesses.filter(b => b.ownerEmail === currentUser?.email);
     const isOwner = ownedBusinesses.length > 0;
+
+    const [history, setHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser?.uid) return;
+        const unsubscribe = db.collection('transactions')
+            .where('userId', '==', currentUser.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .onSnapshot(snap => {
+                setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setHistoryLoading(false);
+            }, err => {
+                console.warn("History fetch failed:", err);
+                setHistoryLoading(false);
+            });
+        return () => unsubscribe();
+    }, [currentUser]);
 
     if (!currentUser && !isGuest) {
         return (
@@ -63,7 +83,9 @@ const Profile = () => {
                     <div className="avatar-placeholder">
                         <i className="fa-solid fa-user"></i>
                     </div>
-                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>{displayUser.name}</h3>
+                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>
+                        {displayUser.nickname || displayUser.name || 'Explorer'}
+                    </h3>
                     
                     <div style={{ margin: '0.5rem 0', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {displayUser.isSuperAdmin && (
@@ -85,6 +107,37 @@ const Profile = () => {
 
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{displayUser.email}</p>
                     <p className="user-id">ID: <span>{displayUser.uid ? displayUser.uid.substring(0, 10).toUpperCase() : displayUser.id}</span></p>
+
+                    {/* Empathy Profile Tags */}
+                    {!displayUser.isGuest && (
+                        <div style={{ marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.8rem' }}>Focusing On</div>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                {displayUser.causes && displayUser.causes.length > 0 ? (
+                                    displayUser.causes.map(cause => (
+                                        <span key={cause} style={{ 
+                                            fontSize: '0.7rem', 
+                                            padding: '0.3rem 0.75rem', 
+                                            borderRadius: '2rem', 
+                                            background: 'rgba(255,255,255,0.06)', 
+                                            color: 'var(--text-primary)',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            whiteSpace: 'nowrap'
+                                        }}>
+                                            {cause}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <button 
+                                        onClick={() => navigate('/settings')}
+                                        style={{ background: 'none', border: '1px dashed rgba(255,255,255,0.2)', color: 'var(--text-secondary)', fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
+                                    >
+                                        + Define your Empathy Profile
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="stats-grid" style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -139,7 +192,55 @@ const Profile = () => {
             </div>
 
             {/* Purchase Logging Component */}
-            {!displayUser.isGuest && <div className="mt-4"><ReceiptLogger businesses={businesses} /></div>}
+            {!displayUser.isGuest && (
+                <>
+                    <div className="mt-4"><ReceiptLogger businesses={businesses} /></div>
+                    
+                    <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
+                        <h3 style={{ marginBottom: '1.2rem' }}><i className="fa-solid fa-history" style={{ color: 'var(--accent-secondary)' }}></i> Activity History</h3>
+                        
+                        {historyLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1.5rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
+                        ) : history.length === 0 ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '1rem 0' }}>No activity recorded yet. Visit a business to start your journey!</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                {history.map(item => {
+                                    const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
+                                    const bizName = businesses.find(b => b.id === item.bizId)?.name || 'Unknown Business';
+                                    const isPurchase = item.type === 'purchase';
+                                    
+                                    return (
+                                        <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                                                <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: isPurchase ? 'rgba(255,184,77,0.1)' : 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <i className={`fa-solid ${isPurchase ? 'fa-receipt' : 'fa-location-dot'}`} style={{ color: isPurchase ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{bizName}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{date.toLocaleDateString()} • {isPurchase ? 'Purchase' : 'Check-in'}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
+                                                <div style={{ 
+                                                    fontSize: '0.6rem', 
+                                                    color: item.status === 'verified' ? '#4caf50' : (item.status === 'pending' ? '#ffb84d' : 'var(--text-secondary)'),
+                                                    textTransform: 'uppercase',
+                                                    fontWeight: 'bold',
+                                                    marginTop: '2px'
+                                                }}>
+                                                    {item.status || 'verified'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
             
             {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
         </div>

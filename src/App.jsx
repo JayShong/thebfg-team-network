@@ -20,6 +20,7 @@ import BusinessProfile from './pages/BusinessProfile';
 
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   const { currentUser, isGuest } = useAuth();
@@ -41,13 +42,31 @@ function App() {
         <Route path="/scan" element={<Scanner />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/business/:id" element={<BusinessProfile />} />
-        <Route path="/settings" element={<Settings />} />
         <Route path="/about" element={<About />} />
+
+        {/* Gated Consumer Routes */}
+        <Route path="/settings" element={
+          <ProtectedRoute requiredRole="member">
+            <Settings />
+          </ProtectedRoute>
+        } />
         
-        {/* Admin Routes */}
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/audit-hub" element={<AuditHub />} />
-        <Route path="/business-portal" element={<BusinessPortal />} />
+        {/* Admin & Auditor Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="admin">
+            <Admin />
+          </ProtectedRoute>
+        } />
+        <Route path="/audit-hub" element={
+          <ProtectedRoute requiredRole="auditor">
+            <AuditHub />
+          </ProtectedRoute>
+        } />
+        <Route path="/business-portal" element={
+          <ProtectedRoute requiredRole="admin">
+            <BusinessPortal />
+          </ProtectedRoute>
+        } />
       </Route>
     </Routes>
   );

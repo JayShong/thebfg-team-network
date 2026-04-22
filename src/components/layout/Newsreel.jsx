@@ -64,7 +64,7 @@ const Newsreel = () => {
             });
         } else if (currentUser) {
             queue.push({
-                text: `✨ Welcome back, ${currentUser.name}! Your support strengthens the Empathy Economy.`,
+                text: `✨ Welcome back, ${currentUser.nickname || currentUser.name || 'Explorer'}! Your support strengthens the Empathy Economy.`,
                 type: 'welcome',
                 action: null
             });
@@ -73,7 +73,7 @@ const Newsreel = () => {
         // 3. Activity Feed (The 20 pulled transactions)
         recentActivity.forEach(act => {
             // Defensive mapping for inconsistent legacy field names
-            const uName = act.userName || act.user_name || act.name || 'Someone';
+            const uName = act.userNickname || act.userName || act.user_name || act.name || 'Explorer';
             const bName = act.bizName || act.business_name || act.biz_name || 'Business';
             
             // Handle Firestore Timestamp vs ISO String

@@ -233,19 +233,8 @@ const PendingVerifications = ({ bizId }) => {
             if (isApproved) {
                 const amount = parseFloat(trans.amount) || 0;
                 
+                // Status update only. The system calculates impact from verified/pending transactions dynamically.
                 batch.update(transRef, { status: 'verified', verifiedAt: new Date().toISOString(), verifiedBy: currentUser.email });
-                batch.update(bizRef, {
-                    purchasesCount: firebase.firestore.FieldValue.increment(1),
-                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
-                });
-                batch.update(userRef, {
-                    purchases: firebase.firestore.FieldValue.increment(1),
-                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
-                });
-                batch.update(statsRef, {
-                    purchases: firebase.firestore.FieldValue.increment(1),
-                    purchaseVolume: firebase.firestore.FieldValue.increment(amount)
-                });
 
                 // Log to Audit Trail
                 const logRef = db.collection('audit_logs').doc();
@@ -255,7 +244,7 @@ const PendingVerifications = ({ bizId }) => {
                     details: `Purchase of RM ${amount} by ${trans.userNickname} verified by Founder.`,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     user: currentUser.email,
-                    userNickname: currentUser.nickname || currentUser.email.split('@')[0]
+                    userNickname: currentUser.nickname || currentUser.name || currentUser.email.split('@')[0] || 'Explorer'
                 });
             } else {
                 batch.update(transRef, { status: 'rejected', rejectedAt: new Date().toISOString(), rejectedBy: currentUser.email });

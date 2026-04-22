@@ -29,7 +29,7 @@ const About = () => {
             }}>
                 <h1 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '1rem', color: '#fff' }}>The 30% Mission</h1>
                 <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.9)', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto' }}>
-                    Ultimately, we are linking individual behaviors to the national mission of contributing to <strong style={{ color: 'var(--primary)' }}>30% of Malaysia's GDP</strong> through empathetic commerce.
+                    Let's make empathy a core part of Malaysia's commercial world.
                 </p>
                 
                 {/* Mission Progress Mockup */}
@@ -42,7 +42,7 @@ const About = () => {
                         <div style={{ width: progressWidth, height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent-success))', borderRadius: '6px' }}></div>
                     </div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.8rem' }}>
-                        <i className="fa-solid fa-circle-info"></i> Your check-ins and verified purchases build the data infrastructure for this national goal.
+                        <i className="fa-solid fa-circle-info"></i> Your activities sends a message that you choose to prioritize empathy over greed.
                     </p>
                 </div>
             </div>
@@ -56,7 +56,7 @@ const About = () => {
             <div className="glass-card detail-section" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
                     <i className="fa-solid fa-shield-halved fa-2x" style={{ color: 'var(--accent-success)' }}></i>
-                    <h3 style={{ color: '#ffffff', margin: 0 }}>ISO53001 Audited Standards</h3>
+                    <h3 style={{ color: '#ffffff', margin: 0 }}>TheBFG.Team Living Standard<br /><span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Powered by ISO53001</span></h3>
                 </div>
                 <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '1.5rem', lineHeight: '1.7' }}>
                     Businesses in the Conviction Network are scored across 5 core paradigms. Each paradigm receives a grade between <strong style={{color: 'var(--accent-success)'}}>A (Leadership)</strong> and <strong style={{color: 'var(--accent)'}}>D (Exploitative)</strong>. 
@@ -105,8 +105,8 @@ const About = () => {
             <div className="glass-card detail-section" style={{ marginTop: '1.5rem', background: 'rgba(255,255,255,0.03)' }}>
                 <h3 style={{ color: '#ffffff', marginBottom: '1rem' }}>How Participation Works</h3>
                 <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', fontSize: '0.95rem' }}>
-                    By scanning a QR code at a partner business, you record your support for their humanistic practices. 
-                    If you made a purchase, you can log it to further help the Conviction Network <strong style={{ color: 'var(--primary)' }}>quantify the impact</strong> of empathetic commerce.
+                    Check-ins are a free way for you to say exploitative businesses got to go. 
+                    Your purchases will make the businesses you support to survive and outlast.
                 </p>
                 <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', flex: 1, minWidth: '140px' }}>

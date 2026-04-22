@@ -148,20 +148,29 @@ const BusinessProfile = () => {
                 
                 {/* Score & Industry Row */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-                    <div className="business-score" style={{ padding: '0.5rem 1rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)' }}>
-                        <i className="fa-solid fa-star"></i> BFG Score: <strong>{scoreStr}</strong>
-                    </div>
+                    {business.membershipType === 'full' ? (
+                        <div className="business-score" style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div><i className="fa-solid fa-star"></i> TheBFG.Team Score: <strong>{scoreStr}</strong></div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-md)', fontFamily: 'monospace' }}>
+                                Sh:{score?.s || '-'} | Em:{score?.e || '-'} | Cu:{score?.c || '-'} | So:{score?.soc || '-'} | Env:{score?.env || '-'}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="business-score" style={{ padding: '0.5rem 1rem', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c4b5fd' }}>
+                            <i className="fa-solid fa-circle-info"></i> Affiliate Member
+                        </div>
+                    )}
                 </div>
 
-                {/* Affiliate Status Logic */}
-                {type === 'affiliate' && (
-                    <div style={{ marginBottom: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                {/* Affiliate Status Disclaimer */}
+                {business.membershipType === 'affiliate' && (
+                    <div style={{ marginBottom: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(139, 92, 246, 0.2)', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c4b5fd', fontWeight: '700', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
                             <i className="fa-solid fa-circle-info"></i> Affiliate Member
                         </div>
-                        <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', fontStyle: 'italic', lineHeight: '1.5' }}>
-                            "Affiliates support our Purpose and have been visited by the team. They have yet to apply to become a full member and receive their score."
-                        </p>
+                        <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)', line_height: '1.5', fontStyle: 'italic' }}>
+                            "Affiliates support our Purpose and have been visited by the team. They have yet to apply to become a full member and receive their score. Persuade them to join by giving them check-ins!"
+                        </div>
                     </div>
                 )}
 

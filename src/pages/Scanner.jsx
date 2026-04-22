@@ -14,6 +14,7 @@ const Scanner = () => {
     const [showTutorial, setShowTutorial] = useState(false);
     const [tutorialStep, setTutorialStep] = useState(0);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [successMsg, setSuccessMsg] = useState('');
     
     useEffect(() => {
         let html5QrCode;
@@ -81,25 +82,14 @@ const Scanner = () => {
                 bizIndustry: scannedBusiness.industry || 'Unknown',
                 bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
-                userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
+                userNickname: currentUser.nickname || currentUser.name || 'Explorer',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 status: 'verified'
             });
 
-            batch.update(db.collection('businesses').doc(scannedBusiness.id), { 
-                checkinsCount: firebase.firestore.FieldValue.increment(1) 
-            });
-
-            batch.update(db.collection('users').doc(currentUser.uid), {
-                checkins: firebase.firestore.FieldValue.increment(1)
-            });
-
-            batch.update(db.collection('system').doc('stats'), {
-                checkins: firebase.firestore.FieldValue.increment(1)
-            });
-
             await batch.commit();
             setIsSuccess(true);
+            setSuccessMsg("Check-in verified! Your impact is being recorded.");
             setScannedBusiness(null);
             
             // Evaluate Badges
@@ -128,6 +118,8 @@ const Scanner = () => {
         }
 
         try {
+            // NOTE: We no longer manually increment counters. 
+            // The system now calculates totals on-the-fly from these transaction records.
             await db.collection('transactions').add({
                 type: 'purchase',
                 bizId: scannedBusiness.id,
@@ -135,14 +127,15 @@ const Scanner = () => {
                 bizIndustry: scannedBusiness.industry || 'Unknown',
                 bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
-                userNickname: currentUser.nickname || currentUser.name || 'Anonymous',
+                userNickname: currentUser.nickname || currentUser.name || 'Explorer',
                 amount: finalAmount,
                 receiptId: receiptId || 'N/A',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending' // Purchases require founder verification
+                status: 'pending' // NOTE: Purchases are verified by Business Owners only.
             });
 
             setIsSuccess(true);
+            setSuccessMsg("Your purchase has been recorded! Your impact is now reflected in the network stats while awaiting verification.");
             setScannedBusiness(null);
             setPurchaseForm(false);
             setAmount('');
@@ -166,9 +159,9 @@ const Scanner = () => {
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>Success!</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                        Your activity has been securely recorded. Thank you for supporting the Empathy Economy.
+                        {successMsg || "Your activity has been securely recorded. Thank you for supporting the Empathy Economy."}
                     </p>
-                    <button onClick={() => { setIsSuccess(false); setScanning(true); setManualId(''); }} className="nav-btn active" style={{ background: 'var(--primary)', width: '100%', justifyContent: 'center' }}>
+                    <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); setManualId(''); }} className="nav-btn active" style={{ background: 'var(--primary)', width: '100%', justifyContent: 'center' }}>
                         Scan Another
                     </button>
                 </div>
