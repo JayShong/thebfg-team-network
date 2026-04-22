@@ -10,4 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm ci && npm run build
       # Direct deployment using Firebase CLI to avoid action input errors
-      - run: npx firebase-tools deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --project thebfgteam-9643a
+      # Added 'firestore' to ensure rules are updated with code changes
+      - run: npx firebase-tools deploy --only hosting,firestore --token ${{ secrets.FIREBASE_TOKEN }} --project thebfgteam-9643a
