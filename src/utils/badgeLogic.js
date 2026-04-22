@@ -219,6 +219,9 @@ export const BADGES_CONFIG = [
 ];
 
 
+// NOTE: These images are actual app screenshots. Please recapture and update them 
+// in public/assets/tutorial/ whenever the UI for the Scanner, Purchase Form, 
+// or Success screen is modified to maintain visual consistency.
 export const TUTORIAL_STEPS = [
     {
         title: "Step 1: Locate the Standee",
