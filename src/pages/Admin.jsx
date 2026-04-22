@@ -121,6 +121,51 @@ const Admin = () => {
                     <h2 style={{ margin: 0 }}>Master Control</h2>
                 </div>
                 <div style={{ display: 'flex', gap: '0.8rem' }}>
+                    {currentUser?.isSuperAdmin && (
+                        <button 
+                            onClick={async () => {
+                                if (!window.confirm("Reconcile global statistics? This will recount all users, businesses, and transactions.")) return;
+                                try {
+                                    // 1. Businesses
+                                    const bizSnap = await db.collection('businesses').get();
+                                    const bizCount = bizSnap.size;
+                                    
+                                    // 2. Consumers
+                                    const userSnap = await db.collection('users').get();
+                                    const userCount = userSnap.size;
+                                    
+                                    // 3. Transactions
+                                    const transSnap = await db.collection('transactions').get();
+                                    let checkins = 0;
+                                    let purchases = 0;
+                                    let volume = 0;
+                                    transSnap.forEach(doc => {
+                                        const d = doc.data();
+                                        if (d.type === 'checkin') checkins++;
+                                        if (d.type === 'purchase') { purchases++; volume += (d.amount || 0); }
+                                    });
+
+                                    await db.collection('system').doc('stats').set({
+                                        consumers: userCount,
+                                        businesses: bizCount,
+                                        checkins: checkins,
+                                        purchases: purchases,
+                                        purchaseVolume: volume,
+                                        gdpPenetration: "0.01%"
+                                    }, { merge: true });
+
+                                    alert("Statistics Reconciled!");
+                                    window.location.reload();
+                                } catch (e) {
+                                    alert("Reconciliation failed: " + e.message);
+                                }
+                            }}
+                            className="nav-btn" 
+                            style={{ fontSize: '0.85rem', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)' }}
+                        >
+                            <i className="fa-solid fa-sync"></i> Reconcile Stats
+                        </button>
+                    )}
                     <button onClick={() => setShowOnboard(!showOnboard)} className="nav-btn active" style={{ fontSize: '0.85rem' }}>
                         <i className="fa-solid fa-plus-circle"></i> Onboard Merchant
                     </button>
