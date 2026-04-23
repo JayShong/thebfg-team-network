@@ -1154,3 +1154,16 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 .gate-shake {
     animation: shake 0.4s ease-in-out;
 }
+
+/* Mobile Responsiveness Hardening */
+@media (max-width: 400px) {
+    .view {
+        padding: 1.5rem 1rem;
+    }
+    .glass-header {
+        padding: 1rem;
+    }
+    .glass-card {
+        padding: 1rem;
+    }
+}

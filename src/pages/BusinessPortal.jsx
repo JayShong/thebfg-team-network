@@ -269,7 +269,7 @@ const BusinessPortal = () => {
                                     {canSeeIntelligence ? 'Securely access customer loyalty and recognition data.' : 'Scan customer cards to record engagement.'}
                                 </p>
                             </div>
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                                 <button 
                                     onClick={() => setShowScanner(true)}
                                     className="nav-btn active" 
@@ -293,7 +293,7 @@ const BusinessPortal = () => {
                         </div>
 
                         {canSeeIntelligence && (
-                            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                 <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{selectedBiz.checkinsCount || 0}</div>
                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Unique Visitors</div>
