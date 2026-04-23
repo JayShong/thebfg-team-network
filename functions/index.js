@@ -354,11 +354,16 @@ exports.creategratitudebond = functions.https.onCall(async (data, context) => {
     const bizData = bizDoc.data();
     
     const isOwner = bizData.ownerEmail === userEmail;
-    const maSnap = await db.doc('system/merchant_roles').get();
-    const isAssistant = maSnap.data()?.emails?.includes(userEmail);
+    const stewardship = bizData.stewardship || {};
+    const isSteward = (stewardship.founders || []).includes(userEmail) || 
+                      (stewardship.managers || []).includes(userEmail) || 
+                      (stewardship.crew || []).includes(userEmail);
     
-    if (!isOwner && !isAssistant) {
-        throw new functions.https.HttpsError('permission-denied', 'Only business owners or assistants can create bonds.');
+    const maSnap = await db.doc('system/merchant_roles').get();
+    const isCustomerSuccess = maSnap.data()?.emails?.includes(userEmail);
+    
+    if (!isOwner && !isSteward && !isCustomerSuccess) {
+        throw new functions.https.HttpsError('permission-denied', 'Only authorized stewards or customer success can create bonds.');
     }
 
     // 2. Create the Gratitude Bond
@@ -420,6 +425,7 @@ exports.getcustomerintelligence = functions.https.onCall(async (data, context) =
         .where('bizId', '==', bizId)
         .where('userId', '==', targetUserId)
         .orderBy('timestamp', 'desc')
+        .limit(50)
         .get();
 
     let checkins = 0;
@@ -432,12 +438,16 @@ exports.getcustomerintelligence = functions.https.onCall(async (data, context) =
     transSnap.forEach(doc => {
         const t = doc.data();
         if (t.type === 'checkin') checkins++;
-        if (t.type === 'purchase' && t.status === 'verified') {
-            purchases++;
-            totalSpend += (parseFloat(t.amount) || 0);
+        if (t.type === 'purchase') {
+            // Log ALL purchases but flag verified ones for stats
+            if (t.status === 'verified') {
+                purchases++;
+                totalSpend += (parseFloat(t.amount) || 0);
+            }
             purchaseLog.push({
                 id: doc.id,
                 amount: t.amount,
+                status: t.status,
                 receiptId: t.receiptId,
                 timestamp: t.timestamp?.toDate ? t.timestamp.toDate().toISOString() : t.timestamp
             });
@@ -452,11 +462,18 @@ exports.getcustomerintelligence = functions.https.onCall(async (data, context) =
         if (t.userNickname) nickname = t.userNickname;
     });
 
+    // 3. Determine Role for Response
+    const stewardship = (await db.collection('businesses').doc(bizId).get()).data().stewardship || {};
+    let role = 'crew';
+    if (userEmail === (await db.collection('businesses').doc(bizId).get()).data().ownerEmail || (stewardship.founders || []).includes(userEmail)) role = 'founder';
+    else if ((stewardship.managers || []).includes(userEmail)) role = 'manager';
+
     return {
         nickname,
         stats: { checkins, purchases, totalSpend },
         purchaseLog,
-        rewardsLog
+        rewardsLog,
+        role // Include role to help frontend gating
     };
 });
 
@@ -467,9 +484,21 @@ exports.grantcustomerreward = functions.https.onCall(async (data, context) => {
 
     if (!description) throw new functions.https.HttpsError('invalid-argument', 'Reward description is required.');
 
-    // 1. Verify merchant permissions (simplified for brevity, should use same logic as creategratitudebond)
+    // 1. Verify merchant permissions (Founders & Managers Only)
     const bizDoc = await db.collection('businesses').doc(bizId).get();
     if (!bizDoc.exists) throw new functions.https.HttpsError('not-found', 'Business not found.');
+    const bizData = bizDoc.data();
+    const stewardship = bizData.stewardship || {};
+
+    const isFounder = bizData.ownerEmail === userEmail || (stewardship.founders || []).includes(userEmail);
+    const isManager = (stewardship.managers || []).includes(userEmail);
+
+    const maSnap = await db.doc('system/merchant_roles').get();
+    const isCustomerSuccess = maSnap.data()?.emails?.includes(userEmail);
+    
+    if (!isFounder && !isManager && !isCustomerSuccess) {
+        throw new functions.https.HttpsError('permission-denied', 'Experience Crew cannot grant rewards. Please inform your Experience Manager.');
+    }
     
     // 2. Record the reward transaction
     const rewardRef = db.collection('transactions').doc();

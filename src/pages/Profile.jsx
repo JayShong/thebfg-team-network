@@ -99,9 +99,24 @@ const Profile = () => {
                                 <i className="fa-solid fa-clipboard-check"></i> Auditor
                             </span>
                         )}
-                        {displayUser.isMerchantAssistant && (
+                        {displayUser.isCustomerSuccess && (
                             <span style={{ background: '#3b82f6', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
-                                <i className="fa-solid fa-user-tag"></i> Merchant Assistant
+                                <i className="fa-solid fa-user-tag"></i> Customer Success
+                            </span>
+                        )}
+                        {isOwner && (
+                            <span style={{ background: 'var(--accent-primary)', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
+                                <i className="fa-solid fa-crown"></i> Founder
+                            </span>
+                        )}
+                        {businesses.some(b => (b.stewardship?.managers || []).includes(displayUser.email)) && (
+                            <span style={{ background: '#ffb84d', color: '#000', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
+                                <i className="fa-solid fa-user-tie"></i> Experience Manager
+                            </span>
+                        )}
+                        {businesses.some(b => (b.stewardship?.crew || []).includes(displayUser.email)) && (
+                            <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
+                                <i className="fa-solid fa-users"></i> Experience Crew
                             </span>
                         )}
                         {displayUser.isGuest && (
@@ -208,9 +223,9 @@ const Profile = () => {
                                     </button>
                                 )}
 
-                                {(displayUser.isSuperAdmin || displayUser.isMerchantAssistant) && (
-                                    <button onClick={() => navigate('/merchant-portal')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-user-tag"></i> Merchant Portal
+                                {displayUser.isCustomerSuccess && (
+                                    <button onClick={() => navigate('/admin')} className="btn btn-secondary">
+                                        <i className="fa-solid fa-user-tag"></i> Customer Success Portal
                                     </button>
                                 )}
 
@@ -220,7 +235,7 @@ const Profile = () => {
                                     </button>
                                 )}
                                 
-                                {isOwner && (
+                                {(isOwner || displayUser.isCustomerSuccess || displayUser.isSuperAdmin || businesses.some(b => [...(b.stewardship?.managers || []), ...(b.stewardship?.crew || [])].includes(displayUser.email))) && (
                                     <button onClick={() => navigate('/business-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
                                         <i className="fa-solid fa-store"></i> My Business Portal
                                     </button>

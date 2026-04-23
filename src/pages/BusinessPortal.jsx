@@ -55,6 +55,11 @@ const BusinessPortal = () => {
         }
     }, [businesses, currentUser, adminEditId]);
 
+    const stewardshipLevel = getStewardshipLevel(selectedBiz);
+    const canEditProfile = stewardshipLevel === 'founder' || stewardshipLevel === 'support';
+    const canSeeIntelligence = stewardshipLevel === 'founder' || stewardshipLevel === 'manager' || stewardshipLevel === 'support';
+    const canVerifyPurchases = stewardshipLevel !== null;
+
     const handleSelectBiz = (biz) => {
         setSelectedBiz(biz);
         setFormData({
@@ -141,9 +146,46 @@ const BusinessPortal = () => {
                 </div>
             </div>
             
-            {myBusinesses.length > 1 && !isSupportMode && (
+            {/* Searchable Business Switcher for Admins/Support */}
+            {(currentUser?.isSuperAdmin || currentUser?.isCustomerSuccess) && (
+                <div className="glass-card" style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid var(--accent-primary-transparent)' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginBottom: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
+                        <i className="fa-solid fa-magnifying-glass"></i> Switch Stewardship Context (Search Businesses)
+                    </label>
+                    <input 
+                        type="text" 
+                        placeholder="Search for a business name or ID..."
+                        className="input-modern"
+                        style={{ width: '100%', marginBottom: '1rem' }}
+                        onChange={(e) => {
+                            const term = e.target.value.toLowerCase();
+                            if (term.length > 1) {
+                                const found = businesses.filter(b => b.name.toLowerCase().includes(term) || b.id.toLowerCase().includes(term));
+                                setMyBusinesses(found);
+                            } else {
+                                // Reset to user's actual businesses or default list
+                                setMyBusinesses(businesses.slice(0, 10));
+                            }
+                        }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', maxHeight: '120px', overflowY: 'auto', padding: '4px' }}>
+                        {myBusinesses.slice(0, 15).map(b => (
+                            <button 
+                                key={b.id} 
+                                onClick={() => handleSelectBiz(b)}
+                                className={`filter-btn ${selectedBiz?.id === b.id ? 'active' : ''}`}
+                                style={{ fontSize: '0.8rem' }}
+                            >
+                                {b.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {myBusinesses.length > 1 && !(currentUser?.isSuperAdmin || currentUser?.isCustomerSuccess) && (
                 <div className="glass-card" style={{ marginBottom: '2rem', padding: '1rem' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Switch Managed Property:</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Your Stewardship Portfolio:</label>
                     <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                         {myBusinesses.map(b => (
                             <button 
@@ -209,14 +251,16 @@ const BusinessPortal = () => {
                     </div>
 
                     {/* Intelligence Center (Aggregate & Bonds) */}
-                    <div className="glass-card" style={{ marginBottom: '2.5rem', border: '1px solid rgba(255,184,77,0.3)' }}>
+                    <div className="glass-card" style={{ marginBottom: '2.5rem', border: '1px solid var(--loyalty-glass-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <div>
                                 <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <i className="fa-solid fa-brain" style={{ color: '#ffb84d' }}></i>
-                                    Intelligence Center
+                                    {canSeeIntelligence ? 'Intelligence Center' : 'Operational Scanner'}
                                 </h3>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Securely access customer loyalty and recognition data.</p>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                    {canSeeIntelligence ? 'Securely access customer loyalty and recognition data.' : 'Scan customer cards to record engagement.'}
+                                </p>
                             </div>
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                                 <button 
@@ -224,41 +268,48 @@ const BusinessPortal = () => {
                                     className="nav-btn active" 
                                     style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px' }}
                                 >
-                                    <i className="fa-solid fa-qrcode"></i> Scan Customer for Insights
+                                    <i className="fa-solid fa-qrcode"></i> Scan Customer
                                 </button>
-                                {/* TEMPORARY PREVIEW BUTTON FOR REVIEW */}
-                                <button 
-                                    onClick={() => {
-                                        setScannedUserId('demo-user-id');
-                                        setShowIntelligence(true);
-                                    }}
-                                    className="nav-btn" 
-                                    style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px', background: 'rgba(255,255,255,0.05)' }}
-                                >
-                                    <i className="fa-solid fa-eye"></i> Preview Intelligence UI
-                                </button>
+                                {canSeeIntelligence && (
+                                    <button 
+                                        onClick={() => {
+                                            setScannedUserId('demo-user-id');
+                                            setShowIntelligence(true);
+                                        }}
+                                        className="nav-btn" 
+                                        style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px', background: 'rgba(255,255,255,0.05)' }}
+                                    >
+                                        <i className="fa-solid fa-eye"></i> Preview Intelligence UI
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{selectedBiz.checkinsCount || 0}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Unique Visitors</div>
+                        {canSeeIntelligence && (
+                            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{selectedBiz.checkinsCount || 0}</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Unique Visitors</div>
+                                </div>
+                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffb84d' }}>{selectedBiz.purchasesCount || 0}</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Loyal Supporters</div>
+                                </div>
+                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Community Impact</div>
+                                </div>
                             </div>
-                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffb84d' }}>{selectedBiz.purchasesCount || 0}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Loyal Supporters</div>
-                            </div>
-                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Community Impact</div>
-                            </div>
-                        </div>
+                        )}
 
-                        <GratitudeBondsLog bizId={selectedBiz.id} onSelectUser={(uid) => {
-                            setScannedUserId(uid);
-                            setShowIntelligence(true);
-                        }} />
+                        <GratitudeBondsLog 
+                            bizId={selectedBiz.id} 
+                            canSeeIntelligence={canSeeIntelligence}
+                            onSelectUser={(uid) => {
+                                setScannedUserId(uid);
+                                setShowIntelligence(true);
+                            }} 
+                        />
                     </div>
 
                     {/* Verification Queue */}
@@ -273,95 +324,72 @@ const BusinessPortal = () => {
                         <PendingVerifications bizId={selectedBiz.id} />
                     </div>
 
-                    <div className="glass-card">
-                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <i className="fa-solid fa-feather-pointed" style={{ color: 'var(--primary)' }}></i>
-                            Public Narrative
-                        </h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
-                        
-                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                            <div className="form-group">
-                                <label>Founder's Story</label>
-                                <textarea className="input-modern" rows="5" value={formData.story} onChange={(e) => setFormData({...formData, story: e.target.value})} placeholder="Tell the community about your conviction..." />
-                            </div>
+                    {canEditProfile && (
+                        <div className="glass-card slide-up">
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <i className="fa-solid fa-feather-pointed" style={{ color: 'var(--primary)' }}></i>
+                                Public Narrative
+                            </h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
+                            
+                            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <div className="form-group">
+                                    <label>Founder's Story</label>
+                                    <textarea className="input-modern" rows="5" value={formData.story} onChange={(e) => setFormData({...formData, story: e.target.value})} placeholder="Tell the community about your conviction..." />
+                                </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label>Website URL</label>
-                                    <input type="url" className="input-modern" value={formData.website} onChange={(e) => setFormData({...formData, website: e.target.value})} />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>Website URL</label>
+                                        <input type="url" className="input-modern" value={formData.website} onChange={(e) => setFormData({...formData, website: e.target.value})} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Contact Email</label>
+                                        <input type="email" className="input-modern" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label>Contact Email</label>
-                                    <input type="email" className="input-modern" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
-                                </div>
-                            </div>
 
-                            <div className="form-group">
-                                <label>Public Purpose Statement</label>
-                                <input type="text" className="input-modern" value={formData.purposeStatement} onChange={(e) => setFormData({...formData, purposeStatement: e.target.value})} placeholder="Describe your business' core mission..." />
-                            </div>
+                                <div className="form-group">
+                                    <label>Public Purpose Statement</label>
+                                    <input type="text" className="input-modern" value={formData.purposeStatement} onChange={(e) => setFormData({...formData, purposeStatement: e.target.value})} placeholder="Describe your business' core mission..." />
+                                </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label>Founder Photo (URL)</label>
-                                    <input type="url" className="input-modern" value={formData.founderImg} onChange={(e) => setFormData({...formData, founderImg: e.target.value})} placeholder="https://..." />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>Founder Photo (URL)</label>
+                                        <input type="url" className="input-modern" value={formData.founderImg} onChange={(e) => setFormData({...formData, founderImg: e.target.value})} placeholder="https://..." />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Shopfront Banner (URL)</label>
+                                        <input type="url" className="input-modern" value={formData.shopfrontImg} onChange={(e) => setFormData({...formData, shopfrontImg: e.target.value})} placeholder="https://..." />
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label>Shopfront Banner (URL)</label>
-                                    <input type="url" className="input-modern" value={formData.shopfrontImg} onChange={(e) => setFormData({...formData, shopfrontImg: e.target.value})} placeholder="https://..." />
-                                </div>
-                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label>Google Maps Pin (URL)</label>
-                                    <input type="url" className="input-modern" value={formData.googleMapsUrl} onChange={(e) => setFormData({...formData, googleMapsUrl: e.target.value})} placeholder="https://goo.gl/maps/..." />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>Google Maps Pin (URL)</label>
+                                        <input type="url" className="input-modern" value={formData.googleMapsUrl} onChange={(e) => setFormData({...formData, googleMapsUrl: e.target.value})} placeholder="https://goo.gl/maps/..." />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Narrative Video (YouTube/Vimeo URL)</label>
+                                        <input type="url" className="input-modern" value={formData.videoUrl} onChange={(e) => setFormData({...formData, videoUrl: e.target.value})} placeholder="https://youtube.com/..." />
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label>Narrative Video (YouTube/Vimeo URL)</label>
-                                    <input type="url" className="input-modern" value={formData.videoUrl} onChange={(e) => setFormData({...formData, videoUrl: e.target.value})} placeholder="https://youtube.com/..." />
-                                </div>
-                            </div>
 
-                            <button 
-                                type="submit" 
-                                disabled={isSaving} 
-                                className="nav-btn" 
-                                style={{ 
-                                    marginTop: '2rem', 
-                                    background: 'rgba(0,0,0,0.2)', 
-                                    width: '100%', 
-                                    justifyContent: 'center',
-                                    height: '65px',
-                                    borderRadius: 'var(--radius-full)',
-                                    border: '1px solid var(--accent-primary)',
-                                    color: 'var(--accent-primary)',
-                                    fontSize: '1.1rem',
-                                    fontWeight: '700',
-                                    transition: 'all 0.3s ease',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                                    e.currentTarget.style.transform = 'scale(1.02)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                            >
-                                {isSaving ? (
-                                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Synchronizing...</>
-                                ) : (
-                                    <><i className="fa-solid fa-floppy-disk"></i> Finalize Profile Changes</>
-                                )}
-                            </button>
-                        </form>
-                    </div>
+                                <button 
+                                    type="submit" 
+                                    disabled={isSaving} 
+                                    className="btn-save-modern"
+                                >
+                                    {isSaving ? (
+                                        <><i className="fa-solid fa-circle-notch fa-spin"></i> Synchronizing...</>
+                                    ) : (
+                                        <><i className="fa-solid fa-floppy-disk"></i> Finalize Profile Changes</>
+                                    )}
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -403,6 +431,8 @@ const PendingVerifications = ({ bizId }) => {
             .where('bizId', '==', bizId)
             .where('status', '==', 'pending')
             .where('type', '==', 'purchase')
+            .orderBy('timestamp', 'desc')
+            .limit(20)
             .onSnapshot(snap => {
                 setPending(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
@@ -497,47 +527,57 @@ const PendingVerifications = ({ bizId }) => {
     );
 };
 
-const GratitudeBondsLog = ({ bizId, onSelectUser }) => {
+const GratitudeBondsLog = ({ bizId, onSelectUser, canSeeIntelligence }) => {
     const [bonds, setBonds] = useState([]);
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!bizId) return;
-        // Fetch recent scans (bonds) that are not expired
         const now = new Date();
         const unsubscribe = db.collection('gratitude_bond_records')
             .where('bizId', '==', bizId)
             .where('type', '==', 'handshake_scan')
+            .where('expiresAt', '>', now)
             .orderBy('expiresAt', 'desc')
-            .limit(10)
+            .limit(20)
             .onSnapshot(snap => {
-                const loaded = [];
-                snap.forEach(doc => {
-                    const data = doc.data();
-                    if (data.expiresAt.toDate() > now) {
-                        loaded.push({ id: doc.id, ...data });
-                    }
-                });
-                setBonds(loaded);
+                setBonds(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setLoading(false);
             });
         return () => unsubscribe();
     }, [bizId]);
 
+    const filtered = search.length > 0 
+        ? bonds.filter(b => b.userId?.toLowerCase().includes(search.toLowerCase())) // Ideally this would be nickname if stored in bond
+        : bonds;
+
     if (loading) return null;
 
     return (
         <div style={{ marginTop: '1.5rem' }}>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '1rem' }}>
-                <i className="fa-solid fa-clock-rotate-left"></i> Recent Gratitude Bonds (Active for 48h)
-            </label>
-            {bonds.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                    <i className="fa-solid fa-clock-rotate-left"></i> {canSeeIntelligence ? 'Active Stewardship Bonds' : 'Recent Scan Log'} (48h)
+                </label>
+                {canSeeIntelligence && (
+                    <input 
+                        type="text" 
+                        placeholder="Search scans..." 
+                        className="input-modern"
+                        style={{ fontSize: '0.7rem', padding: '4px 10px', width: '150px' }}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                )}
+            </div>
+            {filtered.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No active bonds. Scan a customer to begin.</p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No active bonds found.</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', gap: '0.8rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                    {bonds.map(bond => (
+                    {filtered.map(bond => (
                         <div 
                             key={bond.id} 
                             onClick={() => onSelectUser(bond.userId)}
@@ -554,10 +594,10 @@ const GratitudeBondsLog = ({ bizId, onSelectUser }) => {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,184,77,0.05)'}
                         >
                             <div style={{ background: 'rgba(255,255,255,0.1)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.8rem' }}>
-                                <i className="fa-solid fa-user" style={{ color: '#ffb84d' }}></i>
+                                <i className="fa-solid fa-user-check" style={{ color: '#ffb84d' }}></i>
                             </div>
                             <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                Customer Bond
+                                {bond.userId?.substring(0, 8)}...
                             </div>
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                                 {new Date(bond.createdAt?.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

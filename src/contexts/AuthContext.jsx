@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
                     email: user.email,
                     isSuperAdmin: user.email === ROOT_ADMIN_EMAIL,
                     isAuditor: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isAuditor,
-                    isMerchantAssistant: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isMerchantAssistant,
+                    isCustomerSuccess: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isCustomerSuccess,
                     purchases: 0,
                     checkins: 0,
                     ...userDoc.data()
@@ -158,28 +158,18 @@ export const AuthProvider = ({ children }) => {
         return auth.sendPasswordResetEmail(email);
     };
 
-    const mockLogin = () => {
-        const mockProfile = {
-            uid: 'MOCK_OWNER_ID',
-            email: 'jayshong@gmail.com', // Recognized as root admin and owner
-            name: 'Merchant Partner (Mock)',
-            isSuperAdmin: true,
-            isAuditor: true,
-            isMerchantAssistant: true,
-            purchases: 12,
-            checkins: 42,
-            purchaseVolume: 1250.50,
-            nickname: 'Merchant Partner (Mock)'
-        };
-        setCurrentUser(mockProfile);
-        setIsGuest(false);
+    const getStewardshipLevel = (biz) => {
+        if (!currentUser || !biz) return null;
+        const email = currentUser.email;
+        if (biz.ownerEmail === email || (biz.stewardship?.founders || []).includes(email)) return 'founder';
+        if ((biz.stewardship?.managers || []).includes(email)) return 'manager';
+        if ((biz.stewardship?.crew || []).includes(email)) return 'crew';
+        if (currentUser.isCustomerSuccess || currentUser.isSuperAdmin) return 'support';
+        return null;
     };
 
     const updateProfile = async (data) => {
-        if (!currentUser || currentUser.uid === 'MOCK_OWNER_ID') {
-            setCurrentUser(prev => ({ ...prev, ...data }));
-            return;
-        }
+        if (!currentUser) return;
         await db.collection('users').doc(currentUser.uid).update(data);
         setCurrentUser(prev => ({ ...prev, ...data }));
     };
@@ -191,8 +181,8 @@ export const AuthProvider = ({ children }) => {
         pendingApprovalCount,
         fetchRecentActivity,
         login,
-        mockLogin,
         signup,
+        getStewardshipLevel,
         continueAsGuest,
         logout,
         sendPasswordReset,

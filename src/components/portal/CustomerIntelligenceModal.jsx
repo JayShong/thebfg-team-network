@@ -109,31 +109,33 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                                         </div>
                                     </div>
 
-                                    {/* Grant Reward Form */}
-                                    <div className="reward-grant-box">
-                                        <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <i className="fa-solid fa-gift" style={{ color: 'var(--accent-primary)' }}></i>
-                                            Recognize this Supporter
-                                        </h4>
-                                        <form onSubmit={handleGrantReward}>
-                                            <textarea 
-                                                className="input-modern" 
-                                                rows="3" 
-                                                value={rewardText} 
-                                                onChange={(e) => setRewardText(e.target.value)}
-                                                placeholder="Enter gift description (e.g. Free Coffee, 20% discount coupon...)" 
-                                                style={{ width: '100%', marginBottom: '1.25rem', fontSize: '0.95rem', background: 'rgba(0,0,0,0.3)' }}
-                                            />
-                                            <button 
-                                                type="submit" 
-                                                disabled={isGranting || !rewardText.trim()}
-                                                className="nav-btn active" 
-                                                style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '55px', fontSize: '1.1rem' }}
-                                            >
-                                                {isGranting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Strengthen Gratitude Bond'}
-                                            </button>
-                                        </form>
-                                    </div>
+                                    {/* Grant Reward Form (Founders & Managers Only) */}
+                                    {d.role !== 'crew' && (
+                                        <div className="reward-grant-box">
+                                            <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <i className="fa-solid fa-gift" style={{ color: 'var(--accent-primary)' }}></i>
+                                                Recognize this Supporter
+                                            </h4>
+                                            <form onSubmit={handleGrantReward}>
+                                                <textarea 
+                                                    className="input-modern" 
+                                                    rows="3" 
+                                                    value={rewardText} 
+                                                    onChange={(e) => setRewardText(e.target.value)}
+                                                    placeholder="Enter gift description (e.g. Free Coffee, 20% discount coupon...)" 
+                                                    style={{ width: '100%', marginBottom: '1.25rem', fontSize: '0.95rem', background: 'rgba(0,0,0,0.3)' }}
+                                                />
+                                                <button 
+                                                    type="submit" 
+                                                    disabled={isGranting || !rewardText.trim()}
+                                                    className="nav-btn active" 
+                                                    style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '55px', fontSize: '1.1rem' }}
+                                                >
+                                                    {isGranting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Strengthen Gratitude Bond'}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    )}
 
                                     {/* Full Engagement History */}
                                     <div style={{ marginBottom: '1rem' }}>
@@ -147,7 +149,12 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                             <i className={`fa-solid ${e.type === 'purchase' ? 'fa-cart-shopping' : 'fa-location-dot'}`} style={{ color: e.type === 'purchase' ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
                                                             <span className="loyalty-log-value">
-                                                                {e.type === 'purchase' ? `RM ${parseFloat(e.amount).toFixed(2)}` : 'Check-in'}
+                                                                {e.type === 'purchase' ? (
+                                                                    <>
+                                                                        RM {parseFloat(e.amount).toFixed(2)}
+                                                                        {e.status === 'pending' && <span style={{ marginLeft: '8px', fontSize: '0.65rem', padding: '2px 6px', background: 'rgba(255,184,77,0.1)', color: '#ffb84d', borderRadius: '4px', border: '1px solid rgba(255,184,77,0.3)' }}>PENDING</span>}
+                                                                    </>
+                                                                ) : 'Check-in'}
                                                             </span>
                                                         </div>
                                                         <span className="loyalty-log-meta">{e.receiptId ? `ID: ${e.receiptId}` : 'Verified Presence'}</span>

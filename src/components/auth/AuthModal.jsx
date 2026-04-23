@@ -9,7 +9,7 @@ const AuthModal = ({ onClose }) => {
     
     const [isSignUp, setIsSignUp] = useState(false);
     
-    const { login, signup, mockLogin } = useAuth();
+    const { login, signup } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -100,27 +100,12 @@ const AuthModal = ({ onClose }) => {
                         <button 
                             type="button" 
                             onClick={() => setIsSignUp(!isSignUp)} 
-                            style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer', textDecoration: 'none', marginBottom: '1rem' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer', textDecoration: 'none' }}
                             onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
                             onMouseOut={(e) => e.target.style.textDecoration = 'none'}
                         >
                             {isSignUp ? 'Log in here' : 'Register your profile'}
                         </button>
-
-                        <div style={{ padding: '1rem', background: 'rgba(255,184,77,0.05)', borderRadius: '12px', border: '1px dashed rgba(255,184,77,0.2)', marginTop: '1rem' }}>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Development Mode:</p>
-                            <button 
-                                type="button"
-                                onClick={() => {
-                                    mockLogin();
-                                    onClose();
-                                }}
-                                className="btn btn-secondary" 
-                                style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(255,184,77,0.3)', color: '#ffb84d' }}
-                            >
-                                <i className="fa-solid fa-user-shield"></i> Mock Business Owner Login
-                            </button>
-                        </div>
                     </div>
                 </form>
             </div>
