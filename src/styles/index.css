@@ -9,24 +9,16 @@
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     
-    --accent-primary: #8b5cf6; /* Vibrant violet */
-    --accent-secondary: #3b82f6; /* Blue */
-    --accent-success: #10b981; /* Emerald */
-    --accent-warning: #f59e0b;
-    --accent-ghost: #64748b; /* Slate 500 */
-    
-    --gradient-primary: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    --gradient-success: linear-gradient(135deg, #059669, #10b981);
-    
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-    
-    --radius-sm: 8px;
-    --radius-md: 16px;
+    /* Spacing Tokens (Precise Fix) */
+    --app-max-width: 480px;
+    --app-gutter: 1.5rem;
+    --card-padding: 1.5rem;
     --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 12px;
     --radius-full: 999px;
-    
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 * {
@@ -37,29 +29,49 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    min-height: 100%;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    overflow-x: hidden;
+}
+
 body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
     background-image: 
         radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.15), transparent 25%),
         radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.15), transparent 25%);
     background-attachment: fixed;
+    overflow-x: hidden;
 }
 
-/* App Shell (Mobile First constraint) */
+#root {
+    width: 100%;
+}
+
+/* App Shell - The Precise Architecture (Working Revert) */
 #app-container {
     width: 100%;
-    max-width: 480px;
+    max-width: var(--app-max-width);
+    margin: 0 auto; /* Centering method that was confirmed working */
     min-height: 100vh;
     position: relative;
     background: var(--bg-surface);
-    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    min-width: 0;
+    overflow-x: hidden;
 }
 
 /* Utilities */
@@ -89,24 +101,34 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 
 /* Newsreel / Top Banner */
 .newsreel {
-    background: linear-gradient(90deg, #1e293b, var(--accent-primary), #1e293b);
-    background-size: 200% 100%;
-    animation: shimmer 8s linear infinite;
+    background: linear-gradient(90deg, var(--accent-primary), #FF8C00);
     color: white;
-    font-size: 0.7rem;
+    padding: 0.6rem 0; /* Vertical padding only */
+    font-size: 0.75rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 1rem;
-    overflow: hidden;
-    white-space: nowrap;
+    position: relative;
+    z-index: 110;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    letter-spacing: 0.5px;
+    width: 100%;
+    overflow: hidden; /* This acts as the "window" for the scroll */
     border-bottom: 1px solid rgba(255,255,255,0.1);
-    z-index: 101;
-    transition: var(--transition);
+}
+
+.newsreel-scroll {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%; /* Start off-screen to the right */
+    animation: newsreel-marquee 15s linear infinite;
+}
+
+@keyframes newsreel-marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-200%); } /* Ensure it clears the screen to the left */
+}
+
+.newsreel:hover .newsreel-scroll {
+    animation-play-state: paused; /* Pause on hover for easier reading/clicking */
 }
 
 .newsreel:active {
@@ -163,7 +185,7 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 /* Navigation Base */
 .view {
     display: none;
-    padding: 1.5rem;
+    padding: var(--app-gutter);
     padding-bottom: 6rem; /* space for bottom nav */
     animation: fadeIn 0.4s ease forwards;
 }
@@ -184,7 +206,7 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: var(--card-padding);
     box-shadow: var(--glass-shadow);
     transition: var(--transition);
 }
@@ -1155,15 +1177,29 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     animation: shake 0.4s ease-in-out;
 }
 
-/* Mobile Responsiveness Hardening */
-@media (max-width: 400px) {
-    .view {
-        padding: 1.5rem 1rem;
+/* Unified Mobile Refinement (Responsive Safety) */
+@media (max-width: 480px) {
+    :root {
+        --app-gutter: 1rem;
+        --card-padding: 1.25rem;
     }
+    
     .glass-header {
         padding: 1rem;
     }
-    .glass-card {
-        padding: 1rem;
+
+    .portal-header-actions {
+        flex-direction: column !important;
+        width: 100%;
+    }
+
+    .portal-header-actions button {
+        width: 100% !important;
+        flex: none !important;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem !important;
     }
 }

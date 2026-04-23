@@ -269,7 +269,7 @@ const BusinessPortal = () => {
                                     {canSeeIntelligence ? 'Securely access customer loyalty and recognition data.' : 'Scan customer cards to record engagement.'}
                                 </p>
                             </div>
-                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                            <div className="portal-header-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                                 <button 
                                     onClick={() => setShowScanner(true)}
                                     className="nav-btn active" 

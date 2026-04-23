@@ -111,7 +111,9 @@ const Newsreel = () => {
             style={{ cursor: clickAction ? 'pointer' : 'default' }}
             onClick={() => clickAction && clickAction()}
         >
-            {displayMessage}
+            <div className="newsreel-scroll">
+                {displayMessage}
+            </div>
         </div>
     );
 };
