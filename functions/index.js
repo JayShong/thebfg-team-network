@@ -1,5 +1,6 @@
 const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const functions = require('firebase-functions');
 const admin = require("firebase-admin");
 
@@ -367,7 +368,7 @@ exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
  * Volume-based pruning: Keeps only the latest 50 activities.
  * Frequency: Every 1 hour to keep the collection lean and fast.
  */
-exports.prunepublicactivity = functions.pubsub.schedule('every 1 hour').onRun(async (context) => {
+exports.prunepublicactivity = onSchedule('0 * * * *', async (event) => {
     console.log("Starting hourly volume-based cleanup of activity logs...");
 
     try {
