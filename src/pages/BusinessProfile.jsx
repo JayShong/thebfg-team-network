@@ -323,10 +323,20 @@ const BusinessProfile = () => {
 
                 {/* Interactive Action Section */}
                 <div className="detail-section" style={{ padding: '1rem', textAlign: 'center' }}>
+                    <button 
+                        onClick={() => navigate('/scan')}
+                        className="nav-btn active" 
+                        style={{ width: '100%', justifyContent: 'center', height: '60px', borderRadius: 'var(--radius-full)', fontSize: '1.1rem', fontWeight: '800', marginBottom: '1.5rem' }}
+                    >
+                        <i className="fa-solid fa-camera"></i> Visit this Merchant
+                    </button>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                         To support this business, please visit them in person and scan their official BFG standee.
                     </p>
                 </div>
+
+                {/* Symmetric Loyalty Connection */}
+                {currentUser && <UserLoyaltyConnection bizId={id} userId={currentUser.uid} />}
 
                 {/* Audit Trail */}
                 {liveAuditLog.length > 0 && (
@@ -360,6 +370,115 @@ const BusinessProfile = () => {
             >
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
+        </div>
+    );
+};
+
+const UserLoyaltyConnection = ({ bizId, userId }) => {
+    const [stats, setStats] = useState({ checkins: 0, purchases: 0, totalSpend: 0 });
+    const [purchaseLog, setPurchaseLog] = useState([]);
+    const [rewardsLog, setRewardsLog] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!bizId || !userId) return;
+        
+        const unsubscribe = db.collection('transactions')
+            .where('bizId', '==', bizId)
+            .where('userId', '==', userId)
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(snap => {
+                let checkins = 0;
+                let purchases = 0;
+                let totalSpend = 0;
+                const pLog = [];
+                const rLog = [];
+
+                snap.forEach(doc => {
+                    const t = doc.data();
+                    if (t.type === 'checkin') checkins++;
+                    if (t.type === 'purchase' && t.status === 'verified') {
+                        purchases++;
+                        totalSpend += (parseFloat(t.amount) || 0);
+                        pLog.push({ id: doc.id, ...t });
+                    }
+                    if (t.type === 'reward') {
+                        rLog.push({ id: doc.id, ...t });
+                    }
+                });
+
+                setStats({ checkins, purchases, totalSpend });
+                setPurchaseLog(pLog);
+                setRewardsLog(rLog);
+                setLoading(false);
+            });
+            
+        return () => unsubscribe();
+    }, [bizId, userId]);
+
+    if (loading) return null;
+    if (stats.checkins === 0 && stats.purchases === 0 && rewardsLog.length === 0) return null;
+
+    return (
+        <div className="loyalty-card slide-up" style={{ marginTop: '2rem' }}>
+            <div className="loyalty-header">
+                <div className="loyalty-icon-box">
+                    <i className="fa-solid fa-handshake-simple"></i>
+                </div>
+                <div className="loyalty-title-group">
+                    <h3>Your Loyalty Connection</h3>
+                    <p>Symmetric transparency between you and this business.</p>
+                </div>
+            </div>
+
+            <div className="loyalty-stats-grid">
+                <div className="loyalty-stat-card">
+                    <div className="loyalty-stat-value" style={{ color: '#fff' }}>{stats.checkins}</div>
+                    <div className="loyalty-stat-label">Check-ins</div>
+                </div>
+                <div className="loyalty-stat-card">
+                    <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{stats.purchases}</div>
+                    <div className="loyalty-stat-label">Purchases</div>
+                </div>
+                <div className="loyalty-stat-card">
+                    <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {stats.totalSpend.toFixed(0)}</div>
+                    <div className="loyalty-stat-label">Impact</div>
+                </div>
+            </div>
+
+            {rewardsLog.length > 0 && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label className="loyalty-section-label">
+                        <i className="fa-solid fa-gift" style={{ color: '#ff5757', marginRight: '5px' }}></i> Gratitude Rewards Received
+                    </label>
+                    {rewardsLog.map(r => (
+                        <div key={r.id} className="loyalty-reward-item">
+                            <p className="loyalty-reward-text">{r.description}</p>
+                            <p className="loyalty-reward-date">
+                                Granted on {r.timestamp?.toDate ? r.timestamp.toDate().toLocaleDateString() : new Date(r.timestamp).toLocaleDateString()}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div style={{ background: 'rgba(0,0,0,0.15)', padding: '1.25rem', borderRadius: '15px' }}>
+                <label className="loyalty-section-label">Recent Verified Purchases</label>
+                {purchaseLog.length === 0 ? (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>No verified purchases yet.</p>
+                ) : (
+                    purchaseLog.slice(0, 3).map(p => (
+                        <div key={p.id} className="loyalty-log-item">
+                            <span className="loyalty-log-meta">{p.timestamp?.toDate ? p.timestamp.toDate().toLocaleDateString() : new Date(p.timestamp).toLocaleDateString()}</span>
+                            <span className="loyalty-log-value">RM {p.amount.toFixed(2)}</span>
+                        </div>
+                    ))
+                )}
+            </div>
+            
+            <p className="loyalty-footer-note">
+                <i className="fa-solid fa-circle-info"></i> This information is shared with the merchant only upon scanning your Personal Networking Card.
+            </p>
         </div>
     );
 };

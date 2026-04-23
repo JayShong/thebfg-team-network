@@ -1,3 +1,6 @@
+@import './loyalty.css';
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
 :root {
     --bg-base: #0f172a; /* Slate 900 */
     --bg-surface: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */

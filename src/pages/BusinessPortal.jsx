@@ -6,11 +6,15 @@ import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
 import { QRCodeCanvas } from 'qrcode.react';
 import { drawStandee } from '../utils/assetUtils';
+import CustomerScannerModal from '../components/portal/CustomerScannerModal';
+import CustomerIntelligenceModal from '../components/portal/CustomerIntelligenceModal';
+import { useNavigate } from 'react-router-dom';
 
 const BusinessPortal = () => {
     const { currentUser } = useAuth();
     const { businesses, loading: bizLoading } = useBusinesses();
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const adminEditId = searchParams.get('edit');
     
     const [myBusinesses, setMyBusinesses] = useState([]);
@@ -26,6 +30,10 @@ const BusinessPortal = () => {
         videoUrl: '',
         purposeStatement: ''
     });
+
+    const [showScanner, setShowScanner] = useState(false);
+    const [scannedUserId, setScannedUserId] = useState(null);
+    const [showIntelligence, setShowIntelligence] = useState(false);
 
     const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isMerchantAssistant) && adminEditId;
 
@@ -200,6 +208,46 @@ const BusinessPortal = () => {
                         </div>
                     </div>
 
+                    {/* Intelligence Center (Aggregate & Bonds) */}
+                    <div className="glass-card" style={{ marginBottom: '2.5rem', border: '1px solid rgba(255,184,77,0.3)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <i className="fa-solid fa-brain" style={{ color: '#ffb84d' }}></i>
+                                    Intelligence Center
+                                </h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Securely access customer loyalty and recognition data.</p>
+                            </div>
+                            <button 
+                                onClick={() => setShowScanner(true)}
+                                className="nav-btn active" 
+                                style={{ width: '100%', justifyContent: 'center', marginTop: '1rem', borderRadius: 'var(--radius-full)', height: '50px' }}
+                            >
+                                <i className="fa-solid fa-qrcode"></i> Scan Customer for Insights
+                            </button>
+                        </div>
+
+                        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{selectedBiz.checkinsCount || 0}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Unique Visitors</div>
+                            </div>
+                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffb84d' }}>{selectedBiz.purchasesCount || 0}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Loyal Supporters</div>
+                            </div>
+                            <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Community Impact</div>
+                            </div>
+                        </div>
+
+                        <GratitudeBondsLog bizId={selectedBiz.id} onSelectUser={(uid) => {
+                            setScannedUserId(uid);
+                            setShowIntelligence(true);
+                        }} />
+                    </div>
+
                     {/* Verification Queue */}
                     <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -302,6 +350,30 @@ const BusinessPortal = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Modals */}
+            {showScanner && (
+                <CustomerScannerModal 
+                    bizId={selectedBiz.id} 
+                    onClose={() => setShowScanner(false)} 
+                    onBondCreated={(uid) => {
+                        setShowScanner(false);
+                        setScannedUserId(uid);
+                        setShowIntelligence(true);
+                    }}
+                />
+            )}
+
+            {showIntelligence && (
+                <CustomerIntelligenceModal 
+                    userId={scannedUserId} 
+                    bizId={selectedBiz.id} 
+                    onClose={() => {
+                        setShowIntelligence(false);
+                        setScannedUserId(null);
+                    }}
+                />
             )}
         </div>
     );
@@ -408,6 +480,79 @@ const PendingVerifications = ({ bizId }) => {
                     </div>
                 </div>
             ))}
+        </div>
+    );
+};
+
+const GratitudeBondsLog = ({ bizId, onSelectUser }) => {
+    const [bonds, setBonds] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!bizId) return;
+        // Fetch recent scans (bonds) that are not expired
+        const now = new Date();
+        const unsubscribe = db.collection('gratitude_bond_records')
+            .where('bizId', '==', bizId)
+            .where('type', '==', 'handshake_scan')
+            .orderBy('expiresAt', 'desc')
+            .limit(10)
+            .onSnapshot(snap => {
+                const loaded = [];
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.expiresAt.toDate() > now) {
+                        loaded.push({ id: doc.id, ...data });
+                    }
+                });
+                setBonds(loaded);
+                setLoading(false);
+            });
+        return () => unsubscribe();
+    }, [bizId]);
+
+    if (loading) return null;
+
+    return (
+        <div style={{ marginTop: '1.5rem' }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '1rem' }}>
+                <i className="fa-solid fa-clock-rotate-left"></i> Recent Gratitude Bonds (Active for 48h)
+            </label>
+            {bonds.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No active bonds. Scan a customer to begin.</p>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', gap: '0.8rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                    {bonds.map(bond => (
+                        <div 
+                            key={bond.id} 
+                            onClick={() => onSelectUser(bond.userId)}
+                            className="glass-card" 
+                            style={{ 
+                                flex: '0 0 160px', 
+                                padding: '1rem', 
+                                textAlign: 'center', 
+                                cursor: 'pointer',
+                                background: 'rgba(255,184,77,0.05)',
+                                border: '1px solid rgba(255,184,77,0.2)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,184,77,0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,184,77,0.05)'}
+                        >
+                            <div style={{ background: 'rgba(255,255,255,0.1)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.8rem' }}>
+                                <i className="fa-solid fa-user" style={{ color: '#ffb84d' }}></i>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Customer Bond
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                {new Date(bond.createdAt?.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

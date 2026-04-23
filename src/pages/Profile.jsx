@@ -5,6 +5,7 @@ import useBusinesses from '../hooks/useBusinesses';
 import AuthModal from '../components/auth/AuthModal';
 import ReceiptLogger from '../components/profile/ReceiptLogger';
 import { db } from '../services/firebase';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const Profile = () => {
     const { currentUser, isGuest, logout } = useAuth();
@@ -171,6 +172,35 @@ const Profile = () => {
                         </div>
                     ) : (
                         <>
+                            {/* Personal Networking Card (Privacy-First On-Demand) */}
+                            <div style={{ 
+                                margin: '2rem 0', 
+                                padding: '1.5rem', 
+                                background: 'rgba(255,255,255,0.03)', 
+                                borderRadius: '20px', 
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                textAlign: 'center'
+                            }}>
+                                <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                    <i className="fa-solid fa-id-card" style={{ color: 'var(--accent-primary)' }}></i>
+                                    Personal Networking Card
+                                </h4>
+                                <div style={{ 
+                                    background: '#fff', 
+                                    padding: '1rem', 
+                                    borderRadius: '15px', 
+                                    display: 'inline-block',
+                                    marginBottom: '1rem',
+                                    boxShadow: '0 8px 30px rgba(0,0,0,0.3)'
+                                }}>
+                                    <QRCodeCanvas value={currentUser.uid} size={150} level="H" />
+                                </div>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4', maxWidth: '250px', margin: '0 auto' }}>
+                                    <i className="fa-solid fa-shield-halved" style={{ marginRight: '5px' }}></i>
+                                    Present this to a merchant to reveal your loyalty history <strong>with their business only</strong>.
+                                </p>
+                            </div>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {displayUser.isSuperAdmin && (
                                     <button onClick={() => navigate('/admin')} className="btn btn-secondary" style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}>

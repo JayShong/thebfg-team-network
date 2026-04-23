@@ -69,7 +69,12 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/business-portal" element={
-          <ProtectedRoute requiredRole="merchant">
+          <ProtectedRoute requiredRole="merchant" allowStaff={true}>
+            <BusinessPortal />
+          </ProtectedRoute>
+        } />
+        <Route path="/portal" element={
+          <ProtectedRoute requiredRole="merchant" allowStaff={true}>
             <BusinessPortal />
           </ProtectedRoute>
         } />
