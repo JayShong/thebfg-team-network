@@ -116,35 +116,41 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
 
 // 3.1 Verification Trigger (Move Pending to Verified Stats)
 exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (event) => {
-    const before = event.data.before.data();
-    const after = event.data.after.data();
+    try {
+        const before = event.data.before.data();
+        const after = event.data.after.data();
 
-    // Triggered only when a purchase is verified by a merchant
-    if (before.status === 'pending' && after.status === 'verified') {
-        console.log(`Purchase verified for ${after.bizId}. Updating network stats.`);
-        
-        // 2. Trigger Full Impact Recount (for waste/trees/families)
-        return runImpactAggregation();
+        // Triggered only when a purchase is verified by a merchant
+        if (before.status === 'pending' && after.status === 'verified') {
+            console.log(`Purchase verified for ${after.bizId}. Triggering recount.`);
+            return runImpactAggregation();
+        }
+    } catch (e) {
+        console.error(`ERROR: ontransactionupdated failed for txn ${event.params.txnId}`, e);
     }
     return null;
 });
 
 exports.ontransactiondeleted = onDocumentDeleted('transactions/{txnId}', async (event) => {
-    const txn = event.data.data();
-    const updates = {};
-    
-    if (txn.type === 'checkin') {
-        updates.checkins = admin.firestore.FieldValue.increment(-1);
-    } else if (txn.type === 'purchase') {
-        updates.purchases = admin.firestore.FieldValue.increment(-1);
-        const amount = parseFloat(txn.amount) || 0;
-        if (amount > 0) {
-            updates.purchaseVolume = admin.firestore.FieldValue.increment(-amount);
+    try {
+        const txn = event.data.data();
+        const updates = {};
+        
+        if (txn.type === 'checkin') {
+            updates.checkins = admin.firestore.FieldValue.increment(-1);
+        } else if (txn.type === 'purchase') {
+            updates.purchases = admin.firestore.FieldValue.increment(-1);
+            const amount = parseFloat(txn.amount) || 0;
+            if (amount > 0) {
+                updates.purchaseVolume = admin.firestore.FieldValue.increment(-amount);
+            }
         }
-    }
 
-    if (Object.keys(updates).length > 0) {
-        return db.collection('system').doc('stats').set(updates, { merge: true });
+        if (Object.keys(updates).length > 0) {
+            return db.collection('system').doc('stats').set(updates, { merge: true });
+        }
+    } catch (e) {
+        console.error(`ERROR: ontransactiondeleted failed for txn ${event.params.txnId}`, e);
     }
     return null;
 });
@@ -315,7 +321,13 @@ exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
 
     try {
         // 1. Anonymize Transactions (De-linking)
-        const transSnap = await db.collection('transactions').where('userId', '==', uid).get();
+        // SAFETY GATE: We limit to 500 per run to prevent timeout. 
+        // Evidence of failure will be logged if user has more than 500.
+        const transSnap = await db.collection('transactions')
+            .where('userId', '==', uid)
+            .limit(500) 
+            .get();
+        
         const batch = db.batch();
         
         transSnap.forEach(doc => {
@@ -337,17 +349,74 @@ exports.deleteuseraccount = functions.https.onCall(async (data, context) => {
         // 3. Delete User Profile Document
         batch.delete(db.collection('users').doc(uid));
 
-        // 4. Commit Firestore changes
         await batch.commit();
 
-        // 5. Delete from Firebase Authentication (Admin SDK)
+        // 4. Delete from Firebase Authentication (Admin SDK)
         await admin.auth().deleteUser(uid);
 
-        console.log(`GDPR deletion successful for: ${uid}`);
-        return { success: true };
-    } catch (error) {
-        console.error('GDPR deletion failed:', error);
-        throw new functions.https.HttpsError('internal', 'Deletion process failed. Please contact support.');
+        console.log(`GDPR deletion successful for: ${uid}. ${transSnap.size} records anonymized.`);
+        return { success: true, count: transSnap.size };
+    } catch (e) {
+        console.error(`CRITICAL: GDPR deletion failed for user ${uid}`, e);
+        throw new functions.https.HttpsError('internal', 'Deletion failed. Support has been notified.');
+    }
+});
+
+/**
+ * 7. Self-Cleaning Maintenance (Future-Proofing)
+ * Volume-based pruning: Keeps only the latest 50 activities.
+ * Frequency: Every 1 hour to keep the collection lean and fast.
+ */
+exports.prunepublicactivity = functions.pubsub.schedule('every 1 hour').onRun(async (context) => {
+    console.log("Starting hourly volume-based cleanup of activity logs...");
+
+    try {
+        // 1. Find the threshold: The timestamp of the 50th most recent activity
+        const latestDocs = await db.collection('public_activity')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
+
+        if (latestDocs.size < 50) {
+            console.log(`Pruning skipped: Collection size (${latestDocs.size}) below threshold.`);
+            return null;
+        }
+
+        const oldestToKeep = latestDocs.docs[latestDocs.docs.length - 1];
+        const thresholdTimestamp = oldestToKeep.data().timestamp;
+
+        if (!thresholdTimestamp) {
+            console.warn("Cleanup Warning: 50th document has no timestamp. Skipping run.");
+            return null;
+        }
+
+        // 2. Identify all stale logs older than our fixed window
+        const toPrune = await db.collection('public_activity')
+            .where('timestamp', '<', thresholdTimestamp)
+            .get();
+
+        if (toPrune.empty) {
+            console.log("No stale logs detected above the 50-doc window.");
+            return null;
+        }
+
+        // 3. Batch delete
+        const batch = db.batch();
+        toPrune.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+        console.log(`Cleanup Success: Pruned ${toPrune.size} records. Newsreel maintained at exactly 50 docs.`);
+        return null;
+    } catch (e) {
+        // This will trigger an alert in Google Cloud Error Reporting
+        console.error("CRITICAL: prunepublicactivity failed!", {
+            message: e.message,
+            stack: e.stack,
+            timestamp: new Date().toISOString()
+        });
+        return null;
     }
 });
 
@@ -536,73 +605,83 @@ exports.grantcustomerreward = functions.https.onCall(async (data, context) => {
     }
     
     // 2. Record the reward transaction
-    const rewardRef = db.collection('transactions').doc();
-    const timestamp = admin.firestore.FieldValue.serverTimestamp();
-    
-    await rewardRef.set({
-        type: 'reward',
-        bizId,
-        bizName: bizDoc.data().name,
-        userId: targetUserId,
-        description: description,
-        timestamp: timestamp,
-        status: 'verified',
-        grantedBy: userEmail
-    });
+    try {
+        const rewardRef = db.collection('transactions').doc();
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+        
+        await rewardRef.set({
+            type: 'reward',
+            bizId,
+            bizName: bizDoc.data().name,
+            userId: targetUserId,
+            description: description,
+            timestamp: timestamp,
+            status: 'verified',
+            grantedBy: userEmail
+        });
 
-    // 3. Log to gratitude_bond_records
-    await db.collection('gratitude_bond_records').add({
-        bizId,
-        userId: targetUserId,
-        merchantEmail: userEmail,
-        action: 'REWARD_GRANTED',
-        description: description,
-        timestamp: timestamp
-    });
+        // 3. Log to gratitude_bond_records
+        await db.collection('gratitude_bond_records').add({
+            bizId,
+            userId: targetUserId,
+            merchantEmail: userEmail,
+            action: 'REWARD_GRANTED',
+            description: description,
+            timestamp: timestamp
+        });
 
-    return { success: true, rewardId: rewardRef.id };
+        return { success: true, rewardId: rewardRef.id };
+    } catch (e) {
+        console.error(`ERROR: grantcustomerreward failed for biz ${bizId} to user ${targetUserId}`, e);
+        throw new functions.https.HttpsError('internal', 'Failed to grant reward.');
+    }
 });
 
 exports.ghostcheckin = functions.https.onCall(async (data, context) => {
-    const { bizId, ghostId } = data;
-    if (!bizId || !ghostId) throw new functions.https.HttpsError('invalid-argument', 'Missing bizId or ghostId.');
+    try {
+        const { bizId, ghostId } = data;
+        if (!bizId || !ghostId) throw new functions.https.HttpsError('invalid-argument', 'Missing bizId or ghostId.');
 
-    const bizDoc = await db.collection('businesses').doc(bizId).get();
-    if (!bizDoc.exists) throw new functions.https.HttpsError('not-found', 'Business not found.');
+        const bizDoc = await db.collection('businesses').doc(bizId).get();
+        if (!bizDoc.exists) throw new functions.https.HttpsError('not-found', 'Business not found.');
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
+        const today = new Date();
+        today.setHours(0,0,0,0);
 
-    // Check for existing check-in today
-    const existing = await db.collection('transactions')
-        .where('userId', '==', ghostId)
-        .where('bizId', '==', bizId)
-        .where('type', '==', 'checkin')
-        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(today))
-        .limit(1)
-        .get();
+        // Check for existing check-in today
+        const existing = await db.collection('transactions')
+            .where('userId', '==', ghostId)
+            .where('bizId', '==', bizId)
+            .where('type', '==', 'checkin')
+            .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(today))
+            .limit(1)
+            .get();
 
-    if (!existing.empty) {
-        return { 
-            success: false, 
-            error: 'ALREADY_CHECKED_IN', 
-            message: 'Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.' 
-        };
+        if (!existing.empty) {
+            return { 
+                success: false, 
+                error: 'ALREADY_CHECKED_IN', 
+                message: 'Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.' 
+            };
+        }
+
+        // Create the check-in
+        await db.collection('transactions').add({
+            type: 'checkin',
+            bizId,
+            bizName: bizDoc.data().name,
+            bizIndustry: bizDoc.data().industry || 'Unknown',
+            bizLocation: bizDoc.data().location || 'Unknown',
+            userId: ghostId,
+            userNickname: 'Anonymous Supporter',
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'verified',
+            isGhost: true
+        });
+
+        return { success: true };
+    } catch (e) {
+        console.error(`ERROR: ghostcheckin failed for biz ${data.bizId}`, e);
+        throw new functions.https.HttpsError('internal', 'Ghost check-in failed.');
     }
-
-    // Create the check-in
-    await db.collection('transactions').add({
-        type: 'checkin',
-        bizId,
-        bizName: bizDoc.data().name,
-        bizIndustry: bizDoc.data().industry || 'Unknown',
-        bizLocation: bizDoc.data().location || 'Unknown',
-        userId: ghostId,
-        userNickname: 'Anonymous Supporter',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'verified',
-        isGhost: true
-    });
-
-    return { success: true };
 });

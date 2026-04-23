@@ -12,20 +12,47 @@ const AuditHub = () => {
     const [activeTab, setActiveTab] = useState('supervisor'); // 'supervisor', 'auditor'
 
     useEffect(() => {
-        // Use the legacy collection name
-        const unsubscribe = db.collection('audit_logs')
-            .onSnapshot(snapshot => {
-                const loaded = [];
-                snapshot.forEach(doc => {
-                    loaded.push({ id: doc.id, ...doc.data() });
-                });
-                // Sort by date locally matching legacy app.js:4007
-                loaded.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                setLogs(loaded);
-                setLoading(false);
+        if (!currentUser) return;
+
+        let query = db.collection('audit_logs');
+
+        // 1. Define Server-side filtering strategy
+        if (currentUser.isSuperAdmin) {
+            // Admins see a curated recent slice for oversight
+            query = query.orderBy('createdAt', 'desc').limit(50);
+        } else if (activeTab === 'supervisor') {
+            // Supervisors see only what they need to act on
+            query = query.where('supervisorEmail', '==', currentUser.email)
+                         .where('status', '==', 'PENDING_APPROVAL');
+        } else {
+            // Auditors see only their active work-in-progress
+            query = query.where('auditorEmail', '==', currentUser.email);
+            // Note: We filter status locally if needed to avoid complex composite index requirements
+        }
+
+        const unsubscribe = query.onSnapshot(snapshot => {
+            const loaded = [];
+            snapshot.forEach(doc => {
+                loaded.push({ id: doc.id, ...doc.data() });
             });
+            
+            // 2. Perform final sorting and status pruning locally
+            // This handles cases where we couldn't filter perfectly server-side without manual indexing
+            let filtered = loaded;
+            if (!currentUser.isSuperAdmin && activeTab === 'auditor') {
+                filtered = loaded.filter(l => ['SYSTEM_DRAFT', 'RETURNED', 'PUBLISHED'].includes(l.status));
+            }
+
+            filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            setLogs(filtered);
+            setLoading(false);
+        }, err => {
+            console.error("Audit Hub Subscription failed:", err);
+            setLoading(false);
+        });
+
         return unsubscribe;
-    }, []);
+    }, [currentUser, activeTab]);
 
     // Authorization Guard
     if (!currentUser?.isSuperAdmin && !currentUser?.isAuditor) {

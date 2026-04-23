@@ -29,20 +29,16 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const snapshot = await db.collection('audit_logs')
-                .where('status', '==', 'PENDING_APPROVAL')
-                .get();
+            let query = db.collection('audit_logs').where('status', '==', 'PENDING_APPROVAL');
             
-            let count = 0;
-            snapshot.forEach(doc => {
-                const log = doc.data();
-                if (activeUser.isSuperAdmin) {
-                    count++;
-                } else if (log.supervisorEmails?.includes(activeUser.email)) {
-                    count++;
-                }
-            });
-            setPendingApprovalCount(count);
+            // If not superadmin, we can only count audits assigned to us
+            // Note: Cloud Functions count() is very fast
+            if (!activeUser.isSuperAdmin) {
+                query = query.where('supervisorEmail', '==', activeUser.email);
+            }
+
+            const snapshot = await query.count().get();
+            setPendingApprovalCount(snapshot.data().count);
         } catch (e) {
             console.error("Failed to pull pending audits:", e);
         }
