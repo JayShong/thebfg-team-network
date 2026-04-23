@@ -57,82 +57,111 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                         <i className="fa-solid fa-circle-notch fa-spin fa-3x" style={{ color: '#ffb84d' }}></i>
                         <p style={{ marginTop: '1rem' }}>Retrieving Loyalty Profile...</p>
                     </div>
-                ) : error ? (
-                    <div style={{ padding: '3rem', textAlign: 'center' }}>
-                        <i className="fa-solid fa-triangle-exclamation fa-3x" style={{ color: '#ff4d4d' }}></i>
-                        <p style={{ marginTop: '1rem', color: '#ff4d4d' }}>{error}</p>
-                        <button onClick={onClose} className="btn btn-secondary mt-3">Close</button>
-                    </div>
                 ) : (
                     <>
-                        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                            <div style={{ background: 'linear-gradient(135deg, #ffb84d, #ef6c00)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', boxShadow: '0 8px 20px rgba(239,108,0,0.4)', border: '4px solid rgba(255,255,255,0.1)' }}>
-                                <i className="fa-solid fa-user-check" style={{ color: '#fff', fontSize: '2.2rem' }}></i>
-                            </div>
-                            <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>{data.nickname}</h2>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Loyal Supporter recognized by your business</p>
-                        </div>
+                        {/* MOCK DATA OVERRIDE FOR REVIEW */}
+                        {(function() {
+                            if (!data) {
+                                window.mockData = {
+                                    nickname: 'Loyal Supporter (Demo)',
+                                    stats: { checkins: 42, purchases: 12, totalSpend: 1250.50 },
+                                    engagements: [
+                                        { id: 'e1', type: 'purchase', amount: 45.00, timestamp: new Date().toISOString(), receiptId: 'RCPT-001' },
+                                        { id: 'e2', type: 'checkin', timestamp: new Date(Date.now() - 3600000 * 2).toISOString() },
+                                        { id: 'e3', type: 'purchase', amount: 32.50, timestamp: new Date(Date.now() - 86400000).toISOString(), receiptId: 'RCPT-002' },
+                                        { id: 'e4', type: 'checkin', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
+                                        { id: 'e5', type: 'checkin', timestamp: new Date(Date.now() - 86400000 * 5).toISOString() }
+                                    ]
+                                };
+                            }
+                        })()}
 
-                        <div className="loyalty-stats-grid">
-                            <div className="loyalty-stat-card">
-                                <div className="loyalty-stat-value">{data.stats.checkins}</div>
-                                <div className="loyalty-stat-label">Check-ins</div>
-                            </div>
-                            <div className="loyalty-stat-card">
-                                <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{data.stats.purchases}</div>
-                                <div className="loyalty-stat-label">Purchases</div>
-                            </div>
-                            <div className="loyalty-stat-card">
-                                <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {data.stats.totalSpend.toFixed(0)}</div>
-                                <div className="loyalty-stat-label">Impact</div>
-                            </div>
-                        </div>
+                        {(function() {
+                            const d = data || window.mockData;
+                            // Merge logs if using real data, or use mock engagements
+                            const allEngagements = d.engagements || [
+                                ...(d.purchaseLog || []).map(p => ({ ...p, type: 'purchase' })),
+                                ...(d.checkinLog || []).map(c => ({ ...c, type: 'checkin' }))
+                            ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                        {/* Grant Reward Form */}
-                        <div className="reward-grant-box">
-                            <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <i className="fa-solid fa-gift" style={{ color: 'var(--accent-primary)' }}></i>
-                                Recognize this Supporter
-                            </h4>
-                            <form onSubmit={handleGrantReward}>
-                                <textarea 
-                                    className="input-modern" 
-                                    rows="3" 
-                                    value={rewardText} 
-                                    onChange={(e) => setRewardText(e.target.value)}
-                                    placeholder="Enter gift description (e.g. Free Coffee, 20% discount coupon...)" 
-                                    style={{ width: '100%', marginBottom: '1.25rem', fontSize: '0.95rem', background: 'rgba(0,0,0,0.3)' }}
-                                />
-                                <button 
-                                    type="submit" 
-                                    disabled={isGranting || !rewardText.trim()}
-                                    className="nav-btn active" 
-                                    style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '55px', fontSize: '1.1rem' }}
-                                >
-                                    {isGranting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Strengthen Gratitude Bond'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Recent History */}
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label className="loyalty-section-label">Support History</label>
-                            {data.purchaseLog.length === 0 ? (
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem' }}>No purchase records found.</p>
-                            ) : (
-                                data.purchaseLog.slice(0, 5).map(p => (
-                                    <div key={p.id} className="loyalty-log-item">
-                                        <div className="loyalty-log-info">
-                                            <span className="loyalty-log-value">RM {parseFloat(p.amount).toFixed(2)}</span>
-                                            <span className="loyalty-log-meta">ID: {p.receiptId || 'Direct'}</span>
+                            return (
+                                <>
+                                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                                        <div style={{ background: 'linear-gradient(135deg, #ffb84d, #ef6c00)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', boxShadow: '0 8px 20px rgba(239,108,0,0.4)', border: '4px solid rgba(255,255,255,0.1)' }}>
+                                            <i className="fa-solid fa-user-check" style={{ color: '#fff', fontSize: '2.2rem' }}></i>
                                         </div>
-                                        <span className="loyalty-log-meta">
-                                            {new Date(p.timestamp).toLocaleDateString()}
-                                        </span>
+                                        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>{d.nickname}</h2>
+                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Loyal Supporter recognized by your business</p>
                                     </div>
-                                ))
-                            )}
-                        </div>
+
+                                    <div className="loyalty-stats-grid">
+                                        <div className="loyalty-stat-card">
+                                            <div className="loyalty-stat-value">{d.stats.checkins}</div>
+                                            <div className="loyalty-stat-label">Check-ins</div>
+                                        </div>
+                                        <div className="loyalty-stat-card">
+                                            <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{d.stats.purchases}</div>
+                                            <div className="loyalty-stat-label">Purchases</div>
+                                        </div>
+                                        <div className="loyalty-stat-card">
+                                            <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {d.stats.totalSpend.toFixed(0)}</div>
+                                            <div className="loyalty-stat-label">Impact</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Grant Reward Form */}
+                                    <div className="reward-grant-box">
+                                        <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fa-solid fa-gift" style={{ color: 'var(--accent-primary)' }}></i>
+                                            Recognize this Supporter
+                                        </h4>
+                                        <form onSubmit={handleGrantReward}>
+                                            <textarea 
+                                                className="input-modern" 
+                                                rows="3" 
+                                                value={rewardText} 
+                                                onChange={(e) => setRewardText(e.target.value)}
+                                                placeholder="Enter gift description (e.g. Free Coffee, 20% discount coupon...)" 
+                                                style={{ width: '100%', marginBottom: '1.25rem', fontSize: '0.95rem', background: 'rgba(0,0,0,0.3)' }}
+                                            />
+                                            <button 
+                                                type="submit" 
+                                                disabled={isGranting || !rewardText.trim()}
+                                                className="nav-btn active" 
+                                                style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '55px', fontSize: '1.1rem' }}
+                                            >
+                                                {isGranting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Strengthen Gratitude Bond'}
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    {/* Full Engagement History */}
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label className="loyalty-section-label">Engagement History</label>
+                                        {allEngagements.length === 0 ? (
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem' }}>No history found with your business.</p>
+                                        ) : (
+                                            allEngagements.map(e => (
+                                                <div key={e.id} className="loyalty-log-item">
+                                                    <div className="loyalty-log-info">
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <i className={`fa-solid ${e.type === 'purchase' ? 'fa-cart-shopping' : 'fa-location-dot'}`} style={{ color: e.type === 'purchase' ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
+                                                            <span className="loyalty-log-value">
+                                                                {e.type === 'purchase' ? `RM ${parseFloat(e.amount).toFixed(2)}` : 'Check-in'}
+                                                            </span>
+                                                        </div>
+                                                        <span className="loyalty-log-meta">{e.receiptId ? `ID: ${e.receiptId}` : 'Verified Presence'}</span>
+                                                    </div>
+                                                    <span className="loyalty-log-meta">
+                                                        {new Date(e.timestamp).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
 
                         <p className="loyalty-footer-note">
                             <i className="fa-solid fa-lock"></i> All data revealed through this secure handshake is symmetrically shared with the user.

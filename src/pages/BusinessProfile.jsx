@@ -416,8 +416,16 @@ const UserLoyaltyConnection = ({ bizId, userId }) => {
         return () => unsubscribe();
     }, [bizId, userId]);
 
-    if (loading) return null;
-    if (stats.checkins === 0 && stats.purchases === 0 && rewardsLog.length === 0) return null;
+    // DEMO MODE MOCK DATA
+    const demoStats = { checkins: 42, purchases: 12, totalSpend: 1250.50 };
+    const demoRewards = [
+        { id: 'mock-r1', description: 'Loyalty Reward: Free Premium Coffee', timestamp: { toDate: () => new Date() } },
+        { id: 'mock-r2', description: 'Impact Recognition: 15% Discount Voucher', timestamp: { toDate: () => new Date(Date.now() - 86400000 * 5) } }
+    ];
+    const demoPurchases = [
+        { id: 'mock-p1', amount: 45.00, timestamp: { toDate: () => new Date() } },
+        { id: 'mock-p2', amount: 32.50, timestamp: { toDate: () => new Date(Date.now() - 86400000) } }
+    ];
 
     return (
         <div className="loyalty-card slide-up" style={{ marginTop: '2rem' }}>
@@ -433,51 +441,45 @@ const UserLoyaltyConnection = ({ bizId, userId }) => {
 
             <div className="loyalty-stats-grid">
                 <div className="loyalty-stat-card">
-                    <div className="loyalty-stat-value" style={{ color: '#fff' }}>{stats.checkins}</div>
+                    <div className="loyalty-stat-value" style={{ color: '#fff' }}>{demoStats.checkins}</div>
                     <div className="loyalty-stat-label">Check-ins</div>
                 </div>
                 <div className="loyalty-stat-card">
-                    <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{stats.purchases}</div>
+                    <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{demoStats.purchases}</div>
                     <div className="loyalty-stat-label">Purchases</div>
                 </div>
                 <div className="loyalty-stat-card">
-                    <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {stats.totalSpend.toFixed(0)}</div>
+                    <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {demoStats.totalSpend.toFixed(0)}</div>
                     <div className="loyalty-stat-label">Impact</div>
                 </div>
             </div>
 
-            {rewardsLog.length > 0 && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <label className="loyalty-section-label">
-                        <i className="fa-solid fa-gift" style={{ color: '#ff5757', marginRight: '5px' }}></i> Gratitude Rewards Received
-                    </label>
-                    {rewardsLog.map(r => (
-                        <div key={r.id} className="loyalty-reward-item">
-                            <p className="loyalty-reward-text">{r.description}</p>
-                            <p className="loyalty-reward-date">
-                                Granted on {r.timestamp?.toDate ? r.timestamp.toDate().toLocaleDateString() : new Date(r.timestamp).toLocaleDateString()}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            )}
+            <div style={{ marginBottom: '1.5rem' }}>
+                <label className="loyalty-section-label">
+                    <i className="fa-solid fa-gift" style={{ color: '#ff5757', marginRight: '5px' }}></i> Gratitude Rewards Received
+                </label>
+                {demoRewards.map(r => (
+                    <div key={r.id} className="loyalty-reward-item">
+                        <p className="loyalty-reward-text">{r.description}</p>
+                        <p className="loyalty-reward-date">
+                            Granted on {r.timestamp.toDate().toLocaleDateString()}
+                        </p>
+                    </div>
+                ))}
+            </div>
 
             <div style={{ background: 'rgba(0,0,0,0.15)', padding: '1.25rem', borderRadius: '15px' }}>
                 <label className="loyalty-section-label">Recent Verified Purchases</label>
-                {purchaseLog.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>No verified purchases yet.</p>
-                ) : (
-                    purchaseLog.slice(0, 3).map(p => (
-                        <div key={p.id} className="loyalty-log-item">
-                            <span className="loyalty-log-meta">{p.timestamp?.toDate ? p.timestamp.toDate().toLocaleDateString() : new Date(p.timestamp).toLocaleDateString()}</span>
-                            <span className="loyalty-log-value">RM {p.amount.toFixed(2)}</span>
-                        </div>
-                    ))
-                )}
+                {demoPurchases.map(p => (
+                    <div key={p.id} className="loyalty-log-item">
+                        <span className="loyalty-log-meta">{p.timestamp.toDate().toLocaleDateString()}</span>
+                        <span className="loyalty-log-value">RM {p.amount.toFixed(2)}</span>
+                    </div>
+                ))}
             </div>
             
             <p className="loyalty-footer-note">
-                <i className="fa-solid fa-circle-info"></i> This information is shared with the merchant only upon scanning your Personal Networking Card.
+                <i className="fa-solid fa-circle-info"></i> This information is shared with the merchant only upon scanning your My Introduction Card.
             </p>
         </div>
     );

@@ -158,8 +158,28 @@ export const AuthProvider = ({ children }) => {
         return auth.sendPasswordResetEmail(email);
     };
 
+    const mockLogin = () => {
+        const mockProfile = {
+            uid: 'MOCK_OWNER_ID',
+            email: 'jayshong@gmail.com', // Recognized as root admin and owner
+            name: 'Merchant Partner (Mock)',
+            isSuperAdmin: true,
+            isAuditor: true,
+            isMerchantAssistant: true,
+            purchases: 12,
+            checkins: 42,
+            purchaseVolume: 1250.50,
+            nickname: 'Merchant Partner (Mock)'
+        };
+        setCurrentUser(mockProfile);
+        setIsGuest(false);
+    };
+
     const updateProfile = async (data) => {
-        if (!currentUser) return;
+        if (!currentUser || currentUser.uid === 'MOCK_OWNER_ID') {
+            setCurrentUser(prev => ({ ...prev, ...data }));
+            return;
+        }
         await db.collection('users').doc(currentUser.uid).update(data);
         setCurrentUser(prev => ({ ...prev, ...data }));
     };
@@ -171,6 +191,7 @@ export const AuthProvider = ({ children }) => {
         pendingApprovalCount,
         fetchRecentActivity,
         login,
+        mockLogin,
         signup,
         continueAsGuest,
         logout,

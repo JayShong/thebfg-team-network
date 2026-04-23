@@ -183,7 +183,7 @@ const Profile = () => {
                             }}>
                                 <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                     <i className="fa-solid fa-id-card" style={{ color: 'var(--accent-primary)' }}></i>
-                                    Personal Networking Card
+                                    My Introduction Card
                                 </h4>
                                 <div style={{ 
                                     background: '#fff', 
@@ -197,7 +197,7 @@ const Profile = () => {
                                 </div>
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4', maxWidth: '250px', margin: '0 auto' }}>
                                     <i className="fa-solid fa-shield-halved" style={{ marginRight: '5px' }}></i>
-                                    Present this to a merchant to reveal your loyalty history <strong>with their business only</strong>.
+                                    Present this to a merchant to let the merchant see your check-ins and purchases with that merchant. You can see exactly what is shown to them by viewing their business profile in the app.
                                 </p>
                             </div>
 

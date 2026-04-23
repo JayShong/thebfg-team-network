@@ -218,13 +218,26 @@ const BusinessPortal = () => {
                                 </h3>
                                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Securely access customer loyalty and recognition data.</p>
                             </div>
-                            <button 
-                                onClick={() => setShowScanner(true)}
-                                className="nav-btn active" 
-                                style={{ width: '100%', justifyContent: 'center', marginTop: '1rem', borderRadius: 'var(--radius-full)', height: '50px' }}
-                            >
-                                <i className="fa-solid fa-qrcode"></i> Scan Customer for Insights
-                            </button>
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button 
+                                    onClick={() => setShowScanner(true)}
+                                    className="nav-btn active" 
+                                    style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px' }}
+                                >
+                                    <i className="fa-solid fa-qrcode"></i> Scan Customer for Insights
+                                </button>
+                                {/* TEMPORARY PREVIEW BUTTON FOR REVIEW */}
+                                <button 
+                                    onClick={() => {
+                                        setScannedUserId('demo-user-id');
+                                        setShowIntelligence(true);
+                                    }}
+                                    className="nav-btn" 
+                                    style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px', background: 'rgba(255,255,255,0.05)' }}
+                                >
+                                    <i className="fa-solid fa-eye"></i> Preview Intelligence UI
+                                </button>
+                            </div>
                         </div>
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
