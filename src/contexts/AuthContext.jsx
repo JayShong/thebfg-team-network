@@ -10,6 +10,14 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(localStorage.getItem('bfg_guest_mode') === 'true');
+    const [ghostId, setGhostId] = useState(() => {
+        let gid = localStorage.getItem('bfg_ghost_id');
+        if (!gid) {
+            gid = 'ghost_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('bfg_ghost_id', gid);
+        }
+        return gid;
+    });
     const [recentActivity, setRecentActivity] = useState([]);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
@@ -177,6 +185,7 @@ export const AuthProvider = ({ children }) => {
     const value = {
         currentUser,
         isGuest,
+        ghostId,
         recentActivity,
         pendingApprovalCount,
         fetchRecentActivity,

@@ -214,7 +214,7 @@ const BusinessPortal = () => {
                             </div>
                             
                             <div style={{ display: 'none' }}>
-                                <QRCodeCanvas id="hidden-qr" value={selectedBiz.id} size={550} level="H" />
+                                <QRCodeCanvas id="hidden-qr" value={`${window.location.origin}/scanner?bizId=${selectedBiz.id}`} size={550} level="H" />
                             </div>
 
                             <button onClick={() => {
@@ -232,9 +232,16 @@ const BusinessPortal = () => {
                         </div>
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-                            <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
                                 <div className="stat-value">{selectedBiz.checkinsCount || 0}</div>
-                                <div className="stat-label">Total Check-ins Received</div>
+                                <div className="stat-label">Member Check-ins</div>
+                            </div>
+                            <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                <div className="stat-value" style={{ color: '#ffb84d' }}>{selectedBiz.ghostCheckinsCount || 0}</div>
+                                <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                                    Ghost Check-ins 
+                                    <i className="fa-solid fa-circle-question" title="Anonymous support acknowledgments from unregistered visitors. These are not linked to registered identities." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
+                                </div>
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

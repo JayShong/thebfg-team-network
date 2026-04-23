@@ -6,7 +6,7 @@ import { TUTORIAL_STEPS } from '../utils/badgeLogic';
 import firebase from 'firebase/compat/app';
 
 const Scanner = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, ghostId } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
     const [manualId, setManualId] = useState('');
     const [error, setError] = useState('');
@@ -20,6 +20,29 @@ const Scanner = () => {
     // Sentinel State
     const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
     const [lockoutTimer, setLockoutTimer] = useState(0);
+
+    useEffect(() => {
+        // Detect bizId from URL for Native Camera Scans
+        const params = new URLSearchParams(window.location.search);
+        const bizIdFromUrl = params.get('bizId');
+        if (bizIdFromUrl) {
+            handleAutoScan(bizIdFromUrl);
+        }
+    }, []);
+
+    const handleAutoScan = async (bizId) => {
+        try {
+            const doc = await db.collection('businesses').doc(bizId).get();
+            if (doc.exists) {
+                setScannedBusiness({ id: doc.id, ...doc.data() });
+                setScanning(false);
+                // If it's a URL scan, we can potentially auto-submit if we want 
+                // but for now let's just show the business and let them click.
+            }
+        } catch (e) {
+            console.error("Auto-scan failed", e);
+        }
+    };
 
     useEffect(() => {
         if (!currentUser) return;
@@ -100,18 +123,39 @@ const Scanner = () => {
     };
 
     const submitCheckin = async () => {
-        if (!currentUser || !scannedBusiness || isSubmitting) return;
+        if (!scannedBusiness || isSubmitting) return;
         setIsSubmitting(true);
 
+        // 1. Handle Ghost Check-in (Anonymous)
+        if (!currentUser) {
+            try {
+                const ghostCheckin = firebase.functions().httpsCallable('ghostcheckin');
+                const result = await ghostCheckin({ bizId: scannedBusiness.id, ghostId });
+                
+                if (result.data.success) {
+                    setIsSuccess(true);
+                    setSuccessMsg("Ghost Check-in successful! Your anonymous support has been recorded.");
+                } else {
+                    alert(result.data.message || "Could not record acknowledgment.");
+                }
+                setScannedBusiness(null);
+            } catch (e) {
+                console.error("Ghost checkin error", e);
+                alert("Network Error: Could not log anonymous support.");
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
+
+        // 2. Handle Member Check-in
         const today = new Date().toISOString().split('T')[0];
         const lastCheckinDate = sentinelState.lastCheckins?.[scannedBusiness.id];
 
-        // 1. Daily Limit Check
         if (lastCheckinDate === today) {
             const attempts = (sentinelState.spamAttempts?.[scannedBusiness.id] || 0) + 1;
             
             if (attempts >= 3) {
-                // LOCKOUT TRIGGER
                 const lockoutDate = new Date(Date.now() + 10 * 60 * 1000);
                 await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
                     lockoutUntil: firebase.firestore.Timestamp.fromDate(lockoutDate),
@@ -121,7 +165,6 @@ const Scanner = () => {
                 setScannedBusiness(null);
                 setScanning(true);
             } else {
-                // Increment attempt and show feedback
                 await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
                     [`spamAttempts.${scannedBusiness.id}`]: attempts
                 }, { merge: true });
@@ -129,6 +172,7 @@ const Scanner = () => {
                 setScannedBusiness(null);
                 setScanning(true);
             }
+            setIsSubmitting(false);
             return;
         }
 
@@ -148,7 +192,6 @@ const Scanner = () => {
                 status: 'verified'
             });
 
-            // Update Sentinel Local State
             batch.set(db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state'), {
                 [`lastCheckins.${scannedBusiness.id}`]: today,
                 [`spamAttempts.${scannedBusiness.id}`]: 0
@@ -229,10 +272,31 @@ const Scanner = () => {
                     <div style={{ fontSize: '4rem', color: 'var(--accent-success)', marginBottom: '1.5rem' }}>
                         <i className="fa-solid fa-circle-check"></i>
                     </div>
-                    <h2 style={{ marginBottom: '0.5rem' }}>Success!</h2>
+                    <h2 style={{ marginBottom: '0.5rem' }}>Acknowledgment Received!</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                        {successMsg || "Your activity has been securely recorded. Thank you for supporting the Empathy Economy."}
+                        {successMsg || "Your support for the Empathy Economy has been recorded."}
                     </p>
+
+                    {!currentUser && (
+                        <div style={{ 
+                            background: 'rgba(255,184,77,0.1)', 
+                            border: '1px solid rgba(255,184,77,0.3)', 
+                            padding: '1.5rem', 
+                            borderRadius: '15px', 
+                            marginBottom: '2rem',
+                            textAlign: 'left'
+                        }}>
+                            <h4 style={{ color: '#ffb84d', margin: '0 0 0.8rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}>
+                                <i className="fa-solid fa-ghost"></i> Ghost Check-in Successful
+                            </h4>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                                Thank you for your ghost check-in. If you would like to retain your check-in activities when you become a member later, please do it soon before your device deletes your records.
+                            </p>
+                            <button onClick={() => navigate('/settings')} className="btn btn-primary mt-3 feature-gradient" style={{ width: '100%', border: 'none', padding: '0.8rem' }}>
+                                Secure My Impact Permanently
+                            </button>
+                        </div>
+                    )}
                     <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); setManualId(''); }} className="btn btn-primary" style={{ marginTop: '1rem' }}>
                         Scan Another
                     </button>

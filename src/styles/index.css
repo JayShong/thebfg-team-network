@@ -13,6 +13,7 @@
     --accent-secondary: #3b82f6; /* Blue */
     --accent-success: #10b981; /* Emerald */
     --accent-warning: #f59e0b;
+    --accent-ghost: #64748b; /* Slate 500 */
     
     --gradient-primary: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     --gradient-success: linear-gradient(135deg, #059669, #10b981);

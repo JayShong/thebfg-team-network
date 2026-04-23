@@ -70,10 +70,12 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
 
         if (duplicates.length > 0) {
             console.warn(`Sentinel: Rule violation detected for ${txn.userId}. Flagging user.`);
-            await db.collection('users').doc(txn.userId).update({ 
-                isFlagged: true,
-                flagReason: `Daily limit bypass at ${txn.bizName || txn.bizId}`
-            });
+            if (!txn.isGhost) {
+                await db.collection('users').doc(txn.userId).update({ 
+                    isFlagged: true,
+                    flagReason: `Daily limit bypass at ${txn.bizName || txn.bizId}`
+                });
+            }
             // Mark transaction as suspect
             await event.data.ref.update({ status: 'flagged_by_sentinel' });
             return null;
@@ -91,8 +93,18 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // C. Trigger Global Impact Aggregation (Check-ins only for now)
+        // C. Update Business-specific stats
         if (txn.type === 'checkin') {
+            const bizRef = db.collection('businesses').doc(txn.bizId);
+            const bizUpdate = {};
+            if (txn.isGhost) {
+                bizUpdate.ghostCheckinsCount = admin.firestore.FieldValue.increment(1);
+            } else {
+                bizUpdate.checkinsCount = admin.firestore.FieldValue.increment(1);
+            }
+            await bizRef.set(bizUpdate, { merge: true });
+
+            // Trigger Global Impact Aggregation (Check-ins only for now)
             return runImpactAggregation();
         }
         return null;
@@ -111,15 +123,6 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
     if (before.status === 'pending' && after.status === 'verified') {
         console.log(`Purchase verified for ${after.bizId}. Updating network stats.`);
         
-        // 1. Update Global Stats Document (Real-time bump)
-        const statsRef = db.collection('system').doc('stats');
-        const amount = parseFloat(after.amount) || 0;
-        
-        await statsRef.set({
-            purchases: admin.firestore.FieldValue.increment(1),
-            purchaseVolume: admin.firestore.FieldValue.increment(amount)
-        }, { merge: true });
-
         // 2. Trigger Full Impact Recount (for waste/trees/families)
         return runImpactAggregation();
     }
@@ -214,60 +217,92 @@ exports.onbusinessupdated = onDocumentUpdated('businesses/{bizId}', async (event
 });
 
 async function runImpactAggregation() {
-    console.log('Running Global Impact Aggregation...');
-    const bizSnap = await db.collection('businesses').get();
-    const transSnap = await db.collection('transactions').where('type', '==', 'purchase').get();
+    console.log('Running Scalable Global Impact Aggregation (Future-Proofed)...');
+    
+    try {
+        // 1. High-Efficiency Global Aggregations (Index-based, not document-based)
+        const [checkinAgg, ghostAgg, purchaseAgg] = await Promise.all([
+            db.collection('transactions').where('type', '==', 'checkin').count().get(),
+            db.collection('transactions').where('type', '==', 'checkin').where('isGhost', '==', true).count().get(),
+            db.collection('transactions').where('type', '==', 'purchase').where('status', 'in', ['verified', 'approved'])
+                .aggregate({
+                    totalVolume: admin.firestore.AggregateField.sum('amount'),
+                    totalCount: admin.firestore.AggregateField.count()
+                }).get()
+        ]);
 
-    let totalWaste = 0;
-    let totalTrees = 0;
-    let totalFamilies = 0;
-    let totalVolume = 0;
+        const totalCheckinsRaw = checkinAgg.data().count;
+        const totalGhostCheckins = ghostAgg.data().count;
+        const totalMemberCheckins = totalCheckinsRaw - totalGhostCheckins;
+        const totalPurchases = purchaseAgg.data().totalCount;
+        const totalVolume = purchaseAgg.data().totalVolume || 0;
 
-    // 1. Calculate Global Purchase Volume and proportions
-    const bizPurchases = {};
-    transSnap.forEach(doc => {
-        const t = doc.data();
-        if (t.status === 'verified' || t.status === 'approved') {
-            const amount = parseFloat(t.amount) || 0;
-            totalVolume += amount;
-            bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + amount;
-        }
-    });
+        // 2. Fetch Business Data for Impact Proportions
+        // We still fetch business docs as they contain the 'yearlyAssessments' formulas
+        const bizSnap = await db.collection('businesses').get();
+        
+        // At scale, we fetch biz-specific volumes via aggregation or synced counters
+        // For the Alpha/Beta phase, we'll use the purchase transactions to build the map
+        // but limit memory usage by only pulling the necessary fields.
+        const purchaseTransSnap = await db.collection('transactions')
+            .where('type', '==', 'purchase')
+            .where('status', 'in', ['verified', 'approved'])
+            .select('bizId', 'amount')
+            .get();
 
-    // 2. Aggregate Impact based on business assessments
-    bizSnap.forEach(doc => {
-        const biz = doc.data();
-        totalFamilies += (parseInt(biz.impactJobs) || 0);
+        const bizPurchases = {};
+        purchaseTransSnap.forEach(doc => {
+            const t = doc.data();
+            bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
+        });
 
-        if (bizPurchases[doc.id]) {
-            let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-            const assessments = Array.isArray(biz.yearlyAssessments) 
-                ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
+        let totalWaste = 0;
+        let totalTrees = 0;
+        let totalFamilies = 0;
 
-            assessments.forEach(ya => {
-                const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                if (rev > latestRev) {
-                    latestRev = rev;
-                    latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                    latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+        // 3. Aggregate Environmental Impact based on business assessments
+        bizSnap.forEach(doc => {
+            const biz = doc.data();
+            totalFamilies += (parseInt(biz.impactJobs) || 0);
+
+            if (bizPurchases[doc.id]) {
+                let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                const assessments = Array.isArray(biz.yearlyAssessments) 
+                    ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
+
+                assessments.forEach(ya => {
+                    const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                    if (rev > latestRev) {
+                        latestRev = rev;
+                        latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                        latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                    }
+                });
+
+                if (latestRev > 0) {
+                    const proportion = bizPurchases[doc.id] / latestRev;
+                    totalWaste += (proportion * latestWaste);
+                    totalTrees += (proportion * latestTrees);
                 }
-            });
-
-            if (latestRev > 0) {
-                const proportion = bizPurchases[doc.id] / latestRev;
-                totalWaste += (proportion * latestWaste);
-                totalTrees += (proportion * latestTrees);
             }
-        }
-    });
+        });
 
-    // 3. Update Global Stats
-    return db.collection('system').doc('stats').set({
-        totalWaste: Math.round(totalWaste),
-        totalTrees: Math.round(totalTrees),
-        totalFamilies: totalFamilies,
-        purchaseVolume: totalVolume
-    }, { merge: true });
+        // 4. Update Global Stats with verified counts
+        return db.collection('system').doc('stats').set({
+            totalWaste: Math.round(totalWaste),
+            totalTrees: Math.round(totalTrees),
+            totalFamilies: totalFamilies,
+            purchaseVolume: totalVolume,
+            purchases: totalPurchases,
+            checkins: totalMemberCheckins,
+            ghostCheckins: totalGhostCheckins,
+            lastAggregated: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+    } catch (error) {
+        console.error("Aggregation failed:", error);
+        return null;
+    }
 }
 
 // 6. GDPR Deletion Safeguard (Callable)
@@ -526,4 +561,48 @@ exports.grantcustomerreward = functions.https.onCall(async (data, context) => {
     });
 
     return { success: true, rewardId: rewardRef.id };
+});
+
+exports.ghostcheckin = functions.https.onCall(async (data, context) => {
+    const { bizId, ghostId } = data;
+    if (!bizId || !ghostId) throw new functions.https.HttpsError('invalid-argument', 'Missing bizId or ghostId.');
+
+    const bizDoc = await db.collection('businesses').doc(bizId).get();
+    if (!bizDoc.exists) throw new functions.https.HttpsError('not-found', 'Business not found.');
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Check for existing check-in today
+    const existing = await db.collection('transactions')
+        .where('userId', '==', ghostId)
+        .where('bizId', '==', bizId)
+        .where('type', '==', 'checkin')
+        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(today))
+        .limit(1)
+        .get();
+
+    if (!existing.empty) {
+        return { 
+            success: false, 
+            error: 'ALREADY_CHECKED_IN', 
+            message: 'Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.' 
+        };
+    }
+
+    // Create the check-in
+    await db.collection('transactions').add({
+        type: 'checkin',
+        bizId,
+        bizName: bizDoc.data().name,
+        bizIndustry: bizDoc.data().industry || 'Unknown',
+        bizLocation: bizDoc.data().location || 'Unknown',
+        userId: ghostId,
+        userNickname: 'Anonymous Supporter',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'verified',
+        isGhost: true
+    });
+
+    return { success: true };
 });

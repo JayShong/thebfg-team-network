@@ -9,6 +9,7 @@ const Home = () => {
         consumers: 0,
         businesses: 0,
         checkins: 0,
+        ghostCheckins: 0,
         purchases: 0,
         purchaseVolume: 0,
         totalWaste: 0,
@@ -21,6 +22,7 @@ const Home = () => {
     const [personalStats, setPersonalStats] = useState({ checkins: 0, purchases: 0 });
     const [isSyncing, setIsSyncing] = useState(false);
     const [needsSync, setNeedsSync] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const syncStats = async (liveData) => {
         setIsSyncing(true);
@@ -58,6 +60,7 @@ const Home = () => {
                         consumers: userCountSnap.size,
                         businesses: bizCountSnap.size,
                         checkins: checkinSnap.size,
+                        ghostCheckins: currentStats.ghostCheckins || 0, // Fallback as ghost checkins are server-side only for now
                         purchases: purchaseSnap.size
                     };
 
@@ -141,6 +144,8 @@ const Home = () => {
 
             } catch (e) {
                 console.warn("Dashboard data fetch failed:", e);
+            } finally {
+                setIsLoading(false);
             }
         };
         fetchData();
@@ -200,8 +205,16 @@ const Home = () => {
                 <div className="stat-card glass-card feature-gradient">
                     <i className="fa-solid fa-location-dot stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Total Check-ins</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.checkins || 0).toLocaleString()}</p>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            Total Check-ins
+                            <i className="fa-solid fa-circle-question" title="Ghost Check-ins are acknowledgments from anonymous, non-registered supporters. Member Check-ins are from registered identities." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
+                        </h3>
+                        <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            {isLoading ? '...' : (stats.checkins || 0).toLocaleString()} 
+                            <span style={{ color: 'var(--accent-ghost)', fontWeight: '400', fontSize: '1.2rem', marginLeft: '8px' }}>
+                                | {isLoading ? '...' : (stats.ghostCheckins || 0).toLocaleString()}
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div className="stat-card glass-card success-gradient">
