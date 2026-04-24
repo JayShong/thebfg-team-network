@@ -42,7 +42,7 @@ exports.onbusinessdeleted = onDocumentDeleted('businesses/{bizId}', async (event
     return updateGlobalStat('businesses', -1);
 });
 
-const { BADGES_CONFIG, evaluateTier } = require('./badgeEngine');
+const { BADGES_CONFIG, evaluateTier, evaluateBadges } = require('./badgeEngine');
 
 // 3. Transaction Triggers (Sanitized Feed & The Sentinel)
 exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (event) => {
@@ -52,7 +52,7 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
 
     try {
         // A. The Sentinel: Background Verification
-        // Check for 1-per-day limit violation for this business
+        // ... (existing sentinel logic) ...
         const dailyQuery = await db.collection('transactions')
             .where('userId', '==', txn.userId)
             .where('bizId', '==', txn.bizId)
@@ -77,12 +77,96 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                     flagReason: `Daily limit bypass at ${txn.bizName || txn.bizId}`
                 });
             }
-            // Mark transaction as suspect
             await event.data.ref.update({ status: 'flagged_by_sentinel' });
             return null;
         }
 
-        // B. Create Sanitized Public Activity for Newsreel
+        // B. SCALE-FIRST: Update User Stats & Evaluate Badges
+        if (!txn.isGhost) {
+            const statsRef = db.collection('users').doc(txn.userId).collection('counters').doc('summary');
+            const userRef = db.collection('users').doc(txn.userId);
+            const bizDoc = await db.collection('businesses').doc(txn.bizId).get();
+            const biz = bizDoc.exists ? bizDoc.data() : null;
+            
+            await db.runTransaction(async (transaction) => {
+                const statsDoc = await transaction.get(statsRef);
+                const userDoc = await transaction.get(userRef);
+                
+                let stats = statsDoc.exists ? statsDoc.data() : {
+                    totalCheckins: 0,
+                    totalPurchases: 0,
+                    totalWaste: 0,
+                    totalTrees: 0,
+                    totalFamilies: 0,
+                    uniqueBizIds: {},
+                    uniqueLocations: {},
+                    uniqueIndustries: {},
+                    bizVisits: {}
+                };
+
+                // Initialize fields if missing in old documents
+                stats.totalWaste = stats.totalWaste || 0;
+                stats.totalTrees = stats.totalTrees || 0;
+                stats.totalFamilies = stats.totalFamilies || 0;
+
+                const isNewBiz = !stats.uniqueBizIds?.[txn.bizId];
+
+                // Update counters
+                if (txn.type === 'checkin') stats.totalCheckins = (stats.totalCheckins || 0) + 1;
+                if (txn.type === 'purchase') {
+                    stats.totalPurchases = (stats.totalPurchases || 0) + 1;
+                    
+                    // INCREMENTAL QUANTIFIED IMPACT (Only for purchases)
+                    if (biz && txn.status !== 'flagged_by_sentinel') {
+                        let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                        const assessments = Array.isArray(biz.yearlyAssessments) 
+                            ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
+
+                        assessments.forEach(ya => {
+                            const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                            if (rev > latestRev) {
+                                latestRev = rev;
+                                latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                                latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                            }
+                        });
+
+                        if (latestRev > 0) {
+                            const proportion = (parseFloat(txn.amount) || 0) / latestRev;
+                            stats.totalWaste += (proportion * latestWaste);
+                            stats.totalTrees += (proportion * latestTrees);
+                        }
+                    }
+                }
+                
+                // Update maps for unique badges & family impact
+                if (txn.bizId) {
+                    stats.uniqueBizIds = stats.uniqueBizIds || {};
+                    if (isNewBiz) {
+                        stats.uniqueBizIds[txn.bizId] = true;
+                        if (biz) stats.totalFamilies += (parseInt(biz.impactJobs) || 0);
+                    }
+                    
+                    stats.bizVisits = stats.bizVisits || {};
+                    stats.bizVisits[txn.bizId] = (stats.bizVisits[txn.bizId] || 0) + 1;
+                }
+                if (txn.bizLocation) {
+                    stats.uniqueLocations = stats.uniqueLocations || {};
+                    stats.uniqueLocations[txn.bizLocation] = true;
+                }
+                if (txn.bizIndustry) {
+                    stats.uniqueIndustries = stats.uniqueIndustries || {};
+                    stats.uniqueIndustries[txn.bizIndustry] = true;
+                }
+
+                transaction.set(statsRef, stats, { merge: true });
+                
+                // Evaluate Badges using current transaction and updated stats
+                await evaluateBadges(txn, stats, userDoc);
+            });
+        }
+
+        // C. Create Sanitized Public Activity for Newsreel
         const uName = (txn.userNickname || txn.userName || 'Explorer').substring(0, 15);
         const bName = (txn.bizName || 'Business').substring(0, 20);
         
@@ -94,7 +178,7 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // C. Update Business-specific stats
+        // D. Update Business-specific stats
         if (txn.type === 'checkin') {
             const bizRef = db.collection('businesses').doc(txn.bizId);
             const bizUpdate = {};
@@ -104,13 +188,11 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                 bizUpdate.checkinsCount = admin.firestore.FieldValue.increment(1);
             }
             await bizRef.set(bizUpdate, { merge: true });
-
-            // Trigger Global Impact Aggregation (Check-ins only for now)
             return runImpactAggregation();
         }
         return null;
     } catch (e) {
-        console.error("Sentinel processing failed:", e);
+        console.error("Transaction processing failed:", e);
         return null;
     }
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,9 +7,9 @@ import { TUTORIAL_STEPS } from '../utils/badgeLogic';
 import firebase from 'firebase/compat/app';
 
 const Scanner = () => {
+    const navigate = useNavigate();
     const { currentUser, ghostId } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
-    const [manualId, setManualId] = useState('');
     const [error, setError] = useState('');
     const [scanning, setScanning] = useState(true);
     const [showTutorial, setShowTutorial] = useState(false);
@@ -122,6 +123,64 @@ const Scanner = () => {
         }
     };
 
+
+    const updateLocalStats = (type, amount = 0) => {
+        // 1. Update Personal Stats
+        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        let pStats = personalSaved ? JSON.parse(personalSaved) : {
+            personalStats: { checkins: 0, purchases: 0 },
+            quantifiedImpact: { waste: 0, trees: 0, families: 0 },
+            uniqueBizIds: {}
+        };
+
+        if (scannedBusiness) {
+            const isNewBiz = !pStats.uniqueBizIds?.[scannedBusiness.id];
+            if (isNewBiz) {
+                pStats.uniqueBizIds = pStats.uniqueBizIds || {};
+                pStats.uniqueBizIds[scannedBusiness.id] = true;
+                pStats.quantifiedImpact.families = (pStats.quantifiedImpact.families || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
+            }
+
+            if (type === 'checkin') {
+                pStats.personalStats.checkins++;
+            } else if (type === 'purchase') {
+                pStats.personalStats.purchases++;
+                
+                // Calculate incremental impact if business data is available
+                if (scannedBusiness.yearlyAssessments) {
+                    let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                    const assessments = Array.isArray(scannedBusiness.yearlyAssessments) 
+                        ? scannedBusiness.yearlyAssessments : Object.values(scannedBusiness.yearlyAssessments);
+
+                    assessments.forEach(ya => {
+                        const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                        if (rev > latestRev) {
+                            latestRev = rev;
+                            latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                            latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                        }
+                    });
+
+                    if (latestRev > 0) {
+                        const proportion = amount / latestRev;
+                        pStats.quantifiedImpact.waste = (pStats.quantifiedImpact.waste || 0) + (proportion * latestWaste);
+                        pStats.quantifiedImpact.trees = (pStats.quantifiedImpact.trees || 0) + (proportion * latestTrees);
+                    }
+                }
+            }
+        }
+        localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+
+        // 2. Update Global Stats (Estimated)
+        const globalSaved = localStorage.getItem('bfg_global_stats');
+        if (globalSaved) {
+            let gStats = JSON.parse(globalSaved);
+            if (type === 'checkin') gStats.checkins++;
+            if (type === 'purchase') gStats.purchases++;
+            localStorage.setItem('bfg_global_stats', JSON.stringify(gStats));
+        }
+    };
+
     const submitCheckin = async () => {
         if (!scannedBusiness || isSubmitting) return;
         setIsSubmitting(true);
@@ -135,6 +194,7 @@ const Scanner = () => {
                 if (result.data.success) {
                     setIsSuccess(true);
                     setSuccessMsg("Ghost Check-in successful! Your anonymous support has been recorded.");
+                    updateLocalStats('checkin');
                 } else {
                     alert(result.data.message || "Could not record acknowledgment.");
                 }
@@ -200,6 +260,7 @@ const Scanner = () => {
             await batch.commit();
             setIsSuccess(true);
             setSuccessMsg("Check-in verified! Your impact is being recorded.");
+            updateLocalStats('checkin');
             setScannedBusiness(null);
             
             const { evaluateBadges } = await import('../utils/badgeEngine');
@@ -249,6 +310,7 @@ const Scanner = () => {
 
             setIsSuccess(true);
             setSuccessMsg("Your purchase has been recorded! Awaiting merchant verification.");
+            updateLocalStats('purchase', finalAmount);
             setScannedBusiness(null);
             setPurchaseForm(false);
             setAmount('');
@@ -297,7 +359,7 @@ const Scanner = () => {
                             </button>
                         </div>
                     )}
-                    <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); setManualId(''); }} className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                    <button onClick={() => { setIsSuccess(false); setSuccessMsg(''); setScanning(true); }} className="btn btn-primary" style={{ marginTop: '1rem' }}>
                         Scan Another
                     </button>
                 </div>

@@ -5,150 +5,106 @@ import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 const Home = () => {
     const { currentUser } = useAuth();
-    const [stats, setStats] = useState({
-        consumers: 0,
-        businesses: 0,
-        checkins: 0,
-        ghostCheckins: 0,
-        purchases: 0,
-        purchaseVolume: 0,
-        totalWaste: 0,
-        totalTrees: 0,
-        totalFamilies: 0,
-        gdpPenetration: "0.01%"
+
+    // Initialize states from localStorage if available
+    const [stats, setStats] = useState(() => {
+        const saved = localStorage.getItem('bfg_global_stats');
+        return saved ? JSON.parse(saved) : {
+            consumers: 0, businesses: 0, checkins: 0, ghostCheckins: 0,
+            purchases: 0, purchaseVolume: 0, totalWaste: 0, totalTrees: 0,
+            totalFamilies: 0, gdpPenetration: "0.01%"
+        };
     });
 
-    const [quantifiedImpact, setQuantifiedImpact] = useState({ waste: 0, trees: 0, families: 0 });
-    const [personalStats, setPersonalStats] = useState({ checkins: 0, purchases: 0 });
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [needsSync, setNeedsSync] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [quantifiedImpact, setQuantifiedImpact] = useState(() => {
+        const saved = localStorage.getItem('bfg_personal_stats');
+        return saved ? JSON.parse(saved).quantifiedImpact : { waste: 0, trees: 0, families: 0 };
+    });
 
-    const syncStats = async (liveData) => {
+    const [personalStats, setPersonalStats] = useState(() => {
+        const saved = localStorage.getItem('bfg_personal_stats');
+        return saved ? JSON.parse(saved).personalStats : { checkins: 0, purchases: 0 };
+    });
+
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isLoading, setIsLoading] = useState(!localStorage.getItem('bfg_global_stats'));
+
+    const refreshDashboard = async () => {
         setIsSyncing(true);
         try {
-            await db.collection('system').doc('stats').set(liveData, { merge: true });
-            setStats(prev => ({ ...prev, ...liveData }));
-            setNeedsSync(false);
-            alert("System statistics synchronized successfully.");
+            // 1. Fetch Global Stats
+            const statsDoc = await db.collection('system').doc('stats').get();
+            let currentStats = statsDoc.exists ? statsDoc.data() : { ...stats };
+            
+            // 2. If Admin, perform live count check
+            if (currentUser && currentUser.isSuperAdmin) {
+                const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap] = await Promise.all([
+                    db.collection('users').count().get(),
+                    db.collection('businesses').count().get(),
+                    db.collection('transactions').where('type', '==', 'checkin').count().get(),
+                    db.collection('transactions').where('type', '==', 'purchase').count().get()
+                ]);
+
+                currentStats = {
+                    ...currentStats,
+                    consumers: userCountSnap.data().count,
+                    businesses: bizCountSnap.data().count,
+                    checkins: checkinCountSnap.data().count,
+                    purchases: purchaseCountSnap.data().count
+                };
+                
+                // Update server's cached stats if admin refreshes
+                await db.collection('system').doc('stats').set(currentStats, { merge: true });
+            }
+
+            setStats(currentStats);
+            localStorage.setItem('bfg_global_stats', JSON.stringify(currentStats));
+
+            // 3. Fetch Personal Stats (O(1) from pre-calculated summary)
+            if (currentUser) {
+                const summaryDoc = await db.collection('users')
+                    .doc(currentUser.uid)
+                    .collection('counters')
+                    .doc('summary')
+                    .get();
+
+                if (summaryDoc.exists) {
+                    const s = summaryDoc.data();
+                    const pStats = { 
+                        checkins: s.totalCheckins || 0, 
+                        purchases: s.totalPurchases || 0 
+                    };
+                    const qImpact = {
+                        waste: s.totalWaste % 1 !== 0 ? parseFloat(s.totalWaste.toFixed(2)) : (s.totalWaste || 0),
+                        trees: Math.round(s.totalTrees || 0),
+                        families: s.totalFamilies || 0
+                    };
+
+                    setPersonalStats(pStats);
+                    setQuantifiedImpact(qImpact);
+                    localStorage.setItem('bfg_personal_stats', JSON.stringify({
+                        personalStats: pStats,
+                        quantifiedImpact: qImpact,
+                        lastUpdated: new Date().toISOString()
+                    }));
+                }
+            }
+            console.log("Dashboard refreshed successfully.");
         } catch (error) {
-            console.error("Sync failed:", error);
-            alert("Failed to synchronize statistics.");
+            console.error("Refresh failed:", error);
         } finally {
             setIsSyncing(false);
+            setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // 1. Fetch the cached stats (Always available to everyone)
-                const statsDoc = await db.collection('system').doc('stats').get();
-                let currentStats = statsDoc.exists ? statsDoc.data() : { ...stats };
-                setStats(currentStats);
-
-                // 2. If Admin, perform LIVE query to verify integrity
-                if (currentUser && currentUser.isSuperAdmin) {
-                    const [userCountSnap, bizCountSnap, checkinSnap, purchaseSnap] = await Promise.all([
-                        db.collection('users').get(),
-                        db.collection('businesses').get(),
-                        db.collection('transactions').where('type', '==', 'checkin').get(),
-                        db.collection('transactions').where('type', '==', 'purchase').get()
-                    ]);
-
-                    const liveStats = {
-                        consumers: userCountSnap.size,
-                        businesses: bizCountSnap.size,
-                        checkins: checkinSnap.size,
-                        ghostCheckins: currentStats.ghostCheckins || 0, // Fallback as ghost checkins are server-side only for now
-                        purchases: purchaseSnap.size
-                    };
-
-                    // Check if sync is needed
-                    if (liveStats.consumers !== currentStats.consumers || 
-                        liveStats.businesses !== currentStats.businesses ||
-                        liveStats.checkins !== currentStats.checkins ||
-                        liveStats.purchases !== currentStats.purchases) {
-                        setNeedsSync(true);
-                        // Update local state to show live data to admin immediately
-                        setStats(prev => ({ ...prev, ...liveStats }));
-                    }
-                }
-
-                // 3. Fetch Personal Stats (Only if logged in)
-                if (currentUser) {
-                    const [bizSnap, transSnap] = await Promise.all([
-                        db.collection('businesses').get(),
-                        db.collection('transactions')
-                            .where('userId', '==', currentUser.uid)
-                            .get()
-                    ]);
-
-                    const businesses = bizSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    let userCheckins = 0;
-                    let userPurchases = 0;
-                    const bizPurchases = {};
-                    
-                    transSnap.forEach(doc => {
-                        const t = doc.data();
-                        if (t.type === 'checkin') userCheckins++;
-                        if (t.type === 'purchase') {
-                            userPurchases++;
-                            if (t.status === 'verified' || t.status === 'approved') {
-                                bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
-                            }
-                        }
-                    });
-
-                    setPersonalStats({ checkins: userCheckins, purchases: userPurchases });
-
-                    let waste = 0;
-                    let trees = 0;
-                    let families = 0;
-
-                    Object.keys(bizPurchases).forEach(bizId => {
-                        const biz = businesses.find(b => b.id === bizId);
-                        if (biz && biz.status !== 'expired') {
-                            families += (parseInt(biz.impactJobs) || 0);
-                            let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-
-                            if (biz.yearlyAssessments) {
-                                const assessments = Array.isArray(biz.yearlyAssessments) 
-                                    ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
-
-                                assessments.forEach(ya => {
-                                    const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                                    if (rev > latestRev) {
-                                        latestRev = rev;
-                                        latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                                        latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
-                                    }
-                                });
-                            }
-
-                            if (latestRev > 0) {
-                                const proportion = bizPurchases[bizId] / latestRev;
-                                waste += (proportion * latestWaste);
-                                trees += (proportion * latestTrees);
-                            }
-                        }
-                    });
-
-                    setQuantifiedImpact({
-                        waste: waste % 1 !== 0 ? parseFloat(waste.toFixed(2)) : waste,
-                        trees: Math.round(trees),
-                        families: families
-                    });
-                }
-
-            } catch (e) {
-                console.warn("Dashboard data fetch failed:", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
+        // Initial load only if local storage is empty
+        if (!localStorage.getItem('bfg_global_stats')) {
+            refreshDashboard();
+        } else {
+            setIsLoading(false);
+        }
     }, [currentUser]);
 
     const gdpPenetration = stats.gdpPenetration || "0%";
@@ -160,22 +116,25 @@ const Home = () => {
                     <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Dashboard</h1>
                     <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Conviction Network impact overview</p>
                 </div>
-                {needsSync && (
-                    <button 
-                        onClick={() => syncStats({ 
-                            consumers: stats.consumers, 
-                            businesses: stats.businesses, 
-                            checkins: stats.checkins, 
-                            purchases: stats.purchases 
-                        })}
-                        disabled={isSyncing}
-                        className="btn"
-                        style={{ background: 'var(--accent)', color: 'white', fontSize: '0.8rem', padding: '0.5rem 1rem' }}
-                    >
-                        {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-sync"></i>}
-                        <span style={{ marginLeft: '8px' }}>Sync Stats</span>
-                    </button>
-                )}
+
+                <button 
+                    onClick={refreshDashboard}
+                    disabled={isSyncing}
+                    className="btn"
+                    style={{ 
+                        background: 'rgba(255,255,255,0.05)', 
+                        color: 'white', 
+                        fontSize: '0.75rem', 
+                        padding: '0.35rem 0.75rem', 
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center'
+                    }}
+                >
+                    {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate"></i>}
+                    <span style={{ marginLeft: '6px' }}>Refresh Dashboard</span>
+                </button>
             </div>
 
             <div className="glass-card" style={{ marginBottom: '2rem', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))', borderColor: 'rgba(139, 92, 246, 0.3)' }}>
