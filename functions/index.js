@@ -117,10 +117,55 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             updates.totalTrees = Math.round(totalTrees);
             updates.totalFamilies = totalFamilies;
         }
-
+        
         batch.set(db.collection('system').doc('stats'), updates, { merge: true });
         await batch.commit();
-        console.log("CRON: Reconciliation successful. Shards cleared.");
+
+        // 2. CONSOLIDATE BUSINESS SHARDS (Scalable "Dirty Flag" Pattern)
+        const dirtyBizSnap = await db.collection('businesses')
+            .where('needsReconciliation', '==', true)
+            .limit(50) // Process in chunks to avoid timeouts
+            .get();
+
+        if (!dirtyBizSnap.empty) {
+            console.log(`CRON: Consolidating shards for ${dirtyBizSnap.size} businesses...`);
+            for (const bizDoc of dirtyBizSnap.docs) {
+                const bizId = bizDoc.id;
+                const bizData = bizDoc.data();
+                const shardsSnap = await db.collection('businesses').doc(bizId).collection('shards').get();
+                
+                let checkinsInc = 0;
+                let ghostCheckinsInc = 0;
+                let purchasesInc = 0;
+                let volumeInc = 0;
+
+                const shardBatch = db.batch();
+                shardsSnap.forEach(sDoc => {
+                    const s = sDoc.data();
+                    checkinsInc += (s.checkinsCount || 0);
+                    ghostCheckinsInc += (s.ghostCheckinsCount || 0);
+                    purchasesInc += (s.purchasesCount || 0);
+                    volumeInc += (s.purchaseVolume || 0);
+                    shardBatch.delete(sDoc.ref);
+                });
+
+                if (shardsSnap.size > 0) {
+                    await shardBatch.commit();
+                    await db.collection('businesses').doc(bizId).update({
+                        checkinsCount: admin.firestore.FieldValue.increment(checkinsInc),
+                        ghostCheckinsCount: admin.firestore.FieldValue.increment(ghostCheckinsInc),
+                        purchasesCount: admin.firestore.FieldValue.increment(purchasesInc),
+                        purchaseVolume: admin.firestore.FieldValue.increment(volumeInc),
+                        needsReconciliation: false,
+                        lastReconciled: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    await db.collection('businesses').doc(bizId).update({ needsReconciliation: false });
+                }
+            }
+        }
+
+        console.log("CRON: Reconciliation successful. Global and Business shards cleared.");
     } catch (e) {
         console.error("CRON: Reconciliation failed", e);
     }
@@ -221,31 +266,7 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                 if (txn.type === 'checkin') stats.totalCheckins = (stats.totalCheckins || 0) + 1;
                 if (txn.type === 'purchase') {
                     stats.totalPurchases = (stats.totalPurchases || 0) + 1;
-                    
-                    // INCREMENTAL QUANTIFIED IMPACT (Only for purchases)
-                    if (biz && txn.status !== 'flagged_by_sentinel') {
-                        let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-                        const assessments = Array.isArray(biz.yearlyAssessments) 
-                            ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
-
-                        assessments.forEach(ya => {
-                            const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                            if (rev > latestRev) {
-                                latestRev = rev;
-                                latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                                latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
-                            }
-                        });
-
-                    if (latestRev > 0) {
-                        const proportion = (parseFloat(txn.amount) || 0) / latestRev;
-                        stats.incrementalWaste = proportion * latestWaste;
-                        stats.incrementalTrees = proportion * latestTrees;
-                        
-                        stats.totalWaste = (stats.totalWaste || 0) + stats.incrementalWaste;
-                        stats.totalTrees = (stats.totalTrees || 0) + stats.incrementalTrees;
-                    }
-                    }
+                    // Quantified impact (Waste/Trees) moved to verification stage
                 }
                 
                 // Update maps for unique badges & family impact
@@ -329,6 +350,8 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
         
         if (Object.keys(bizUpdate).length > 0) {
             await bizShardRef.set(bizUpdate, { merge: true });
+            // Mark for reconciliation (Dirty Flag)
+            await db.collection('businesses').doc(txn.bizId).update({ needsReconciliation: true });
         }
         
         return null;
@@ -396,17 +419,33 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
                 purchaseVolume: admin.firestore.FieldValue.increment(parseFloat(after.amount) || 0)
             };
             await bizShardRef.set(bizCounterUpdate, { merge: true });
+            
+            // Mark for reconciliation (Dirty Flag)
+            await db.collection('businesses').doc(after.bizId).update({ needsReconciliation: true });
 
-            // 3. Securely evaluate badges for the user
+            // 3. Securely evaluate badges and impact for the user
             if (!after.isGhost) {
                 const userRef = db.collection('users').doc(after.userId);
-                const statsRef = db.collection('users').doc(after.userId).collection('counters').doc('summary');
+                const statsRef = userRef.collection('counters').doc('summary');
                 
                 await db.runTransaction(async (transaction) => {
                     const uSnap = await transaction.get(userRef);
                     const sSnap = await transaction.get(statsRef);
+                    
                     if (uSnap.exists && sSnap.exists) {
-                        const badgesToUnlock = evaluateBadges({ ...uSnap.data(), ...sSnap.data() });
+                        const stats = sSnap.data();
+                        
+                        // Update User's Quantified Impact
+                        const newWaste = (stats.totalWaste || 0) + incWaste;
+                        const newTrees = (stats.totalTrees || 0) + incTrees;
+                        
+                        transaction.update(statsRef, { 
+                            totalWaste: newWaste, 
+                            totalTrees: newTrees 
+                        });
+
+                        // Re-evaluate Badges with the NEW verified totals
+                        const badgesToUnlock = evaluateBadges({ ...uSnap.data(), ...stats, totalWaste: newWaste, totalTrees: newTrees });
                         if (badgesToUnlock.length > 0) {
                             const currentBadges = uSnap.data().badges || {};
                             badgesToUnlock.forEach(bTitle => {
