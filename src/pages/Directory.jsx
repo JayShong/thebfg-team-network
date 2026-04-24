@@ -1,33 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useBusinesses from '../hooks/useBusinesses';
 import BusinessCard from '../components/business/BusinessCard';
 
 const Directory = () => {
-    const { businesses, loading, error } = useBusinesses();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('all');
-
-    // Memoize the filtered list so it only recalculates when dependencies change natively
-    const filteredBusinesses = useMemo(() => {
-        return businesses.filter(biz => {
-            // Apply text search with optional chaining fallback
-            const safeName = biz.name || '';
-            const safeIndustry = biz.industry || '';
-            const matchesSearch = safeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                  safeIndustry.toLowerCase().includes(searchQuery.toLowerCase());
-            // Apply category filter
-            let matchesFilter = true;
-            if (activeFilter === 'fnb') matchesFilter = biz.industry === 'Food & Beverage';
-            if (activeFilter === 'retail') matchesFilter = biz.industry === 'Retail';
-            if (activeFilter === 'services') matchesFilter = biz.industry === 'Services';
-            
-            // By standard, hide expired from the main feed unless specifically searched? 
-            // In legacy, we just showed them with .card-status-expired. We'll show all.
-            const matchesStatus = true; 
-
-            return matchesSearch && matchesFilter && matchesStatus;
-        }).sort((a, b) => (b.smiles || 0) - (a.smiles || 0)); // Sort by smiles descending
-    }, [businesses, searchQuery, activeFilter]);
+    
+    // Server-side paginated hook
+    const { businesses, loading, loadingMore, error, hasMore, loadMore } = useBusinesses(searchQuery, activeFilter);
+    
+    // Intersection Observer for Infinite Scroll
+    const observer = useRef();
+    const lastElementRef = (node) => {
+        if (loading) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                loadMore();
+            }
+        });
+        if (node) observer.current.observe(node);
+    };
 
     return (
         <div style={{ width: '100%', paddingBottom: '3rem' }}>
@@ -42,7 +35,6 @@ const Directory = () => {
                 <i className="fa-solid fa-search" style={{ color: 'var(--text-secondary)' }}></i>
                 <input 
                     type="text" 
-                    id="search-input" 
                     placeholder="Search paradigm businesses..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -85,7 +77,7 @@ const Directory = () => {
 
             {/* Business List Container */}
             <div id="biz-list" className="business-list" style={{ display: 'flex', flexDirection: 'column', paddingBottom: '2rem' }}>
-                {loading && (
+                {loading && businesses.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         <i className="fa-solid fa-circle-notch fa-spin fa-2x"></i>
                         <p style={{ marginTop: '1rem' }}>Loading network entities...</p>
@@ -99,15 +91,29 @@ const Directory = () => {
                     </div>
                 )}
 
-                {!loading && !error && filteredBusinesses.length === 0 && (
+                {!loading && businesses.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         <p>No paradigm businesses match your search.</p>
                     </div>
                 )}
 
-                {!loading && filteredBusinesses.map((biz) => (
-                    <BusinessCard key={biz.id} business={biz} />
-                ))}
+                {businesses.map((biz, index) => {
+                    if (businesses.length === index + 1) {
+                        return (
+                            <div ref={lastElementRef} key={biz.id}>
+                                <BusinessCard business={biz} />
+                            </div>
+                        );
+                    } else {
+                        return <BusinessCard key={biz.id} business={biz} />;
+                    }
+                })}
+
+                {loadingMore && (
+                    <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>
+                        <i className="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
+                )}
             </div>
         </div>
     );

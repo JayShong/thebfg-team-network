@@ -24,11 +24,40 @@ const BusinessProfile = () => {
         }
     }, [id, businesses, loading]);
 
+    const [shardedStats, setShardedStats] = useState({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+
     useEffect(() => {
         if (!id) return;
+        
+        // Pull shards for real-time impact accuracy
+        const fetchShards = async () => {
+            try {
+                const shardSnap = await db.collection('businesses').doc(id).collection('shards').get();
+                let checkins = business?.checkinsCount || 0;
+                let ghostCheckins = business?.ghostCheckinsCount || 0;
+                let purchases = business?.purchasesCount || 0;
+                let volume = business?.purchaseVolume || 0;
+
+                shardSnap.forEach(doc => {
+                    const s = doc.data();
+                    checkins += (s.checkinsCount || 0);
+                    ghostCheckins += (s.ghostCheckinsCount || 0);
+                    purchases += (s.purchasesCount || 0);
+                    volume += (s.purchaseVolume || 0);
+                });
+
+                setShardedStats({ checkins, ghostCheckins, purchases, volume });
+            } catch (e) {
+                console.warn("Failed to fetch shards:", e);
+            }
+        };
+
+        fetchShards();
+
         const unsubscribe = db.collection('audit_logs')
             .where('bizId', '==', id)
             .orderBy('timestamp', 'desc')
+            .limit(20) // Scale safeguard
             .onSnapshot(snapshot => {
                 const logs = snapshot.docs.map(doc => ({
                     id: doc.id,
@@ -37,7 +66,7 @@ const BusinessProfile = () => {
                 setLiveAuditLog(logs);
             });
         return () => unsubscribe();
-    }, [id]);
+    }, [id, business]);
 
     const getNickname = (email) => {
         if (!email) return 'Operator';
@@ -333,6 +362,23 @@ const BusinessProfile = () => {
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                         To support this business, please visit them in person and scan their official BFG standee.
                     </p>
+                </div>
+
+                {/* Network Support Summary (Sharded) */}
+                <div className="detail-section glass-card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2))' }}>
+                    <h3 style={{ marginBottom: '1.2rem', fontSize: '1.1rem' }}>
+                        <i className="fa-solid fa-chart-column" style={{ color: 'var(--accent-primary)' }}></i> Network Support
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{shardedStats.checkins + shardedStats.ghostCheckins}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Total Visitors</div>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent-success)' }}>RM {shardedStats.volume.toLocaleString()}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Verified Support</div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Symmetric Loyalty Connection */}

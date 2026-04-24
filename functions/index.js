@@ -1037,3 +1037,51 @@ exports.ghostcheckin = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Ghost check-in failed.');
     }
 });
+
+/**
+ * SELF-HEALING: Automated Business Data Audit
+ * Runs every day at 1 AM to detect and report data inconsistencies.
+ */
+exports.automatedbusinessaudit = onSchedule("0 1 * * *", async (event) => {
+    console.log("CRON: Starting automated business audit...");
+    
+    try {
+        const bizSnap = await db.collection('businesses').get();
+        const report = {
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            totalBusinesses: bizSnap.size,
+            flaggedBusinesses: [],
+            summary: {
+                missingName: 0,
+                missingIndustry: 0,
+                missingOwner: 0,
+                missingImpactJobs: 0,
+                missingAssessments: 0
+            }
+        };
+
+        bizSnap.forEach(doc => {
+            const data = doc.data();
+            const issues = [];
+            
+            if (!data.name) { issues.push('missing_name'); report.summary.missingName++; }
+            if (!data.industry) { issues.push('missing_industry'); report.summary.missingIndustry++; }
+            if (!data.ownerEmail) { issues.push('missing_owner'); report.summary.missingOwner++; }
+            if (data.impactJobs === undefined || data.impactJobs === null) { issues.push('missing_impact_jobs'); report.summary.missingImpactJobs++; }
+            if (!data.yearlyAssessments || Object.keys(data.yearlyAssessments).length === 0) { issues.push('missing_assessments'); report.summary.missingAssessments++; }
+
+            if (issues.length > 0) {
+                report.flaggedBusinesses.push({
+                    id: doc.id,
+                    name: data.name || 'Unknown',
+                    issues: issues
+                });
+            }
+        });
+
+        await db.collection('system').doc('audit_report').set(report);
+        console.log(`CRON: Business audit complete. ${report.flaggedBusinesses.length} issues detected.`);
+    } catch (e) {
+        console.error("CRON: Business audit failed", e);
+    }
+});
