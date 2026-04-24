@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../services/firebase';
 
 const Newsreel = () => {
-    const { currentUser, isGuest, logout, recentActivity, pendingApprovalCount } = useAuth();
+    const { currentUser, isGuest, logout, recentActivity, localActivities, pendingApprovalCount } = useAuth();
     const navigate = useNavigate();
     
     const [index, setIndex] = useState(0);
@@ -73,7 +73,10 @@ const Newsreel = () => {
         }
 
         // 3. Activity Feed (Sanitized Public Activities)
-        recentActivity.forEach(act => {
+        // Merge server activities with local instant injections
+        const allActivity = [...localActivities, ...recentActivity];
+        
+        allActivity.forEach(act => {
             queue.push({
                 text: act.text || "Momentum in the network...",
                 type: act.type || 'activity',

@@ -60,8 +60,32 @@ const BusinessPortal = () => {
     const canSeeIntelligence = stewardshipLevel === 'founder' || stewardshipLevel === 'manager' || stewardshipLevel === 'support';
     const canVerifyPurchases = stewardshipLevel !== null;
 
-    const handleSelectBiz = (biz) => {
+    const [shardedStats, setShardedStats] = useState({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+
+    const handleSelectBiz = async (biz) => {
         setSelectedBiz(biz);
+        setShardedStats({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+        
+        try {
+            const shardSnap = await db.collection('businesses').doc(biz.id).collection('shards').get();
+            let checkins = biz.checkinsCount || 0;
+            let ghostCheckins = biz.ghostCheckinsCount || 0;
+            let purchases = biz.purchasesCount || 0;
+            let volume = biz.purchaseVolume || 0;
+
+            shardSnap.forEach(doc => {
+                const s = doc.data();
+                checkins += (s.checkinsCount || 0);
+                ghostCheckins += (s.ghostCheckinsCount || 0);
+                purchases += (s.purchasesCount || 0);
+                volume += (s.purchaseVolume || 0);
+            });
+
+            setShardedStats({ checkins, ghostCheckins, purchases, volume });
+        } catch (e) {
+            console.warn("Failed to fetch shards:", e);
+        }
+
         setFormData({
             story: biz.story || '',
             website: biz.website || '',
@@ -233,11 +257,11 @@ const BusinessPortal = () => {
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                              <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                                <div className="stat-value">{selectedBiz.checkinsCount || 0}</div>
+                                <div className="stat-value">{shardedStats.checkins || selectedBiz.checkinsCount || 0}</div>
                                 <div className="stat-label">Member Check-ins</div>
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                                <div className="stat-value" style={{ color: '#ffb84d' }}>{selectedBiz.ghostCheckinsCount || 0}</div>
+                                <div className="stat-value" style={{ color: '#ffb84d' }}>{shardedStats.ghostCheckins || selectedBiz.ghostCheckinsCount || 0}</div>
                                 <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                                     Ghost Check-ins 
                                     <i className="fa-solid fa-circle-question" title="Anonymous support acknowledgments from unregistered visitors. These are not linked to registered identities." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
@@ -245,8 +269,8 @@ const BusinessPortal = () => {
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <div className="stat-value">{selectedBiz.purchasesCount || 0}</div>
-                                    <div style={{ fontSize: '0.9rem', color: '#ffb84d', fontWeight: '600', marginTop: '0.2rem' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
+                                    <div className="stat-value">{shardedStats.purchases || selectedBiz.purchasesCount || 0}</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#ffb84d', fontWeight: '600', marginTop: '0.2rem' }}>RM {(shardedStats.volume || selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
                                 </div>
                                 <div className="stat-label">Purchases from the Network</div>
                             </div>

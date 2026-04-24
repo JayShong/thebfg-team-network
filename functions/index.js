@@ -12,6 +12,7 @@ setGlobalOptions({ region: 'us-central1' });
 
 
 const NUM_SHARDS = 10;
+const NUM_BUSINESS_SHARDS = 10;
 
 /**
  * Helper to update the global stats document using sharding to prevent hotspots.
@@ -269,30 +270,34 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                 }
 
                 // C. UPDATE GLOBAL NETWORK TOTALS (Using Sharding to prevent hotspots)
+                // RULE: Only Check-ins and Reach (Families) are incremented instantly.
+                // Purchases and Quantified Impact wait for Merchant Verification.
                 const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
                 const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
+                
                 const globalBatch = {
                     checkins: txn.type === 'checkin' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
-                    purchases: txn.type === 'purchase' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
-                    totalWaste: admin.firestore.FieldValue.increment(txn.type === 'purchase' && stats.incrementalWaste ? stats.incrementalWaste : 0),
-                    totalTrees: admin.firestore.FieldValue.increment(txn.type === 'purchase' && stats.incrementalTrees ? stats.incrementalTrees : 0),
                     totalFamilies: isNewBiz && biz ? admin.firestore.FieldValue.increment(parseInt(biz.impactJobs) || 0) : admin.firestore.FieldValue.increment(0)
+                    // Note: 'purchases', 'totalWaste', and 'totalTrees' are moved to ontransactionupdated
                 };
                 
                 transaction.set(statsRef, stats);
                 transaction.set(shardRef, globalBatch, { merge: true });
 
                 // D. Tier & Badge Evaluation
-                const badgesToUnlock = evaluateBadges({ ...userDoc.data(), ...stats });
-                if (badgesToUnlock.length > 0) {
-                    const currentBadges = userDoc.data().badges || {};
-                    badgesToUnlock.forEach(bTitle => {
-                        const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
-                        if (bId && !currentBadges[bId]) {
-                            currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
-                        }
-                    });
-                    transaction.update(userRef, { badges: currentBadges });
+                // RULE: Only evaluate instantly for Check-ins. Purchases wait for verification.
+                if (txn.type === 'checkin') {
+                    const badgesToUnlock = evaluateBadges({ ...userDoc.data(), ...stats });
+                    if (badgesToUnlock.length > 0) {
+                        const currentBadges = userDoc.data().badges || {};
+                        badgesToUnlock.forEach(bTitle => {
+                            const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
+                            if (bId && !currentBadges[bId]) {
+                                currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
+                            }
+                        });
+                        transaction.update(userRef, { badges: currentBadges });
+                    }
                 }
             });
         }
@@ -309,18 +314,23 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // D. Update Business-specific stats
+        // D. Update Business-specific stats (Distributed Sharding)
+        const bizShardId = Math.floor(Math.random() * NUM_BUSINESS_SHARDS).toString();
+        const bizShardRef = db.collection('businesses').doc(txn.bizId).collection('shards').doc(bizShardId);
+        
+        const bizUpdate = {};
         if (txn.type === 'checkin') {
-            const bizRef = db.collection('businesses').doc(txn.bizId);
-            const bizUpdate = {};
             if (txn.isGhost) {
                 bizUpdate.ghostCheckinsCount = admin.firestore.FieldValue.increment(1);
             } else {
                 bizUpdate.checkinsCount = admin.firestore.FieldValue.increment(1);
             }
-            await bizRef.set(bizUpdate, { merge: true });
-            return runImpactAggregation();
         }
+        
+        if (Object.keys(bizUpdate).length > 0) {
+            await bizShardRef.set(bizUpdate, { merge: true });
+        }
+        
         return null;
     } catch (e) {
         console.error("Transaction processing failed:", e);
@@ -336,8 +346,84 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
 
         // Triggered only when a purchase is verified by a merchant
         if (before.status === 'pending' && after.status === 'verified') {
-            console.log(`Purchase verified for ${after.bizId}. Triggering recount.`);
-            return runImpactAggregation();
+            console.log(`Purchase verified for ${after.bizId}. Updating Verified Stats & Badges.`);
+            
+            const bizDoc = await db.collection('businesses').doc(after.bizId).get();
+            const biz = bizDoc.exists ? bizDoc.data() : null;
+            
+            // 1. Calculate the verified impact increment
+            let incWaste = 0;
+            let incTrees = 0;
+            
+            if (biz) {
+                let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                const assessments = Array.isArray(biz.yearlyAssessments) 
+                    ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
+
+                assessments.forEach(ya => {
+                    const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                    if (rev > latestRev) {
+                        latestRev = rev;
+                        latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                        latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                    }
+                });
+
+                if (latestRev > 0) {
+                    const proportion = (parseFloat(after.amount) || 0) / latestRev;
+                    incWaste = proportion * latestWaste;
+                    incTrees = proportion * latestTrees;
+                }
+            }
+
+            // 2. Update Global Shards (Securely increment only now)
+            const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
+            const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
+            
+            const globalUpdate = {
+                purchases: admin.firestore.FieldValue.increment(1),
+                totalWaste: admin.firestore.FieldValue.increment(incWaste),
+                totalTrees: admin.firestore.FieldValue.increment(incTrees)
+            };
+            await shardRef.set(globalUpdate, { merge: true });
+
+            // 2.1 Update Business-specific counters (Distributed Sharding - Verified only)
+            const bizShardId = Math.floor(Math.random() * NUM_BUSINESS_SHARDS).toString();
+            const bizShardRef = db.collection('businesses').doc(after.bizId).collection('shards').doc(bizShardId);
+            
+            const bizCounterUpdate = {
+                purchasesCount: admin.firestore.FieldValue.increment(1),
+                purchaseVolume: admin.firestore.FieldValue.increment(parseFloat(after.amount) || 0)
+            };
+            await bizShardRef.set(bizCounterUpdate, { merge: true });
+
+            // 3. Securely evaluate badges for the user
+            if (!after.isGhost) {
+                const userRef = db.collection('users').doc(after.userId);
+                const statsRef = db.collection('users').doc(after.userId).collection('counters').doc('summary');
+                
+                await db.runTransaction(async (transaction) => {
+                    const uSnap = await transaction.get(userRef);
+                    const sSnap = await transaction.get(statsRef);
+                    if (uSnap.exists && sSnap.exists) {
+                        const badgesToUnlock = evaluateBadges({ ...uSnap.data(), ...sSnap.data() });
+                        if (badgesToUnlock.length > 0) {
+                            const currentBadges = uSnap.data().badges || {};
+                            badgesToUnlock.forEach(bTitle => {
+                                const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
+                                if (bId && !currentBadges[bId]) {
+                                    currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
+                                }
+                            });
+                            transaction.update(userRef, { badges: currentBadges });
+                        }
+                    }
+                });
+            }
+
+            // 4. Final log
+            console.log(`Verified impact for ${after.bizId} successfully recorded via shards.`);
+            return null;
         }
     } catch (e) {
         console.error(`ERROR: ontransactionupdated failed for txn ${event.params.txnId}`, e);
@@ -433,7 +519,18 @@ exports.aggregatenetworkimpact = onDocumentCreated('businesses/{bizId}', async (
 });
 
 exports.onbusinessupdated = onDocumentUpdated('businesses/{bizId}', async (event) => {
-    return runImpactAggregation();
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    const formulaChanged = 
+        JSON.stringify(before.yearlyAssessments) !== JSON.stringify(after.yearlyAssessments) ||
+        before.impactJobs !== after.impactJobs;
+
+    if (formulaChanged) {
+        console.log(`Impact formula changed for ${after.id}. Triggering recount.`);
+        return runImpactAggregation();
+    }
+    return null;
 });
 
 async function runImpactAggregation() {

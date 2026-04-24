@@ -72,73 +72,7 @@ const Home = () => {
             
 
 
-            // 2. If Admin, perform live count & impact reconciliation
-            if (currentUser && (currentUser.isSuperAdmin || currentUser.email === 'jayshong@gmail.com')) {
-                console.log("REFRESH: Admin detected, performing FULL network reconciliation...");
-                
-                // Using .get() for compatibility with the v8/v9-compat SDK
-                const [userSnap, bizSnap, checkinSnap, purchaseSnap] = await Promise.all([
-                    db.collection('users').get(),
-                    db.collection('businesses').get(),
-                    db.collection('transactions').where('type', '==', 'checkin').get(),
-                    db.collection('transactions').where('type', '==', 'purchase').get()
-                ]);
-
-                console.log("REFRESH: Business Audit:", bizSnap.docs.map(d => ({ id: d.id, name: d.data().name || 'MISSING NAME' })));
-
-                // Calculate total family impact from business data
-                let totalFamilies = 0;
-                const bizMap = {};
-                bizSnap.forEach(doc => {
-                    const biz = doc.data();
-                    bizMap[doc.id] = biz;
-                    totalFamilies += (parseInt(biz.impactJobs) || 0);
-                });
-
-                // Sum up global waste & trees
-                let totalWaste = 0;
-                let totalTrees = 0;
-
-                purchaseSnap.forEach(doc => {
-                    const txn = doc.data();
-                    const biz = bizMap[txn.bizId];
-                    if (biz && biz.yearlyAssessments) {
-                        let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-                        const assessments = Array.isArray(biz.yearlyAssessments) 
-                            ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
-
-                        assessments.forEach(ya => {
-                            const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                            if (rev > latestRev) {
-                                latestRev = rev;
-                                latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                                latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
-                            }
-                        });
-
-                        if (latestRev > 0) {
-                            const proportion = (parseFloat(txn.amount) || 0) / latestRev;
-                            totalWaste += (proportion * latestWaste);
-                            totalTrees += (proportion * latestTrees);
-                        }
-                    }
-                });
-
-                currentStats = {
-                    ...currentStats,
-                    consumers: userSnap.size,
-                    businesses: bizSnap.size,
-                    checkins: checkinSnap.size,
-                    purchases: purchaseSnap.size,
-                    totalWaste: parseFloat(totalWaste.toFixed(2)),
-                    totalTrees: Math.round(totalTrees),
-                    totalFamilies: totalFamilies
-                };
-                
-                console.log("REFRESH: Reconciliation complete. Saving to server...", currentStats);
-                await db.collection('system').doc('stats').set(currentStats, { merge: true });
-            }
-
+            // 2. Finalize dashboard state
             setStats(currentStats);
             localStorage.setItem('bfg_global_stats', JSON.stringify(currentStats));
 

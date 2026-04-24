@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
         return gid;
     });
     const [recentActivity, setRecentActivity] = useState([]);
+    const [localActivities, setLocalActivities] = useState([]);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
     const fetchPendingAudits = async (user) => {
@@ -64,6 +65,15 @@ export const AuthProvider = ({ children }) => {
         } catch (e) {
             console.error("Failed to pull newsreel activity:", e);
         }
+    };
+
+    const addLocalActivity = (text) => {
+        setLocalActivities(prev => [{
+            id: `local-${Date.now()}`,
+            text,
+            type: 'activity',
+            timestamp: new Date()
+        }, ...prev].slice(0, 5)); // Keep only last 5 local activities
     };
 
     useEffect(() => {
@@ -212,6 +222,8 @@ export const AuthProvider = ({ children }) => {
         isGuest,
         ghostId,
         recentActivity,
+        localActivities,
+        addLocalActivity,
         pendingApprovalCount,
         fetchRecentActivity,
         login,

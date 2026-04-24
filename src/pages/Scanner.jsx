@@ -8,7 +8,7 @@ import firebase from 'firebase/compat/app';
 
 const Scanner = () => {
     const navigate = useNavigate();
-    const { currentUser, ghostId } = useAuth();
+    const { currentUser, ghostId, addLocalActivity } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
     const [error, setError] = useState('');
     const [scanning, setScanning] = useState(true);
@@ -273,6 +273,12 @@ const Scanner = () => {
             updateLocalStats('checkin');
             setScannedBusiness(null);
             
+            // Inject local activity for instant newsreel feedback
+            addLocalActivity(currentUser?.nickname || currentUser?.name 
+                ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${scannedBusiness.name}`
+                : `📍 A guest checked-in at ${scannedBusiness.name}`
+            );
+            
             const { evaluateBadges } = await import('../utils/badgeEngine');
             await evaluateBadges(currentUser);
         } catch(e) {
@@ -288,46 +294,64 @@ const Scanner = () => {
     const [receiptId, setReceiptId] = useState('');
 
     const submitPurchase = async () => {
-        if (!currentUser || !amount || isSubmitting) return;
+        // Now allows either currentUser OR ghostId (Guest Mode)
+        const activeUserId = currentUser?.uid || ghostId;
+        if (!activeUserId || !amount || !receiptId || isSubmitting) {
+            if (!amount) alert("Please enter the amount.");
+            else if (!receiptId) alert("Receipt ID / Bill Number is mandatory for verification.");
+            return;
+        }
+
         const finalAmount = parseFloat(amount);
         setIsSubmitting(true);
         
         if (isNaN(finalAmount) || finalAmount <= 0) {
             alert("Please enter a valid amount.");
+            setIsSubmitting(false);
             return;
         }
 
-        // Global Cooldown Check (5 mins)
-        // Note: Check-ins have NO global cooldown, but purchases/logs do.
-        // Actually the user said "A user cannot log any activity (check-in or purchase) more than once every 5 minutes."
-        // BUT then they said "There are no time restrictions to check-ins, as long as it's a different merchant."
-        // So I'll apply the 5-min cooldown to PURCHASES only, to prevent spamming the merchant queue.
-
         try {
+            const isGhost = !currentUser;
+            
             await db.collection('transactions').add({
                 type: 'purchase',
                 bizId: scannedBusiness.id,
                 bizName: scannedBusiness.name,
                 bizIndustry: scannedBusiness.industry || 'Unknown',
                 bizLocation: scannedBusiness.location || 'Unknown',
-                userId: currentUser.uid,
-                userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                userId: activeUserId,
+                userNickname: currentUser ? (currentUser.nickname || currentUser.name || 'Explorer') : 'Guest Supporter',
+                isGhost: isGhost,
                 amount: finalAmount,
-                receiptId: receiptId || 'N/A',
+                receiptId: receiptId, // Mandatory
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 status: 'pending'
             });
 
             setIsSuccess(true);
-            setSuccessMsg("Your purchase has been recorded! Awaiting merchant verification.");
+            setSuccessMsg(isGhost 
+                ? "Your guest purchase has been recorded! Thank you for supporting the Empathy Economy. (Impact verified upon merchant approval)"
+                : "Your purchase has been recorded! Global impact and badges will be updated once the merchant verifies your receipt."
+            );
+            
             updateLocalStats('purchase', finalAmount);
             setScannedBusiness(null);
+            
+            // Inject local activity for instant newsreel feedback
+            addLocalActivity(currentUser?.nickname || currentUser?.name 
+                ? `💳 ${currentUser.nickname || currentUser.name} supported ${scannedBusiness.name}`
+                : `💳 A guest supported ${scannedBusiness.name}`
+            );
             setPurchaseForm(false);
             setAmount('');
             setReceiptId('');
             
-            const { evaluateBadges } = await import('../utils/badgeEngine');
-            await evaluateBadges(currentUser);
+            // Only evaluate badges for registered users
+            if (currentUser) {
+                const { evaluateBadges } = await import('../utils/badgeEngine');
+                await evaluateBadges(currentUser);
+            }
         } catch(e) {
             console.error(e);
             alert("Failed to log purchase.");
@@ -452,10 +476,11 @@ const Scanner = () => {
                                         value={amount} 
                                         onChange={(e) => setAmount(e.target.value)} 
                                         style={{ width: '100%', marginBottom: '1rem' }}
+                                        required
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Receipt / Bill ID (Optional)</label>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Receipt / Bill ID</label>
                                     <input 
                                         type="text" 
                                         className="input-modern" 
@@ -463,6 +488,7 @@ const Scanner = () => {
                                         value={receiptId} 
                                         onChange={(e) => setReceiptId(e.target.value)} 
                                         style={{ width: '100%', marginBottom: '1.5rem' }}
+                                        required
                                     />
                                 </div>
                                 <button onClick={submitPurchase} disabled={isSubmitting} className="btn btn-success" style={{ width: '100%' }}>
