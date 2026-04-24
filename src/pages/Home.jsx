@@ -50,31 +50,84 @@ const Home = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
+
     const refreshDashboard = async () => {
         setIsSyncing(true);
+        console.log("REFRESH: Fetching dashboard data...");
         try {
             // 1. Fetch Global Stats
             const statsDoc = await db.collection('system').doc('stats').get();
-            let currentStats = statsDoc.exists ? statsDoc.data() : { ...stats };
+            const serverGlobalStats = statsDoc.exists ? statsDoc.data() : {};
+            console.log("REFRESH: Global data received:", serverGlobalStats);
+
+            // Merge server data with local defaults to prevent wiping out counters
+            let currentStats = { ...stats, ...serverGlobalStats };
             
-            // 2. If Admin, perform live count check
-            if (currentUser && currentUser.isSuperAdmin) {
-                const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap] = await Promise.all([
+
+            // 2. If Admin, perform live count & impact reconciliation
+            if (currentUser && (currentUser.isSuperAdmin || currentUser.email === 'jayshong@gmail.com')) {
+                console.log("REFRESH: Admin detected, performing FULL network reconciliation...");
+                const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap, allBizSnap] = await Promise.all([
                     db.collection('users').count().get(),
                     db.collection('businesses').count().get(),
                     db.collection('transactions').where('type', '==', 'checkin').count().get(),
-                    db.collection('transactions').where('type', '==', 'purchase').count().get()
+                    db.collection('transactions').where('type', '==', 'purchase').count().get(),
+                    db.collection('businesses').get()
                 ]);
+
+                // Calculate total family impact from business data
+                let totalFamilies = 0;
+                allBizSnap.forEach(doc => {
+                    const biz = doc.data();
+                    totalFamilies += (parseInt(biz.impactJobs) || 0);
+                });
+
+                // Sum up global waste & trees (O(N) for admin reconciliation ONLY)
+                const transSnap = await db.collection('transactions').where('type', '==', 'purchase').get();
+                let totalWaste = 0;
+                let totalTrees = 0;
+
+                // For efficiency during admin sync, we fetch the businesses once
+                const bizMap = {};
+                allBizSnap.forEach(doc => { bizMap[doc.id] = doc.data(); });
+
+                transSnap.forEach(doc => {
+                    const txn = doc.data();
+                    const biz = bizMap[txn.bizId];
+                    if (biz && biz.yearlyAssessments) {
+                        let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                        const assessments = Array.isArray(biz.yearlyAssessments) 
+                            ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
+
+                        assessments.forEach(ya => {
+                            const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                            if (rev > latestRev) {
+                                latestRev = rev;
+                                latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                                latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                            }
+                        });
+
+                        if (latestRev > 0) {
+                            const proportion = (parseFloat(txn.amount) || 0) / latestRev;
+                            totalWaste += (proportion * latestWaste);
+                            totalTrees += (proportion * latestTrees);
+                        }
+                    }
+                });
 
                 currentStats = {
                     ...currentStats,
                     consumers: userCountSnap.data().count,
                     businesses: bizCountSnap.data().count,
                     checkins: checkinCountSnap.data().count,
-                    purchases: purchaseCountSnap.data().count
+                    purchases: purchaseCountSnap.data().count,
+                    totalWaste: parseFloat(totalWaste.toFixed(2)),
+                    totalTrees: Math.round(totalTrees),
+                    totalFamilies: totalFamilies
                 };
                 
-                // Update server's cached stats if admin refreshes
+                console.log("REFRESH: Reconciliation complete. Saving to server...", currentStats);
                 await db.collection('system').doc('stats').set(currentStats, { merge: true });
             }
 
@@ -91,6 +144,7 @@ const Home = () => {
 
                 if (summaryDoc.exists) {
                     const s = summaryDoc.data();
+                    console.log("REFRESH: Personal summary found:", s);
                     const pStats = { 
                         checkins: s.totalCheckins || 0, 
                         purchases: s.totalPurchases || 0 
@@ -108,10 +162,12 @@ const Home = () => {
                         quantifiedImpact: qImpact,
                         lastUpdated: new Date().toISOString()
                     }));
+                } else {
+                    console.warn("REFRESH: Personal summary doc is missing for UID:", currentUser.uid);
                 }
             }
         } catch (error) {
-            console.error("Refresh failed:", error);
+            console.error("REFRESH: Dashboard refresh failed:", error);
         } finally {
             setIsSyncing(false);
             setIsLoading(false);

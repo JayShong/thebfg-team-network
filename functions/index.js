@@ -10,6 +10,7 @@ const db = admin.firestore();
 // Set global options to use us-central1 (or your preferred region)
 setGlobalOptions({ region: 'us-central1' });
 
+
 /**
  * Helper to update the global stats document
  */
@@ -19,6 +20,86 @@ async function updateGlobalStat(field, amount) {
         [field]: admin.firestore.FieldValue.increment(amount)
     }, { merge: true });
 }
+
+/**
+ * SELF-HEALING: Automated Reconciliation
+ * Runs every 30 mins for counts, and every 6 hours for deep impact sum.
+ */
+exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => {
+
+    console.log("CRON: Starting automated network reconciliation...");
+    const now = new Date();
+    const isDeepReconcile = (now.getDay() === 0 && now.getHours() === 3 && now.getMinutes() < 30);
+
+    try {
+        const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap] = await Promise.all([
+            db.collection('users').count().get(),
+            db.collection('businesses').count().get(),
+            db.collection('transactions').where('type', '==', 'checkin').count().get(),
+            db.collection('transactions').where('type', '==', 'purchase').count().get()
+        ]);
+
+        const updates = {
+            consumers: userCountSnap.data().count,
+            businesses: bizCountSnap.data().count,
+            checkins: checkinCountSnap.data().count,
+            purchases: purchaseCountSnap.data().count,
+            lastAutoReconcile: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (isDeepReconcile) {
+            console.log("CRON: Performing deep impact reconciliation...");
+            const [allBizSnap, transSnap] = await Promise.all([
+                db.collection('businesses').get(),
+                db.collection('transactions').where('type', '==', 'purchase').get()
+            ]);
+
+            let totalFamilies = 0;
+            const bizMap = {};
+            allBizSnap.forEach(doc => { 
+                const b = doc.data();
+                bizMap[doc.id] = b;
+                totalFamilies += (parseInt(b.impactJobs) || 0);
+            });
+
+            let totalWaste = 0;
+            let totalTrees = 0;
+            transSnap.forEach(doc => {
+                const txn = doc.data();
+                const biz = bizMap[txn.bizId];
+                if (biz && biz.yearlyAssessments) {
+                    let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
+                    const assessments = Array.isArray(biz.yearlyAssessments) 
+                        ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments);
+
+                    assessments.forEach(ya => {
+                        const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
+                        if (rev > latestRev) {
+                            latestRev = rev;
+                            latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
+                            latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
+                        }
+                    });
+
+                    if (latestRev > 0) {
+                        const proportion = (parseFloat(txn.amount) || 0) / latestRev;
+                        totalWaste += (proportion * latestWaste);
+                        totalTrees += (proportion * latestTrees);
+                    }
+                }
+            });
+
+            updates.totalWaste = parseFloat(totalWaste.toFixed(2));
+            updates.totalTrees = Math.round(totalTrees);
+            updates.totalFamilies = totalFamilies;
+        }
+
+        await db.collection('system').doc('stats').set(updates, { merge: true });
+        console.log("CRON: Reconciliation successful.");
+    } catch (e) {
+        console.error("CRON: Reconciliation failed", e);
+    }
+});
 
 // 1. User Triggers
 exports.onusercreated = onDocumentCreated('users/{userId}', async (event) => {
@@ -134,7 +215,10 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                         if (latestRev > 0) {
                             const proportion = (parseFloat(txn.amount) || 0) / latestRev;
                             stats.totalWaste += (proportion * latestWaste);
-                            stats.totalTrees += (proportion * latestTrees);
+                            stats.incrementalWaste = (proportion * latestWaste);
+                            stats.incrementalTrees = (proportion * latestTrees);
+                            stats.totalWaste += stats.incrementalWaste;
+                            stats.totalTrees += stats.incrementalTrees;
                         }
                     }
                 }
@@ -149,20 +233,41 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                     
                     stats.bizVisits = stats.bizVisits || {};
                     stats.bizVisits[txn.bizId] = (stats.bizVisits[txn.bizId] || 0) + 1;
-                }
-                if (txn.bizLocation) {
-                    stats.uniqueLocations = stats.uniqueLocations || {};
-                    stats.uniqueLocations[txn.bizLocation] = true;
-                }
-                if (txn.bizIndustry) {
-                    stats.uniqueIndustries = stats.uniqueIndustries || {};
-                    stats.uniqueIndustries[txn.bizIndustry] = true;
+                    
+                    if (txn.bizLocation) {
+                        stats.uniqueLocations = stats.uniqueLocations || {};
+                        stats.uniqueLocations[txn.bizLocation] = true;
+                    }
+                    if (txn.bizIndustry) {
+                        stats.uniqueIndustries = stats.uniqueIndustries || {};
+                        stats.uniqueIndustries[txn.bizIndustry] = true;
+                    }
                 }
 
-                transaction.set(statsRef, stats, { merge: true });
+                // C. UPDATE GLOBAL NETWORK TOTALS
+                const globalBatch = {
+                    checkins: txn.type === 'checkin' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
+                    purchases: txn.type === 'purchase' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
+                    totalWaste: admin.firestore.FieldValue.increment(txn.type === 'purchase' && stats.incrementalWaste ? stats.incrementalWaste : 0),
+                    totalTrees: admin.firestore.FieldValue.increment(txn.type === 'purchase' && stats.incrementalTrees ? stats.incrementalTrees : 0),
+                    totalFamilies: isNewBiz && biz ? admin.firestore.FieldValue.increment(parseInt(biz.impactJobs) || 0) : admin.firestore.FieldValue.increment(0)
+                };
                 
-                // Evaluate Badges using current transaction and updated stats
-                await evaluateBadges(txn, stats, userDoc);
+                transaction.set(statsRef, stats);
+                transaction.set(db.collection('system').doc('stats'), globalBatch, { merge: true });
+
+                // D. Tier & Badge Evaluation
+                const badgesToUnlock = evaluateBadges({ ...userDoc.data(), ...stats });
+                if (badgesToUnlock.length > 0) {
+                    const currentBadges = userDoc.data().badges || {};
+                    badgesToUnlock.forEach(bTitle => {
+                        const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
+                        if (bId && !currentBadges[bId]) {
+                            currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
+                        }
+                    });
+                    transaction.update(userRef, { badges: currentBadges });
+                }
             });
         }
 
