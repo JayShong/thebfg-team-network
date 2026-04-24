@@ -128,23 +128,24 @@ const Scanner = () => {
         // 1. Update Personal Stats
         const personalSaved = localStorage.getItem('bfg_personal_stats');
         let pStats = personalSaved ? JSON.parse(personalSaved) : {
-            personalStats: { checkins: 0, purchases: 0 },
-            quantifiedImpact: { waste: 0, trees: 0, families: 0 },
-            uniqueBizIds: {}
+            totalCheckins: 0, totalPurchases: 0, totalWaste: 0, totalTrees: 0, totalFamilies: 0,
+            uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {}
         };
-
+        
+        // Ensure structure exists for legacy data
+        if (!pStats.uniqueBizIds) pStats.uniqueBizIds = {};
+        
         if (scannedBusiness) {
-            const isNewBiz = !pStats.uniqueBizIds?.[scannedBusiness.id];
+            const isNewBiz = !pStats.uniqueBizIds[scannedBusiness.id];
             if (isNewBiz) {
-                pStats.uniqueBizIds = pStats.uniqueBizIds || {};
                 pStats.uniqueBizIds[scannedBusiness.id] = true;
-                pStats.quantifiedImpact.families = (pStats.quantifiedImpact.families || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
+                pStats.totalFamilies = (pStats.totalFamilies || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
             }
-
+            
             if (type === 'checkin') {
-                pStats.personalStats.checkins++;
+                pStats.totalCheckins = (pStats.totalCheckins || 0) + 1;
             } else if (type === 'purchase') {
-                pStats.personalStats.purchases++;
+                pStats.totalPurchases = (pStats.totalPurchases || 0) + 1;
                 
                 // Calculate incremental impact if business data is available
                 if (scannedBusiness.yearlyAssessments) {
@@ -162,11 +163,20 @@ const Scanner = () => {
                     });
 
                     if (latestRev > 0) {
-                        const proportion = amount / latestRev;
-                        pStats.quantifiedImpact.waste = (pStats.quantifiedImpact.waste || 0) + (proportion * latestWaste);
-                        pStats.quantifiedImpact.trees = (pStats.quantifiedImpact.trees || 0) + (proportion * latestTrees);
+                        const proportion = (parseFloat(amount) || 0) / latestRev;
+                        pStats.totalWaste = (pStats.totalWaste || 0) + (proportion * latestWaste);
+                        pStats.totalTrees = (pStats.totalTrees || 0) + (proportion * latestTrees);
                     }
                 }
+            }
+
+            if (scannedBusiness.location) {
+                pStats.uniqueLocations = pStats.uniqueLocations || {};
+                pStats.uniqueLocations[scannedBusiness.location] = true;
+            }
+            if (scannedBusiness.industry) {
+                pStats.uniqueIndustries = pStats.uniqueIndustries || {};
+                pStats.uniqueIndustries[scannedBusiness.industry] = true;
             }
         }
         localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));

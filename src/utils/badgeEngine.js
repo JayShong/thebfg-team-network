@@ -8,7 +8,7 @@ const BADGES_CONFIG = [
     // Seen (Visibility)
     { 
         id: 'seen_first_step', title: 'The First Step', category: 'Seen', 
-        condition: (u, stats) => (stats.personalStats.checkins || 0) + (stats.personalStats.purchases || 0) >= 1 
+        condition: (u, stats) => (stats.totalCheckins || 0) + (stats.totalPurchases || 0) >= 1 
     },
     { 
         id: 'seen_explorer', title: 'The Explorer', category: 'Seen', 
@@ -43,13 +43,13 @@ const BADGES_CONFIG = [
     // Verified (Verification)
     { 
         id: 'verified_zero_waste', title: 'Zero Waste Partner', category: 'Verified', 
-        condition: (u, stats) => (stats.personalStats.checkins || 0) >= 5 
+        condition: (u, stats) => (stats.totalCheckins || 0) >= 5 
     },
     
     // Valued (Appreciation)
     { 
         id: 'valued_consummate', title: 'Consummate Supporter', category: 'Valued', 
-        condition: (u, stats) => (stats.personalStats.purchases || 0) >= 10 
+        condition: (u, stats) => (stats.totalPurchases || 0) >= 10 
     },
     { 
         id: 'valued_local_legend', title: 'Local Legend', category: 'Valued', 

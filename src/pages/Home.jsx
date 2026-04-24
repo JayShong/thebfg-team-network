@@ -30,7 +30,11 @@ const Home = () => {
             const saved = localStorage.getItem('bfg_personal_stats');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                return parsed.quantifiedImpact || { waste: 0, trees: 0, families: 0 };
+                return {
+                    waste: parsed.totalWaste || 0,
+                    trees: parsed.totalTrees || 0,
+                    families: parsed.totalFamilies || 0
+                };
             }
         } catch (e) { console.warn("Personal impact cache corrupt"); }
         return { waste: 0, trees: 0, families: 0 };
@@ -41,7 +45,10 @@ const Home = () => {
             const saved = localStorage.getItem('bfg_personal_stats');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                return parsed.personalStats || { checkins: 0, purchases: 0 };
+                return {
+                    checkins: parsed.totalCheckins || 0,
+                    purchases: parsed.totalPurchases || 0
+                };
             }
         } catch (e) { console.warn("Personal stats cache corrupt"); }
         return { checkins: 0, purchases: 0 };
@@ -64,34 +71,35 @@ const Home = () => {
             let currentStats = { ...stats, ...serverGlobalStats };
             
 
+
             // 2. If Admin, perform live count & impact reconciliation
             if (currentUser && (currentUser.isSuperAdmin || currentUser.email === 'jayshong@gmail.com')) {
                 console.log("REFRESH: Admin detected, performing FULL network reconciliation...");
-                const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap, allBizSnap] = await Promise.all([
-                    db.collection('users').count().get(),
-                    db.collection('businesses').count().get(),
-                    db.collection('transactions').where('type', '==', 'checkin').count().get(),
-                    db.collection('transactions').where('type', '==', 'purchase').count().get(),
-                    db.collection('businesses').get()
+                
+                // Using .get() for compatibility with the v8/v9-compat SDK
+                const [userSnap, bizSnap, checkinSnap, purchaseSnap] = await Promise.all([
+                    db.collection('users').get(),
+                    db.collection('businesses').get(),
+                    db.collection('transactions').where('type', '==', 'checkin').get(),
+                    db.collection('transactions').where('type', '==', 'purchase').get()
                 ]);
+
+                console.log("REFRESH: Business Audit:", bizSnap.docs.map(d => ({ id: d.id, name: d.data().name || 'MISSING NAME' })));
 
                 // Calculate total family impact from business data
                 let totalFamilies = 0;
-                allBizSnap.forEach(doc => {
+                const bizMap = {};
+                bizSnap.forEach(doc => {
                     const biz = doc.data();
+                    bizMap[doc.id] = biz;
                     totalFamilies += (parseInt(biz.impactJobs) || 0);
                 });
 
-                // Sum up global waste & trees (O(N) for admin reconciliation ONLY)
-                const transSnap = await db.collection('transactions').where('type', '==', 'purchase').get();
+                // Sum up global waste & trees
                 let totalWaste = 0;
                 let totalTrees = 0;
 
-                // For efficiency during admin sync, we fetch the businesses once
-                const bizMap = {};
-                allBizSnap.forEach(doc => { bizMap[doc.id] = doc.data(); });
-
-                transSnap.forEach(doc => {
+                purchaseSnap.forEach(doc => {
                     const txn = doc.data();
                     const biz = bizMap[txn.bizId];
                     if (biz && biz.yearlyAssessments) {
@@ -118,10 +126,10 @@ const Home = () => {
 
                 currentStats = {
                     ...currentStats,
-                    consumers: userCountSnap.data().count,
-                    businesses: bizCountSnap.data().count,
-                    checkins: checkinCountSnap.data().count,
-                    purchases: purchaseCountSnap.data().count,
+                    consumers: userSnap.size,
+                    businesses: bizSnap.size,
+                    checkins: checkinSnap.size,
+                    purchases: purchaseSnap.size,
                     totalWaste: parseFloat(totalWaste.toFixed(2)),
                     totalTrees: Math.round(totalTrees),
                     totalFamilies: totalFamilies
@@ -145,23 +153,30 @@ const Home = () => {
                 if (summaryDoc.exists) {
                     const s = summaryDoc.data();
                     console.log("REFRESH: Personal summary found:", s);
-                    const pStats = { 
-                        checkins: s.totalCheckins || 0, 
-                        purchases: s.totalPurchases || 0 
-                    };
-                    const qImpact = {
-                        waste: s.totalWaste % 1 !== 0 ? parseFloat(s.totalWaste.toFixed(2)) : (s.totalWaste || 0),
-                        trees: Math.round(s.totalTrees || 0),
-                        families: s.totalFamilies || 0
+                    
+                    const pStats = {
+                        totalCheckins: s.totalCheckins || 0,
+                        totalPurchases: s.totalPurchases || 0,
+                        totalWaste: s.totalWaste || 0,
+                        totalTrees: s.totalTrees || 0,
+                        totalFamilies: s.totalFamilies || 0,
+                        uniqueBizIds: s.uniqueBizIds || {},
+                        uniqueLocations: s.uniqueLocations || {},
+                        uniqueIndustries: s.uniqueIndustries || {},
+                        lastSynced: new Date().toISOString()
                     };
 
-                    setPersonalStats(pStats);
-                    setQuantifiedImpact(qImpact);
-                    localStorage.setItem('bfg_personal_stats', JSON.stringify({
-                        personalStats: pStats,
-                        quantifiedImpact: qImpact,
-                        lastUpdated: new Date().toISOString()
-                    }));
+                    setPersonalStats({
+                        checkins: pStats.totalCheckins,
+                        purchases: pStats.totalPurchases
+                    });
+                    setQuantifiedImpact({
+                        waste: pStats.totalWaste % 1 !== 0 ? parseFloat(pStats.totalWaste.toFixed(2)) : pStats.totalWaste,
+                        trees: Math.round(pStats.totalTrees),
+                        families: pStats.totalFamilies
+                    });
+                    
+                    localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
                 } else {
                     console.warn("REFRESH: Personal summary doc is missing for UID:", currentUser.uid);
                 }

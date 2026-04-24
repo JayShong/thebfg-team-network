@@ -37,8 +37,9 @@ export const AuthProvider = ({ children }) => {
                 query = query.where('supervisorEmail', '==', activeUser.email);
             }
 
-            const snapshot = await query.count().get();
-            setPendingApprovalCount(snapshot.data().count);
+
+            const snapshot = await query.get();
+            setPendingApprovalCount(snapshot.size);
         } catch (e) {
             console.error("Failed to pull pending audits:", e);
         }
@@ -106,6 +107,34 @@ export const AuthProvider = ({ children }) => {
                 // Admin/Merchant Assistant UI Access
                 // Removed: isSuperAdmin leak for Merchant Assistants. 
                 // Each portal is now strictly partitioned by specific role flags.
+
+                // 4. SYNC STATS: Populate localStorage from pre-calculated Firestore summary
+                try {
+                    const summaryDoc = await db.collection('users')
+                        .doc(user.uid)
+                        .collection('counters')
+                        .doc('summary')
+                        .get();
+
+                    if (summaryDoc.exists) {
+                        const s = summaryDoc.data();
+                        const pStats = {
+                            totalCheckins: s.totalCheckins || 0,
+                            totalPurchases: s.totalPurchases || 0,
+                            totalWaste: s.totalWaste || 0,
+                            totalTrees: s.totalTrees || 0,
+                            totalFamilies: s.totalFamilies || 0,
+                            uniqueBizIds: s.uniqueBizIds || {},
+                            uniqueLocations: s.uniqueLocations || {},
+                            uniqueIndustries: s.uniqueIndustries || {},
+                            lastSynced: new Date().toISOString()
+                        };
+                        localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+                        console.log("AUTH: Stats synced from Firestore summary.");
+                    }
+                } catch (e) {
+                    console.error("AUTH: Stats sync failed", e);
+                }
 
                 setCurrentUser(profile);
                 fetchRecentActivity(); // This now calls fetchPendingAudits as well

@@ -11,12 +11,15 @@ const db = admin.firestore();
 setGlobalOptions({ region: 'us-central1' });
 
 
+const NUM_SHARDS = 10;
+
 /**
- * Helper to update the global stats document
+ * Helper to update the global stats document using sharding to prevent hotspots.
  */
 async function updateGlobalStat(field, amount) {
-    const statsRef = db.collection('system').doc('stats');
-    return statsRef.set({
+    const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
+    const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
+    return shardRef.set({
         [field]: admin.firestore.FieldValue.increment(amount)
     }, { merge: true });
 }
@@ -32,13 +35,16 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
     const isDeepReconcile = (now.getDay() === 0 && now.getHours() === 3 && now.getMinutes() < 30);
 
     try {
-        const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap] = await Promise.all([
+        const [userCountSnap, bizCountSnap, checkinCountSnap, purchaseCountSnap, shardsSnap, mainDocSnap] = await Promise.all([
             db.collection('users').count().get(),
             db.collection('businesses').count().get(),
             db.collection('transactions').where('type', '==', 'checkin').count().get(),
-            db.collection('transactions').where('type', '==', 'purchase').count().get()
+            db.collection('transactions').where('type', '==', 'purchase').count().get(),
+            db.collection('system').doc('stats').collection('shards').get(),
+            db.collection('system').doc('stats').get()
         ]);
 
+        const mainStats = mainDocSnap.exists ? mainDocSnap.data() : {};
         const updates = {
             consumers: userCountSnap.data().count,
             businesses: bizCountSnap.data().count,
@@ -47,11 +53,28 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             lastAutoReconcile: admin.firestore.FieldValue.serverTimestamp()
         };
 
+        // 1. Sum up and CLEAR sharded increments
+        let shardWaste = 0;
+        let shardTrees = 0;
+        const batch = db.batch();
+        
+        shardsSnap.forEach(doc => {
+            const data = doc.data();
+            shardWaste += (data.totalWaste || 0);
+            shardTrees += (data.totalTrees || 0);
+            // Clear shard after reading
+            batch.delete(doc.ref);
+        });
+
+        // Add shard deltas to main stats
+        updates.totalWaste = (mainStats.totalWaste || 0) + shardWaste;
+        updates.totalTrees = (mainStats.totalTrees || 0) + shardTrees;
+
         if (isDeepReconcile) {
             console.log("CRON: Performing deep impact reconciliation...");
             const [allBizSnap, transSnap] = await Promise.all([
                 db.collection('businesses').get(),
-                db.collection('transactions').where('type', '==', 'purchase').get()
+                db.collection('transactions').where('type', '==', 'purchase').where('status', '==', 'verified').get()
             ]);
 
             let totalFamilies = 0;
@@ -94,8 +117,9 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             updates.totalFamilies = totalFamilies;
         }
 
-        await db.collection('system').doc('stats').set(updates, { merge: true });
-        console.log("CRON: Reconciliation successful.");
+        batch.set(db.collection('system').doc('stats'), updates, { merge: true });
+        await batch.commit();
+        console.log("CRON: Reconciliation successful. Shards cleared.");
     } catch (e) {
         console.error("CRON: Reconciliation failed", e);
     }
@@ -212,14 +236,14 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                             }
                         });
 
-                        if (latestRev > 0) {
-                            const proportion = (parseFloat(txn.amount) || 0) / latestRev;
-                            stats.totalWaste += (proportion * latestWaste);
-                            stats.incrementalWaste = (proportion * latestWaste);
-                            stats.incrementalTrees = (proportion * latestTrees);
-                            stats.totalWaste += stats.incrementalWaste;
-                            stats.totalTrees += stats.incrementalTrees;
-                        }
+                    if (latestRev > 0) {
+                        const proportion = (parseFloat(txn.amount) || 0) / latestRev;
+                        stats.incrementalWaste = proportion * latestWaste;
+                        stats.incrementalTrees = proportion * latestTrees;
+                        
+                        stats.totalWaste = (stats.totalWaste || 0) + stats.incrementalWaste;
+                        stats.totalTrees = (stats.totalTrees || 0) + stats.incrementalTrees;
+                    }
                     }
                 }
                 
@@ -244,7 +268,9 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                     }
                 }
 
-                // C. UPDATE GLOBAL NETWORK TOTALS
+                // C. UPDATE GLOBAL NETWORK TOTALS (Using Sharding to prevent hotspots)
+                const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
+                const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
                 const globalBatch = {
                     checkins: txn.type === 'checkin' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
                     purchases: txn.type === 'purchase' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
@@ -254,7 +280,7 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                 };
                 
                 transaction.set(statsRef, stats);
-                transaction.set(db.collection('system').doc('stats'), globalBatch, { merge: true });
+                transaction.set(shardRef, globalBatch, { merge: true });
 
                 // D. Tier & Badge Evaluation
                 const badgesToUnlock = evaluateBadges({ ...userDoc.data(), ...stats });
@@ -433,7 +459,9 @@ async function runImpactAggregation() {
 
         // 2. Fetch Business Data for Impact Proportions
         // We still fetch business docs as they contain the 'yearlyAssessments' formulas
-        const bizSnap = await db.collection('businesses').get();
+        const bizSnap = await db.collection('businesses')
+            .select('impactJobs', 'yearlyAssessments', 'name')
+            .get();
         
         // At scale, we fetch biz-specific volumes via aggregation or synced counters
         // For the Alpha/Beta phase, we'll use the purchase transactions to build the map
