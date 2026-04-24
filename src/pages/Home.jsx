@@ -6,10 +6,19 @@ import { PLATFORM_CONFIG } from '../config/platformConfig';
 const Home = () => {
     const { currentUser } = useAuth();
 
-    // Initialize states from localStorage if available
+
+    // Initialize states from localStorage with robust fallbacks
     const [stats, setStats] = useState(() => {
-        const saved = localStorage.getItem('bfg_global_stats');
-        return saved ? JSON.parse(saved) : {
+        try {
+            const saved = localStorage.getItem('bfg_global_stats');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && typeof parsed === 'object' && parsed.consumers !== undefined) {
+                    return parsed;
+                }
+            }
+        } catch (e) { console.warn("Global stats cache corrupt"); }
+        return {
             consumers: 0, businesses: 0, checkins: 0, ghostCheckins: 0,
             purchases: 0, purchaseVolume: 0, totalWaste: 0, totalTrees: 0,
             totalFamilies: 0, gdpPenetration: "0.01%"
@@ -17,17 +26,29 @@ const Home = () => {
     });
 
     const [quantifiedImpact, setQuantifiedImpact] = useState(() => {
-        const saved = localStorage.getItem('bfg_personal_stats');
-        return saved ? JSON.parse(saved).quantifiedImpact : { waste: 0, trees: 0, families: 0 };
+        try {
+            const saved = localStorage.getItem('bfg_personal_stats');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return parsed.quantifiedImpact || { waste: 0, trees: 0, families: 0 };
+            }
+        } catch (e) { console.warn("Personal impact cache corrupt"); }
+        return { waste: 0, trees: 0, families: 0 };
     });
 
     const [personalStats, setPersonalStats] = useState(() => {
-        const saved = localStorage.getItem('bfg_personal_stats');
-        return saved ? JSON.parse(saved).personalStats : { checkins: 0, purchases: 0 };
+        try {
+            const saved = localStorage.getItem('bfg_personal_stats');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return parsed.personalStats || { checkins: 0, purchases: 0 };
+            }
+        } catch (e) { console.warn("Personal stats cache corrupt"); }
+        return { checkins: 0, purchases: 0 };
     });
 
     const [isSyncing, setIsSyncing] = useState(false);
-    const [isLoading, setIsLoading] = useState(!localStorage.getItem('bfg_global_stats'));
+    const [isLoading, setIsLoading] = useState(true);
 
     const refreshDashboard = async () => {
         setIsSyncing(true);
@@ -89,7 +110,6 @@ const Home = () => {
                     }));
                 }
             }
-            console.log("Dashboard refreshed successfully.");
         } catch (error) {
             console.error("Refresh failed:", error);
         } finally {
@@ -99,8 +119,8 @@ const Home = () => {
     };
 
     useEffect(() => {
-        // Initial load only if local storage is empty
-        if (!localStorage.getItem('bfg_global_stats')) {
+        // Trigger refresh if local storage is missing OR global stats are effectively zero
+        if (!localStorage.getItem('bfg_global_stats') || stats.consumers === 0) {
             refreshDashboard();
         } else {
             setIsLoading(false);
@@ -117,23 +137,31 @@ const Home = () => {
                     <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Conviction Network impact overview</p>
                 </div>
 
+
+
+
                 <button 
                     onClick={refreshDashboard}
                     disabled={isSyncing}
                     className="btn"
                     style={{ 
-                        background: 'rgba(255,255,255,0.05)', 
+                        background: 'rgba(255,255,255,0.08)', 
                         color: 'white', 
-                        fontSize: '0.75rem', 
-                        padding: '0.35rem 0.75rem', 
-                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '0.7rem', 
+                        padding: '2px', 
+                        border: '1px solid rgba(255,255,255,0.15)',
                         whiteSpace: 'nowrap',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        width: 'fit-content',
+                        minWidth: '0',
+                        gap: '4px',
+                        height: 'auto',
+                        borderRadius: '6px'
                     }}
                 >
-                    {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate"></i>}
-                    <span style={{ marginLeft: '6px' }}>Refresh Dashboard</span>
+                    {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate" style={{ fontSize: '0.75rem' }}></i>}
+                    <span style={{ fontWeight: '600' }}>Refresh Dashboard</span>
                 </button>
             </div>
 
