@@ -110,22 +110,22 @@ export const BADGES_CONFIG = [
 export const evaluateTier = (userBadges) => {
     const totalUnlocked = Object.values(userBadges || {}).filter(b => b.unlocked).length;
     
-    let tierName = 'Blue';
+    let tierName = 'Scout';
     let progress = 0;
     let totalNext = 10;
     let isMax = false;
 
     if (totalUnlocked >= 100) {
-        tierName = 'Platinum';
+        tierName = 'Legend';
         isMax = true;
         progress = 100;
         totalNext = 100;
     } else if (totalUnlocked >= 40) {
-        tierName = 'Gold';
+        tierName = 'Guardian';
         totalNext = 100;
         progress = ((totalUnlocked - 40) / 60) * 100;
     } else if (totalUnlocked >= 10) {
-        tierName = 'Silver';
+        tierName = 'Steward';
         totalNext = 40;
         progress = ((totalUnlocked - 10) / 30) * 100;
     } else {

@@ -600,6 +600,10 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+.slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
 @keyframes slideUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1317,18 +1321,19 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(8, 8, 20, 0.97);
+    background: rgba(8, 8, 20, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     animation: welcomeFadeIn 0.5s ease forwards;
-    padding: 2rem;
+    padding: 1.5rem;
     text-align: center;
 }
 
-.welcome-overlay .welcome-icon {
-    font-size: 4rem;
-    margin-bottom: 2rem;
-    animation: welcomeTextSlide 0.8s ease 0.3s both;
+.welcome-card {
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+    z-index: 10001;
 }
 
 .welcome-overlay h1 {
@@ -1336,21 +1341,12 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     font-weight: 700;
     color: #fff;
     margin-bottom: 1rem;
-    animation: welcomeTextSlide 0.8s ease 0.5s both, welcomeGlow 3s ease-in-out 1.5s infinite;
-    max-width: 400px;
 }
 
 .welcome-overlay p {
     font-size: 1rem;
     color: rgba(255, 255, 255, 0.7);
     line-height: 1.6;
-    max-width: 360px;
-    animation: welcomeTextSlide 0.8s ease 0.7s both;
-}
-
-.welcome-overlay .welcome-cta {
-    margin-top: 2.5rem;
-    animation: welcomeTextSlide 0.8s ease 0.9s both;
 }
 
 /* Milestone Celebration */

@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import useBusinesses from '../hooks/useBusinesses';
 import AuthModal from '../components/auth/AuthModal';
 import ReceiptLogger from '../components/profile/ReceiptLogger';
-import MilestoneCelebration, { MILESTONES } from '../components/MilestoneCelebration';
+import MilestoneCelebration, { SUPPORT_MILESTONES, PURCHASE_MILESTONES, DISCOVERY_MILESTONES } from '../components/MilestoneCelebration';
+import SeasonalSnapshot from '../components/profile/SeasonalSnapshot';
 import { db } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
+import { evaluateTier } from '../utils/badgeLogic';
 
 const Profile = () => {
     const { currentUser, isGuest, logout } = useAuth();
@@ -18,9 +20,12 @@ const Profile = () => {
     const ownedBusinesses = businesses.filter(b => b.ownerEmail === currentUser?.email);
     const isOwner = ownedBusinesses.length > 0;
 
+    const userTier = evaluateTier(currentUser?.badges || {});
+
     const [history, setHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [replayMilestone, setReplayMilestone] = useState(null);
+    const [showSnapshot, setShowSnapshot] = useState(false);
 
     // Read total supports from localStorage for milestone gallery
     const getUserSupports = () => {
@@ -89,6 +94,23 @@ const Profile = () => {
                 </button>
             </div>
 
+            {/* Seasonal Snapshot Trigger */}
+            <div className="slide-up" style={{ marginBottom: '1.5rem', animationDelay: '0.05s' }}>
+                <button 
+                    onClick={() => setShowSnapshot(true)}
+                    className="btn btn-primary"
+                    style={{ 
+                        background: 'linear-gradient(135deg, #F59E0B, #FF8C00)', 
+                        border: 'none',
+                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)',
+                        padding: '0.8rem',
+                        fontSize: '0.9rem'
+                    }}
+                >
+                    <i className="fa-solid fa-bolt-lightning"></i> View Seasonal Snapshot
+                </button>
+            </div>
+
             <div className="profile-card slide-up">
                 <div className="badge-header">
                     <i className="fa-solid fa-certificate badge-icon"></i>
@@ -122,6 +144,11 @@ const Profile = () => {
                         {isOwner && (
                             <span style={{ background: 'var(--accent-primary)', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
                                 <i className="fa-solid fa-crown"></i> Founder
+                            </span>
+                        )}
+                        {!displayUser.isGuest && (
+                            <span style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: 'var(--accent-primary)', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '800', border: '1px solid var(--accent-primary)44' }}>
+                                <i className="fa-solid fa-gem"></i> {userTier.name}
                             </span>
                         )}
                         {businesses.some(b => (b.stewardship?.managers || []).includes(displayUser.email)) && (
@@ -282,7 +309,7 @@ const Profile = () => {
                         gridTemplateColumns: 'repeat(3, 1fr)', 
                         gap: '0.75rem' 
                     }}>
-                        {MILESTONES.map(m => {
+                        {SUPPORT_MILESTONES.map(m => {
                             const isUnlocked = totalSupports >= m.count;
                             return (
                                 <div 
@@ -345,6 +372,12 @@ const Profile = () => {
                 <MilestoneCelebration 
                     count={replayMilestone} 
                     onDismiss={() => setReplayMilestone(null)} 
+                />
+            )}
+
+            {showSnapshot && (
+                <SeasonalSnapshot 
+                    onClose={() => setShowSnapshot(false)} 
                 />
             )}
 

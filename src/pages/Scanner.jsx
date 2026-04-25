@@ -5,7 +5,7 @@ import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { TUTORIAL_STEPS } from '../utils/badgeLogic';
 import firebase from 'firebase/compat/app';
-import MilestoneCelebration, { MILESTONES } from '../components/MilestoneCelebration';
+import MilestoneCelebration, { SUPPORT_MILESTONES, PURCHASE_MILESTONES, DISCOVERY_MILESTONES } from '../components/MilestoneCelebration';
 
 const Scanner = () => {
     const navigate = useNavigate();
@@ -24,7 +24,7 @@ const Scanner = () => {
     const [lockoutTimer, setLockoutTimer] = useState(0);
     
     // Milestone State
-    const [milestoneCount, setMilestoneCount] = useState(null);
+    const [activeMilestone, setActiveMilestone] = useState(null);
 
     useEffect(() => {
         // Detect bizId from URL for Native Camera Scans
@@ -144,17 +144,29 @@ const Scanner = () => {
             if (isNewBiz) {
                 pStats.uniqueBizIds[scannedBusiness.id] = true;
                 pStats.totalFamilies = (pStats.totalFamilies || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
+                
+                // Check for discovery milestone
+                const discoveryCount = Object.keys(pStats.uniqueBizIds).length;
+                if (DISCOVERY_MILESTONES.some(m => m.count === discoveryCount)) {
+                    setActiveMilestone({ count: discoveryCount, type: 'discovery' });
+                }
             }
             
             if (type === 'checkin') {
                 pStats.totalCheckins = (pStats.totalCheckins || 0) + 1;
-                // Check for milestone
+                // Check for support milestone
                 const newCount = pStats.totalCheckins;
-                if (MILESTONES.some(m => m.count === newCount)) {
-                    setMilestoneCount(newCount);
+                if (SUPPORT_MILESTONES.some(m => m.count === newCount)) {
+                    setActiveMilestone({ count: newCount, type: 'support' });
                 }
             } else if (type === 'purchase') {
                 pStats.totalPurchases = (pStats.totalPurchases || 0) + 1;
+                
+                // Check for purchase milestone
+                const purchaseCount = pStats.totalPurchases;
+                if (PURCHASE_MILESTONES.some(m => m.count === purchaseCount)) {
+                    setActiveMilestone({ count: purchaseCount, type: 'purchase' });
+                }
                 
                 // Calculate incremental impact if business data is available
                 if (scannedBusiness.yearlyAssessments) {
@@ -527,10 +539,11 @@ const Scanner = () => {
             )}
 
             {/* Milestone Celebration Overlay */}
-            {milestoneCount && (
+            {activeMilestone && (
                 <MilestoneCelebration 
-                    count={milestoneCount} 
-                    onDismiss={() => setMilestoneCount(null)} 
+                    count={activeMilestone.count} 
+                    type={activeMilestone.type}
+                    onDismiss={() => setActiveMilestone(null)} 
                 />
             )}
 
