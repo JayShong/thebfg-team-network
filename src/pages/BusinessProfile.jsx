@@ -280,8 +280,9 @@ const BusinessProfile = () => {
                 {/* Purpose Statement Section */}
                 {(purposeStatement || impactWaste || impactJobs) && (
                     <div className="detail-section glass-card" style={{ padding: '1.5rem', background: 'linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0,0,0,0.4))' }}>
-                        <div style={{ marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                             <h3 style={{ margin: 0 }}>Purpose Statement</h3>
+                            <span style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.1)', padding: '0.3rem 0.6rem', borderRadius: '1rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 'bold' }}>ALPHA / WIP</span>
                         </div>
                         <p style={{ fontSize: '0.95rem', fontStyle: 'italic', marginBottom: '1.25rem', color: 'rgba(255,255,255,0.8)' }}>
                             "{purposeStatement || 'The purpose and environmental commitments of this business are currently under audit.'}"
@@ -308,6 +309,7 @@ const BusinessProfile = () => {
                     <div className="detail-section glass-card" style={{ padding: '1.5rem', background: 'linear-gradient(145deg, rgba(76, 175, 80, 0.1), rgba(0,0,0,0.4))' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h3 style={{ margin: 0 }}><i className="fa-solid fa-chart-line"></i> Yearly Assessments</h3>
+                            <span style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.1)', padding: '0.3rem 0.6rem', borderRadius: '1rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 'bold' }}>ALPHA / WIP</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {Object.entries(yearlyAssessments).sort((a, b) => b[0] - a[0]).map(([year, ya]) => (

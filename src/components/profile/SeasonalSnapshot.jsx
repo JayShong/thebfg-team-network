@@ -97,7 +97,10 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
 
                     {/* Impact Highlights */}
                     <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '15px', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
-                        <h4 style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Collective Proof</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h4 style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Collective Proof</h4>
+                            <span style={{ fontSize: '0.55rem', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '1rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 'bold' }}>ALPHA / WIP</span>
+                        </div>
                         
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

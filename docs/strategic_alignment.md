@@ -145,3 +145,4 @@ Two specific gaps:
 | Newsreel real-time | Pseudo-real-time | Cost-controlled. Server cron + local injection. Do not change. |
 | Score data model | Transitioning from string to map | Backward compatible. Both handled in `BusinessProfile.jsx`. |
 | Public Holiday API | `date.nager.at` | Free, no API key, automatic Malaysian calendar. |
+| Quantified Impact Module | Persistent ALPHA/WIP label | Intentional decision to keep impact stats (waste, trees, families) as experimental/WIP even after launch to manage data verification expectations. |
