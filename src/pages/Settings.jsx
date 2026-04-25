@@ -366,7 +366,7 @@ const Settings = () => {
             </form>
 
             <div style={{ marginTop: '3rem', textAlign: 'center', opacity: 0.4, fontSize: '0.65rem', letterSpacing: '1px' }}>
-                THE BFG TEAM PLATFORM • VERSION 1.0.0<br />
+                THE BFG TEAM PLATFORM • VERSION 0.9.6 (PRE-LAUNCH)<br />
                 INSTITUTIONAL SYNC: 2026-04-26
             </div>
 

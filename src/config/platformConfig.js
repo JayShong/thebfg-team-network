@@ -9,7 +9,7 @@ export const PLATFORM_CONFIG = {
     IMPACT_ROADMAP_DATE: 'June 2027',
     
     // Alpha/Beta Status
-    IS_ALPHA: false,
+    IS_ALPHA: true,
     
     // Default Supervisors for Audits
     DEFAULT_SUPERVISORS: ['jayshong@gmail.com'],
