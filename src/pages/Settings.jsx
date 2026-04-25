@@ -365,6 +365,11 @@ const Settings = () => {
                 </button>
             </form>
 
+            <div style={{ marginTop: '3rem', textAlign: 'center', opacity: 0.4, fontSize: '0.65rem', letterSpacing: '1px' }}>
+                THE BFG TEAM PLATFORM • VERSION 2.0.0<br />
+                INSTITUTIONAL SYNC: 2026-04-26
+            </div>
+
             {editingApp && (
                 <ApplicationEditor 
                     application={editingApp} 

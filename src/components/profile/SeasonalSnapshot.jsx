@@ -116,6 +116,28 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
                         </div>
                     </div>
 
+                    {/* Outward Framing - Network Context */}
+                    {(() => {
+                        const globalStats = JSON.parse(localStorage.getItem('bfg_global_stats') || '{}');
+                        const networkCheckins = globalStats.checkins || 1;
+                        const networkAmbassadors = globalStats.consumers || 1;
+                        const userShare = ((totalCheckins / networkCheckins) * 100).toFixed(4);
+                        
+                        return (
+                            <div style={{ padding: '0 0.5rem', marginBottom: '2rem' }}>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: '600', margin: '0 0 0.4rem 0' }}>
+                                    <i className="fa-solid fa-earth-americas"></i> Your Movement Contribution
+                                </p>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
+                                    Your {totalCheckins} supports represent <strong>{userShare}%</strong> of the network's total activity this season.
+                                </p>
+                                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                                    Together with {networkAmbassadors.toLocaleString()} ambassadors, we are reclaiming the economy.
+                                </p>
+                            </div>
+                        );
+                    })()}
+
                     {/* Season Progress */}
                     <div style={{ marginBottom: '2rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>

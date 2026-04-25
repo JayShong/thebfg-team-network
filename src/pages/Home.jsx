@@ -63,7 +63,6 @@ const Home = () => {
 
     const refreshDashboard = async () => {
         setIsSyncing(true);
-        console.log("REFRESH: Fetching dashboard data...");
         try {
             // 1. Fetch Reconciled Global Stats
             const statsDoc = await db.collection('system').doc('stats').get();
@@ -277,8 +276,32 @@ const Home = () => {
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>The 30% Goal</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: '#FFA000' }}>{gdpPenetration}</p>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.75rem', fontStyle: 'italic' }}>
-                            The share of Malaysia's economy we're working to reclaim for businesses that care.
+                        
+                        {(() => {
+                            const val = parseFloat(gdpPenetration.replace('%', '')) || 0;
+                            const progress = Math.min((val / 30) * 100, 100);
+                            let narrative = "The foundation is being laid.";
+                            if (val >= 30) narrative = "We built it.";
+                            else if (val >= 15) narrative = "The final push. Every choice counts.";
+                            else if (val >= 5) narrative = "The tipping point is within reach.";
+                            else if (val >= 1) narrative = "We are becoming undeniable.";
+                            else if (val >= 0.5) narrative = "The conviction economy is emerging.";
+                            else if (val >= 0.1) narrative = "The movement is taking root.";
+
+                            return (
+                                <>
+                                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,160,0,0.1)', borderRadius: '2px', margin: '10px 0', overflow: 'hidden' }}>
+                                        <div style={{ width: `${progress}%`, height: '100%', background: '#FFA000', transition: 'width 1s ease-out' }}></div>
+                                    </div>
+                                    <p style={{ fontSize: '0.8rem', color: '#FFA000', fontWeight: '600', marginBottom: '0.5rem' }}>
+                                        {narrative}
+                                    </p>
+                                </>
+                            );
+                        })()}
+
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            The share of Malaysia's economy we're reclaiming for businesses that care.
                         </p>
                     </div>
                 </div>
