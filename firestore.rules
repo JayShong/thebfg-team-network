@@ -122,5 +122,11 @@ service cloud.firestore {
       );
       allow delete: if isSuperAdmin();
     }
+
+    // Consumer Feedback
+    match /feedback/{feedbackId} {
+      allow create: if true; // Allow guests and users to submit observations
+      allow read, update, delete: if isAuditor() || isSuperAdmin();
+    }
   }
 }

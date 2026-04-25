@@ -107,13 +107,29 @@ export const BADGES_CONFIG = [
     }
 ];
 
-export const evaluateTier = (userBadges) => {
-    const totalUnlocked = Object.values(userBadges || {}).filter(b => b.unlocked).length;
+export const evaluateTier = (userBadges = {}) => {
+    // Handle both { id: true } and { id: { unlocked: true } } formats
+    const unlockedIds = Object.keys(userBadges).filter(id => {
+        const val = userBadges[id];
+        return val === true || (val && val.unlocked === true);
+    });
+
+    const totalUnlocked = unlockedIds.length;
     
+    // Calculate category counts
+    const categoryCounts = { 'Seen': 0, 'Verified': 0, 'Valued': 0 };
+    unlockedIds.forEach(id => {
+        const badge = GENERATED_BADGES.find(b => b.id === id);
+        if (badge) {
+            categoryCounts[badge.category] = (categoryCounts[badge.category] || 0) + 1;
+        }
+    });
+
     let tierName = 'Scout';
     let progress = 0;
     let totalNext = 10;
     let isMax = false;
+    let missingCats = [];
 
     if (totalUnlocked >= 100) {
         tierName = 'Legend';
@@ -137,7 +153,9 @@ export const evaluateTier = (userBadges) => {
         badgeCount: totalUnlocked,
         progress,
         totalNext,
-        isMax
+        isMax,
+        categoryCounts,
+        missingCats
     };
 };
 
