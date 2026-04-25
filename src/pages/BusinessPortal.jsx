@@ -11,7 +11,7 @@ import CustomerIntelligenceModal from '../components/portal/CustomerIntelligence
 import { useNavigate } from 'react-router-dom';
 
 const BusinessPortal = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, getStewardshipLevel } = useAuth();
     const { businesses, loading: bizLoading } = useBusinesses();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -35,7 +35,7 @@ const BusinessPortal = () => {
     const [scannedUserId, setScannedUserId] = useState(null);
     const [showIntelligence, setShowIntelligence] = useState(false);
 
-    const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isMerchantAssistant) && adminEditId;
+    const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isCustomerSuccess) && adminEditId;
 
     useEffect(() => {
         if (businesses.length > 0) {

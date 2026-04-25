@@ -25,8 +25,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
             return <RestrictedAccess requiredRole="Superadmin Governance" />;
         }
 
-        if (requiredRole === 'merchant' && !currentUser.isSuperAdmin && !currentUser.isMerchantAssistant) {
-            return <RestrictedAccess requiredRole="Merchant Assistant" />;
+        if (requiredRole === 'merchant' && !currentUser.isSuperAdmin && !currentUser.isCustomerSuccess) {
+            return <RestrictedAccess requiredRole="Merchant Operations" />;
         }
  
         if (requiredRole === 'auditor' && !currentUser.isSuperAdmin && !currentUser.isAuditor) {
