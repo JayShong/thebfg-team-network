@@ -141,10 +141,10 @@ const evaluateTier = (userBadges) => {
     const totalUnlocked = Object.values(userBadges || {}).filter(b => b.unlocked).length;
     
     // Tier boundaries (Scaled for 152+ badges)
-    if (totalUnlocked >= 100) return 'Platinum';
-    if (totalUnlocked >= 40) return 'Gold';
-    if (totalUnlocked >= 10) return 'Silver';
-    return 'Blue';
+    if (totalUnlocked >= 100) return 'Legend';
+    if (totalUnlocked >= 40) return 'Guardian';
+    if (totalUnlocked >= 10) return 'Steward';
+    return 'Scout';
 };
 
 /**

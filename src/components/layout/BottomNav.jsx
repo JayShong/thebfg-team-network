@@ -39,8 +39,9 @@ const BottomNav = () => {
             </button>
             
             <button 
-                className={`nav-item scan-btn ${location.pathname === '/scan' ? 'active' : ''}`}
-                onClick={() => navigate('/scan')}
+                className={`nav-item scan-btn ${location.pathname === '/scanner' ? 'active' : ''}`}
+                onClick={() => navigate('/scanner')}
+
             >
                 <div className="scan-btn-inner">
                     <i className="fa-solid fa-qrcode"></i>

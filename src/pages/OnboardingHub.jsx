@@ -90,7 +90,7 @@ const OnboardingHub = () => {
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <i className="fa-solid fa-spinner fa-spin fa-2x"></i>
-                    <p style={{ marginTop: '1rem' }}>Sychronizing application pool...</p>
+                    <p style={{ marginTop: '1rem' }}>Synchronizing application pool...</p>
                 </div>
             ) : (
                 <div className="slide-up" style={{ marginTop: '2rem' }}>

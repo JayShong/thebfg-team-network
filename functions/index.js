@@ -16,20 +16,31 @@ const NUM_BUSINESS_SHARDS = 10;
 
 /**
  * Helper to update the global stats document using sharding to prevent hotspots.
+ * Supports updating multiple fields at once.
+ * Can be used within an existing transaction.
  */
-async function updateGlobalStat(field, amount) {
+async function updateGlobalStat(updatesMap, transaction = null) {
     const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
     const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
-    return shardRef.set({
-        [field]: admin.firestore.FieldValue.increment(amount)
-    }, { merge: true });
+    
+    const increments = {};
+    for (const [key, value] of Object.entries(updatesMap)) {
+        increments[key] = admin.firestore.FieldValue.increment(value);
+    }
+
+    if (transaction) {
+        transaction.set(shardRef, increments, { merge: true });
+        return Promise.resolve();
+    } else {
+        return shardRef.set(increments, { merge: true });
+    }
 }
 
 /**
  * SELF-HEALING: Automated Reconciliation
- * Runs every 30 mins for counts, and every 6 hours for deep impact sum.
+ * Runs every 5 mins for counts, and every 6 hours for deep impact sum.
  */
-exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => {
+exports.reconcilenetworkstats = onSchedule('every 5 minutes', async (event) => {
 
     console.log("CRON: Starting automated network reconciliation...");
     const now = new Date();
@@ -140,6 +151,7 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             for (const bizDoc of dirtyBizSnap.docs) {
                 const bizId = bizDoc.id;
                 const bizData = bizDoc.data();
+                
                 const shardsSnap = await db.collection('businesses').doc(bizId).collection('shards').get();
                 
                 let checkinsInc = 0;
@@ -183,53 +195,62 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             }
         }
 
+        // 3. SEASONAL EXPIRY CHECK (Dependency-based archival)
+        const { seasonId } = getSeasonContext();
+        const lastArchivedSeason = mainStats.lastArchivedSeason || '2026_S1'; 
+
+        if (lastArchivedSeason !== seasonId) {
+            console.log(`CRON: Season transition detected (${lastArchivedSeason} -> ${seasonId}). Triggering archival...`);
+            await runSeasonArchive(lastArchivedSeason);
+            await db.collection('system').doc('stats').update({ lastArchivedSeason: seasonId });
+        }
+
         console.log("CRON: Reconciliation successful. Global and Business shards cleared.");
     } catch (e) {
         console.error("CRON: Reconciliation failed", e);
     }
 });
 
+
 // 1. User Triggers
 exports.onusercreated = onDocumentCreated('users/{userId}', async (event) => {
     console.log('Incrementing consumer count');
-    return updateGlobalStat('consumers', 1);
+    return updateGlobalStat({ consumers: 1 });
 });
 
 exports.onuserdeleted = onDocumentDeleted('users/{userId}', async (event) => {
     console.log('Decrementing consumer count');
-    return updateGlobalStat('consumers', -1);
+    return updateGlobalStat({ consumers: -1 });
 });
 
 // 2. Business Triggers
 exports.onbusinesscreated = onDocumentCreated('businesses/{bizId}', async (event) => {
     console.log('Incrementing business count');
-    return updateGlobalStat('businesses', 1);
+    return updateGlobalStat({ businesses: 1 });
 });
 
-exports.onbusinessdeleted = onDocumentDeleted('businesses/{bizId}', async (event) => {
+exports.onbusinessdeleted = onDocumentDeleted('businesses/{userId}', async (event) => {
     console.log('Decrementing business count');
-    return updateGlobalStat('businesses', -1);
+    return updateGlobalStat({ businesses: -1 });
 });
 
 const { BADGES_CONFIG, evaluateTier, evaluateBadges } = require('./badgeEngine');
 
 /**
  * Determine the current season and year based on timestamp.
- * Special Rule: Season 1 of 2026 ends on Dec 31, 2026.
+ * Standard rule: S1 (Jan-Jun), S2 (Jul-Dec)
  */
 const getSeasonContext = (timestamp) => {
     const date = timestamp?.toDate ? timestamp.toDate() : new Date();
     const year = date.getFullYear();
     const month = date.getMonth(); // 0-indexed
 
-    let seasonId;
-    if (year === 2026) {
-        seasonId = '2026_GENESIS'; // Special extended first season
-    } else {
-        // Standard rule: S1 (Jan-Jun), S2 (Jul-Dec)
-        const sNum = month < 6 ? 1 : 2;
-        seasonId = `${year}_S${sNum}`;
-    }
+    // Genesis Season Extension: All of 2026 is S1
+    if (year === 2026) return { year: '2026', seasonId: '2026_S1' };
+
+    // S1: Months 0-5 (Jan-Jun), S2: Months 6-11 (Jul-Dec)
+    const sNum = month < 6 ? 1 : 2;
+    const seasonId = `${year}_S${sNum}`;
 
     return { year: year.toString(), seasonId };
 };
@@ -269,10 +290,12 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
                 });
             }
             await event.data.ref.update({ status: 'flagged_by_sentinel' });
+            await updateGlobalStat({ sentinelBlocks: 1 });
             return null;
         }
 
         // B. SCALE-FIRST: Update User Stats & Evaluate Badges
+        await updateGlobalStat({ checkins: 1 });
         if (!txn.isGhost) {
             const statsRef = db.collection('users').doc(txn.userId).collection('counters').doc('summary');
             const annualRef = db.collection('users').doc(txn.userId).collection('annual').doc(year);
@@ -442,16 +465,12 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
                 }
             }
 
-            // 2. Update Global Shards (Securely increment only now)
-            const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
-            const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
-            
-            const globalUpdate = {
-                purchases: admin.firestore.FieldValue.increment(1),
-                totalWaste: admin.firestore.FieldValue.increment(incWaste),
-                totalTrees: admin.firestore.FieldValue.increment(incTrees)
-            };
-            await shardRef.set(globalUpdate, { merge: true });
+            // 2. Update Global Shards (Distributed)
+            await updateGlobalStat({
+                purchases: 1,
+                totalWaste: incWaste,
+                totalTrees: incTrees
+            });
 
             // 2.1 Update Business-specific counters (Distributed Sharding - Verified only)
             const bizShardId = Math.floor(Math.random() * NUM_BUSINESS_SHARDS).toString();
@@ -468,17 +487,21 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
 
             // 3. Securely evaluate badges and impact for the user
             if (!after.isGhost) {
+                const { year, seasonId } = getSeasonContext(after.timestamp);
                 const userRef = db.collection('users').doc(after.userId);
                 const statsRef = userRef.collection('counters').doc('summary');
+                const seasonalRef = userRef.collection('seasons').doc(seasonId);
                 
                 await db.runTransaction(async (transaction) => {
                     const uSnap = await transaction.get(userRef);
                     const sSnap = await transaction.get(statsRef);
+                    const seasSnap = await transaction.get(seasonalRef);
                     
                     if (uSnap.exists && sSnap.exists) {
                         const stats = sSnap.data();
+                        const seasonalData = seasSnap.exists ? seasSnap.data() : { totalCheckins: 0, totalPurchases: 0, badges: {} };
                         
-                        // Update User's Quantified Impact
+                        // Update User's Quantified Impact (Lifetime)
                         const newWaste = (stats.totalWaste || 0) + incWaste;
                         const newTrees = (stats.totalTrees || 0) + incTrees;
                         
@@ -487,19 +510,29 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
                             totalTrees: newTrees 
                         });
 
-                        // Re-evaluate Badges with the NEW verified totals
+                        // Update User's Quantified Impact (Seasonal)
+                        const newSeasWaste = (seasonalData.totalWaste || 0) + incWaste;
+                        const newSeasTrees = (seasonalData.totalTrees || 0) + incTrees;
+
+                        // Re-evaluate Badges with the NEW verified totals (Strictly Seasonal)
                         const { updatedBadges, newlyUnlocked, tier } = evaluateBadges(
                             after, 
-                            { ...stats, totalWaste: newWaste, totalTrees: newTrees }, 
-                            uSnap.data().badges || {}
+                            { ...seasonalData, totalWaste: newSeasWaste, totalTrees: newSeasTrees }, 
+                            seasonalData.badges || {}
                         );
 
-                        if (newlyUnlocked.length > 0) {
-                            transaction.update(userRef, { 
-                                badges: updatedBadges,
-                                tier: tier
-                            });
-                        }
+                        // Update Seasonal Doc
+                        transaction.set(seasonalRef, { 
+                            totalWaste: newSeasWaste,
+                            totalTrees: newSeasTrees,
+                            badges: updatedBadges,
+                            lastVerified: admin.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                        
+                        // Also update root tier for display
+                        transaction.update(userRef, { 
+                            currentTier: tier 
+                        });
                     }
                 });
             }
@@ -1359,6 +1392,144 @@ exports.claimbusinessrecommendation = functions.https.onCall(async (data, contex
         return { success: true, bizName: bizData.name };
     } catch (err) {
         console.error("Claim failed:", err);
+        throw new functions.https.HttpsError('internal', err.message);
+    }
+});
+
+/**
+ * Helper: Seasonal Archiver
+ */
+const runSeasonArchive = async (seasonId) => {
+    console.log(`SEASON ARCHIVER: Finalizing season ${seasonId}...`);
+    
+    // Check lock
+    const lockRef = db.collection('system').doc('archival_lock');
+    const lockSnap = await lockRef.get();
+    if (lockSnap.exists && lockSnap.data().locked) {
+        console.log("Archive skipped: Lock active.");
+        return;
+    }
+
+    try {
+        await lockRef.set({ locked: true, startedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+        await db.collection('system').doc('seasons').collection('history').doc(seasonId).set({
+            status: 'closed',
+            closedAt: admin.firestore.FieldValue.serverTimestamp(),
+            archived: true
+        }, { merge: true });
+
+        let lastDoc = null;
+        let totalArchived = 0;
+
+        while (true) {
+            let query = db.collection('users')
+                .where('lastActiveSeason', '==', seasonId)
+                .limit(400);
+            
+            if (lastDoc) query = query.startAfter(lastDoc);
+            
+            const snap = await query.get();
+            if (snap.empty) break;
+
+            const batch = db.batch();
+            for (const userDoc of snap.docs) {
+                const uid = userDoc.id;
+                const seasonalRef = db.collection('users').doc(uid).collection('seasons').doc(seasonId);
+                const seasonalSnap = await seasonalRef.get();
+                
+                if (seasonalSnap.exists) {
+                    const seasonalData = seasonalSnap.data();
+                    const badges = seasonalData.badges || {};
+                    const unlockedBadgeCount = Object.keys(badges).length;
+
+                    if (unlockedBadgeCount > 0) {
+                        const trophy = {
+                            seasonId: seasonId,
+                            count: unlockedBadgeCount,
+                            tier: userDoc.data().currentTier || 'Blue',
+                            archivedAt: new Date().toISOString()
+                        };
+
+                        batch.update(userDoc.ref, {
+                            achievements: admin.firestore.FieldValue.arrayUnion(trophy),
+                            badges: {}
+                        });
+                        batch.update(seasonalRef, { isArchived: true });
+                        totalArchived++;
+                    }
+                }
+            }
+            
+            await batch.commit();
+            lastDoc = snap.docs[snap.docs.length - 1];
+        }
+
+        console.log(`SEASON ARCHIVER: Finished. Total archived: ${totalArchived}`);
+    } finally {
+        await lockRef.set({ locked: false });
+    }
+};
+
+/**
+ * 9. Initiative Attendance Tracking (Phase 5.4)
+ * Records participation in physical initiatives via QR scans.
+ */
+exports.recordinitiativeattendance = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    
+    const { initiativeId } = data;
+    if (!initiativeId) throw new functions.https.HttpsError('invalid-argument', 'Initiative ID required.');
+
+    const uid = context.auth.uid;
+    const today = new Date().toISOString().split('T')[0];
+    const { seasonId } = getSeasonContext();
+
+    try {
+        const initRef = db.collection('initiatives').doc(initiativeId);
+        const userSeasRef = db.collection('users').doc(uid).collection('seasons').doc(seasonId);
+        const attendanceRef = userSeasRef.collection('attendance').doc(`${today}_${initiativeId}`);
+
+        // 1. Check for double-attendance today
+        const attSnap = await attendanceRef.get();
+        if (attSnap.exists) {
+            return { success: true, message: 'Attendance already recorded for today.' };
+        }
+
+        const initSnap = await initRef.get();
+        if (!initSnap.exists) throw new functions.https.HttpsError('not-found', 'Initiative not found.');
+
+        // 2. Atomic Update
+        await db.runTransaction(async (transaction) => {
+            // Update Initiative Count
+            transaction.update(initRef, { 
+                totalAttendance: admin.firestore.FieldValue.increment(1),
+                lastAttendanceAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Update User Seasonal Stats
+            transaction.set(userSeasRef, {
+                totalAttendance: admin.firestore.FieldValue.increment(1)
+            }, { merge: true });
+
+            // Record this specific attendance instance
+            transaction.set(attendanceRef, {
+                initiativeId,
+                initiativeTitle: initSnap.data().title || 'Unnamed Initiative',
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                date: today
+            });
+
+            // Update Global Stats (Sharded for high frequency launch events)
+            await updateGlobalStat({ 
+                initiativeParticipation: 1 
+            }, transaction);
+        });
+
+        console.log(`Attendance recorded for user ${uid} at initiative ${initiativeId}`);
+        return { success: true };
+    } catch (err) {
+        console.error("Attendance recording failed:", err);
         throw new functions.https.HttpsError('internal', err.message);
     }
 });

@@ -58,7 +58,8 @@ function App() {
         <Route path="/privileges" element={<Privileges />} />
         
         {/* Auxiliary Routes */}
-        <Route path="/scan" element={<Scanner />} />
+        <Route path="/scanner" element={<Scanner />} />
+
         <Route path="/profile" element={<Profile />} />
         <Route path="/business/:id" element={<BusinessProfile />} />
         <Route path="/about" element={<About />} />

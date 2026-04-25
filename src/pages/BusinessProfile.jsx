@@ -26,36 +26,16 @@ const BusinessProfile = () => {
         }
     }, [id, businesses, loading]);
 
-    const [shardedStats, setShardedStats] = useState({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+    // Reconciled stats from the business document (Updated every 5 mins by the network cron)
+    const stats = {
+        checkins: (business?.checkinsCount || 0) + (business?.ghostCheckinsCount || 0),
+        purchases: business?.purchasesCount || 0,
+        volume: business?.purchaseVolume || 0
+    };
 
     useEffect(() => {
         if (!id) return;
         
-        // Pull shards for real-time impact accuracy
-        const fetchShards = async () => {
-            try {
-                const shardSnap = await db.collection('businesses').doc(id).collection('shards').get();
-                let checkins = business?.checkinsCount || 0;
-                let ghostCheckins = business?.ghostCheckinsCount || 0;
-                let purchases = business?.purchasesCount || 0;
-                let volume = business?.purchaseVolume || 0;
-
-                shardSnap.forEach(doc => {
-                    const s = doc.data();
-                    checkins += (s.checkinsCount || 0);
-                    ghostCheckins += (s.ghostCheckinsCount || 0);
-                    purchases += (s.purchasesCount || 0);
-                    volume += (s.purchaseVolume || 0);
-                });
-
-                setShardedStats({ checkins, ghostCheckins, purchases, volume });
-            } catch (e) {
-                console.warn("Failed to fetch shards:", e);
-            }
-        };
-
-        fetchShards();
-
         const unsubscribe = db.collection('audit_logs')
             .where('bizId', '==', id)
             .orderBy('timestamp', 'desc')
@@ -385,11 +365,11 @@ const BusinessProfile = () => {
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{shardedStats.checkins + shardedStats.ghostCheckins}</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{stats.checkins}</div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Total Visitors</div>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent-success)' }}>RM {shardedStats.volume.toLocaleString()}</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent-success)' }}>RM {stats.volume.toLocaleString()}</div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Verified Support</div>
                         </div>
                     </div>

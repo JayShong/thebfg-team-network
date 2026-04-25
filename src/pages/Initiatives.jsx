@@ -26,7 +26,7 @@ const Initiatives = () => {
 
     const fetchInitiatives = useCallback(async () => {
         if (loading || !hasMore) return;
-        
+
         setLoading(true);
         try {
             let query = db.collection('initiatives').orderBy('createdAt', 'desc');
@@ -36,12 +36,12 @@ const Initiatives = () => {
             }
 
             const snapshot = await query.limit(PAGE_SIZE).get();
-            
+
             if (!snapshot.empty) {
                 const newInitiatives = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setInitiatives(prev => [...prev, ...newInitiatives]);
                 setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-                
+
                 if (snapshot.docs.length < PAGE_SIZE) {
                     setHasMore(false);
                 }
@@ -60,13 +60,13 @@ const Initiatives = () => {
     const lastElementRef = useCallback(node => {
         if (loading) return;
         if (observer.current) observer.current.disconnect();
-        
+
         observer.current = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting && hasMore) {
                 fetchInitiatives();
             }
         }, { threshold: 0.5 });
-        
+
         if (node) observer.current.observe(node);
     }, [loading, hasMore, fetchInitiatives]);
 
@@ -112,11 +112,11 @@ const Initiatives = () => {
                 )}
 
                 {/* Loading / End of List Indicator */}
-                <div 
-                    ref={lastElementRef} 
-                    style={{ 
-                        textAlign: 'center', 
-                        padding: '3rem 1rem', 
+                <div
+                    ref={lastElementRef}
+                    style={{
+                        textAlign: 'center',
+                        padding: '3rem 1rem',
                         color: 'var(--text-secondary)',
                         marginTop: '1rem'
                     }}

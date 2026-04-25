@@ -55,7 +55,6 @@ const Settings = () => {
         if (!currentUser) return;
         const unsubscribe = db.collection('applications')
             .where('ownerUid', '==', currentUser.uid)
-            .where('status', 'in', ['pending', 'draft'])
             .limit(1)
             .onSnapshot(snap => {
                 if (!snap.empty) {
@@ -285,18 +284,21 @@ const Settings = () => {
                                     </p>
                                 </div>
                                 <span className="tier-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
-                                    {myApplication.assignedTo ? 'Partner Assigned' : 'Awaiting CS Partner'}
+                                    {['pending', 'draft'].includes(myApplication.status) ? (myApplication.assignedTo ? 'Partner Assigned' : 'Awaiting CS Partner') : 'Historical Record'}
                                 </span>
                             </div>
                             
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '1.2rem' }}>
-                                {myApplication.assignedTo 
-                                    ? `Great news! A Customer Success partner (${myApplication.assignedEmail}) is currently handling your application. You can both co-edit the details together.`
-                                    : "Your application is in the pool. Once a Customer Success member picks it up, you'll be able to co-edit the full business profile details here."}
+                                {['pending', 'draft'].includes(myApplication.status)
+                                    ? (myApplication.assignedTo 
+                                        ? `Great news! A Customer Success partner (${myApplication.assignedEmail}) is currently handling your application. You can both co-edit the details together.`
+                                        : "Your application is in the pool. Once a Customer Success member picks it up, you'll be able to co-edit the full business profile details here.")
+                                    : "This application has been processed and is now part of the BFG Network historical records. It is preserved here for your reference."}
                             </p>
 
                             <button type="button" onClick={() => setEditingApp(myApplication)} className="nav-btn active" style={{ width: '100%', justifyContent: 'center' }}>
-                                <i className="fa-solid fa-pen-to-square"></i> Edit My Application Details
+                                <i className={`fa-solid ${['pending', 'draft'].includes(myApplication.status) ? 'fa-pen-to-square' : 'fa-eye'}`}></i> 
+                                {['pending', 'draft'].includes(myApplication.status) ? ' Edit My Application Details' : ' View Historical Record'}
                             </button>
                         </div>
                     ) : onboardingSuccess ? (
@@ -369,6 +371,7 @@ const Settings = () => {
                     onClose={() => setEditingApp(null)} 
                     onSave={handleUpdateApp}
                     isSaving={loading}
+                    readOnly={!['pending', 'draft'].includes(editingApp.status)}
                 />
             )}
         </div>

@@ -1,17 +1,40 @@
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { BADGES_CONFIG, BADGE_CATEGORIES } from '../../utils/badgeLogic';
-import { functions } from '../../services/firebase';
+import { BADGES_CONFIG, BADGE_CATEGORIES, getSeasonId } from '../../utils/badgeLogic';
+import { db, functions } from '../../services/firebase';
 
 const BadgeGallery = () => {
     const { currentUser } = useAuth();
     const [selectedBadge, setSelectedBadge] = useState(null);
+    const [seasonalBadges, setSeasonalBadges] = useState({});
     const [claimCode, setClaimCode] = useState('');
     const [isClaiming, setIsClaiming] = useState(false);
     const [claimSuccess, setClaimSuccess] = useState(null);
     const [claimError, setClaimError] = useState(null);
 
+    useEffect(() => {
+        if (!currentUser) return;
+        
+        const seasonId = getSeasonId();
+        const unsub = db.collection('users').doc(currentUser.uid)
+            .collection('seasons').doc(seasonId)
+            .collection('badges')
+            .onSnapshot(snapshot => {
+                const badges = {};
+                snapshot.forEach(doc => {
+                    badges[doc.id] = doc.data();
+                });
+                setSeasonalBadges(badges);
+            }, err => {
+                console.error("Failed to fetch seasonal badges:", err);
+            });
+            
+        return () => unsub();
+    }, [currentUser]);
+
     const categoryOrder = ['Seen', 'Verified', 'Valued'];
-    const userBadges = currentUser?.badges || {};
+    const userBadges = seasonalBadges;
+
 
     const handleClaim = async (e) => {
         e.preventDefault();

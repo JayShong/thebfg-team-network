@@ -9,6 +9,7 @@ import SeasonalSnapshot from '../components/profile/SeasonalSnapshot';
 import { db } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
 import { evaluateTier } from '../utils/badgeLogic';
+import ApplicationEditor from '../components/admin/ApplicationEditor';
 
 const Profile = () => {
     const { currentUser, isGuest, logout } = useAuth();
@@ -26,6 +27,9 @@ const Profile = () => {
     const [historyLoading, setHistoryLoading] = useState(true);
     const [replayMilestone, setReplayMilestone] = useState(null);
     const [showSnapshot, setShowSnapshot] = useState(false);
+    const [userApplication, setUserApplication] = useState(null);
+    const [showAppEditor, setShowAppEditor] = useState(false);
+    const [isSavingApp, setIsSavingApp] = useState(false);
 
     // Read total supports from localStorage for milestone gallery
     const getUserSupports = () => {
@@ -35,7 +39,7 @@ const Profile = () => {
                 const parsed = JSON.parse(saved);
                 return parsed.totalCheckins || 0;
             }
-        } catch (e) {}
+        } catch (e) { }
         return 0;
     };
     const totalSupports = getUserSupports();
@@ -55,6 +59,35 @@ const Profile = () => {
             });
         return () => unsubscribe();
     }, [currentUser]);
+
+    useEffect(() => {
+        if (!currentUser?.email) return;
+        const unsubscribe = db.collection('applications')
+            .where('email', '==', currentUser.email)
+            .limit(1)
+            .onSnapshot(snap => {
+                if (!snap.empty) {
+                    setUserApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                }
+            });
+        return () => unsubscribe();
+    }, [currentUser]);
+
+    const handleUpdateApplication = async (updates) => {
+        setIsSavingApp(true);
+        try {
+            await db.collection('applications').doc(userApplication.id).update({
+                ...updates,
+                lastEditedAt: new Date().toISOString()
+            });
+            setShowAppEditor(false);
+            alert("Application updated successfully.");
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            setIsSavingApp(false);
+        }
+    };
 
     if (!currentUser && !isGuest) {
         return (
@@ -96,11 +129,11 @@ const Profile = () => {
 
             {/* Seasonal Snapshot Trigger */}
             <div className="slide-up" style={{ marginBottom: '1.5rem', animationDelay: '0.05s' }}>
-                <button 
+                <button
                     onClick={() => setShowSnapshot(true)}
                     className="btn btn-primary"
-                    style={{ 
-                        background: 'linear-gradient(135deg, #F59E0B, #FF8C00)', 
+                    style={{
+                        background: 'linear-gradient(135deg, #F59E0B, #FF8C00)',
                         border: 'none',
                         boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)',
                         padding: '0.8rem',
@@ -124,7 +157,7 @@ const Profile = () => {
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>
                         {displayUser.nickname || displayUser.name || 'Explorer'}
                     </h3>
-                    
+
                     <div style={{ margin: '0.5rem 0', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {displayUser.isSuperAdmin && (
                             <span style={{ background: 'linear-gradient(135deg, #FFD700, #FF8C00)', color: '#000', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '700' }}>
@@ -178,11 +211,11 @@ const Profile = () => {
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                                 {displayUser.causes && displayUser.causes.length > 0 ? (
                                     displayUser.causes.map(cause => (
-                                        <span key={cause} style={{ 
-                                            fontSize: '0.7rem', 
-                                            padding: '0.3rem 0.75rem', 
-                                            borderRadius: '2rem', 
-                                            background: 'rgba(255,255,255,0.06)', 
+                                        <span key={cause} style={{
+                                            fontSize: '0.7rem',
+                                            padding: '0.3rem 0.75rem',
+                                            borderRadius: '2rem',
+                                            background: 'rgba(255,255,255,0.06)',
                                             color: 'var(--text-primary)',
                                             border: '1px solid rgba(255,255,255,0.1)',
                                             whiteSpace: 'nowrap'
@@ -191,12 +224,13 @@ const Profile = () => {
                                         </span>
                                     ))
                                 ) : (
-                                    <button 
+                                    <button
                                         onClick={() => navigate('/settings')}
                                         style={{ background: 'none', border: '1px dashed rgba(255,255,255,0.2)', color: 'var(--text-secondary)', fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
                                     >
                                         + Define your Empathy Profile
                                     </button>
+
                                 )}
                             </div>
                         </div>
@@ -226,6 +260,7 @@ const Profile = () => {
                                 <li style={{ marginBottom: '0.4rem' }}>Every check-in is a signal. Every purchase is a vote. Make yours count permanently.</li>
                                 <li style={{ marginBottom: '0.4rem' }}>Collect Tokens of Empathy and rise through the Ambassador Journey.</li>
                                 <li style={{ marginBottom: '0.4rem' }}>Prove that conviction-driven consumers are real — and growing.</li>
+
                             </ul>
                             <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none' }}>
                                 Create Free Account
@@ -234,11 +269,11 @@ const Profile = () => {
                     ) : (
                         <>
                             {/* Personal Networking Card (Privacy-First On-Demand) */}
-                            <div style={{ 
-                                margin: '2rem 0', 
-                                padding: '1.5rem', 
-                                background: 'rgba(255,255,255,0.03)', 
-                                borderRadius: '20px', 
+                            <div style={{
+                                margin: '2rem 0',
+                                padding: '1.5rem',
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: '20px',
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 textAlign: 'center'
                             }}>
@@ -246,10 +281,10 @@ const Profile = () => {
                                     <i className="fa-solid fa-id-card" style={{ color: 'var(--accent-primary)' }}></i>
                                     My Introduction Card
                                 </h4>
-                                <div style={{ 
-                                    background: '#fff', 
-                                    padding: '1rem', 
-                                    borderRadius: '15px', 
+                                <div style={{
+                                    background: '#fff',
+                                    padding: '1rem',
+                                    borderRadius: '15px',
                                     display: 'inline-block',
                                     marginBottom: '1rem',
                                     boxShadow: '0 8px 30px rgba(0,0,0,0.3)'
@@ -263,6 +298,17 @@ const Profile = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {userApplication && (
+                                    <button 
+                                        onClick={() => setShowAppEditor(true)} 
+                                        className="btn btn-secondary" 
+                                        style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}
+                                    >
+                                        <i className={`fa-solid ${userApplication.status === 'approved' ? 'fa-box-archive' : 'fa-pen-nib'}`}></i>
+                                        {userApplication.status === 'approved' ? ' View Application (Onboarded)' : ' Refine Application Form'}
+                                    </button>
+                                )}
+
                                 {displayUser.isSuperAdmin && (
                                     <button onClick={() => navigate('/admin')} className="btn btn-secondary" style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}>
                                         <i className="fa-solid fa-crown"></i> Governance Portal
@@ -280,7 +326,7 @@ const Profile = () => {
                                         <i className="fa-solid fa-clipboard-check"></i> Verification Hub
                                     </button>
                                 )}
-                                
+
                                 {(isOwner || displayUser.isCustomerSuccess || displayUser.isSuperAdmin || businesses.some(b => [...(b.stewardship?.managers || []), ...(b.stewardship?.crew || [])].includes(displayUser.email))) && (
                                     <button onClick={() => navigate('/business-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
                                         <i className="fa-solid fa-store"></i> My Business Portal
@@ -303,27 +349,27 @@ const Profile = () => {
                         <i className="fa-solid fa-star" style={{ color: '#F59E0B' }}></i> Your Milestones
                     </h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                        {totalSupports > 0 
+                        {totalSupports > 0
                             ? `${totalSupports} supports and counting. Tap an unlocked milestone to relive the moment.`
                             : 'Support a for-good business to unlock your first milestone.'
                         }
                     </p>
-                    <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(3, 1fr)', 
-                        gap: '0.75rem' 
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '0.75rem'
                     }}>
                         {SUPPORT_MILESTONES.map(m => {
                             const isUnlocked = totalSupports >= m.count;
                             return (
-                                <div 
+                                <div
                                     key={m.count}
                                     onClick={() => isUnlocked && setReplayMilestone(m.count)}
                                     style={{
-                                        background: isUnlocked 
+                                        background: isUnlocked
                                             ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.12))'
                                             : 'rgba(255,255,255,0.02)',
-                                        border: isUnlocked 
+                                        border: isUnlocked
                                             ? '1px solid rgba(139, 92, 246, 0.3)'
                                             : '1px dashed rgba(255,255,255,0.08)',
                                         borderRadius: '14px',
@@ -348,16 +394,16 @@ const Profile = () => {
                                             <i className="fa-solid fa-play"></i>
                                         </div>
                                     )}
-                                    <div style={{ 
-                                        fontSize: isUnlocked ? '1.5rem' : '1.2rem', 
+                                    <div style={{
+                                        fontSize: isUnlocked ? '1.5rem' : '1.2rem',
                                         fontWeight: '800',
                                         color: isUnlocked ? '#fff' : 'rgba(255,255,255,0.3)',
                                         marginBottom: '0.3rem'
                                     }}>
                                         {isUnlocked ? m.count : '???'}
                                     </div>
-                                    <div style={{ 
-                                        fontSize: '0.6rem', 
+                                    <div style={{
+                                        fontSize: '0.6rem',
                                         color: isUnlocked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
                                         textTransform: 'uppercase',
                                         letterSpacing: '1px'
@@ -373,15 +419,15 @@ const Profile = () => {
 
             {/* Milestone Replay Overlay */}
             {replayMilestone && (
-                <MilestoneCelebration 
-                    count={replayMilestone} 
-                    onDismiss={() => setReplayMilestone(null)} 
+                <MilestoneCelebration
+                    count={replayMilestone}
+                    onDismiss={() => setReplayMilestone(null)}
                 />
             )}
 
             {showSnapshot && (
-                <SeasonalSnapshot 
-                    onClose={() => setShowSnapshot(false)} 
+                <SeasonalSnapshot
+                    onClose={() => setShowSnapshot(false)}
                 />
             )}
 
@@ -389,10 +435,10 @@ const Profile = () => {
             {!displayUser.isGuest && (
                 <>
                     <div className="mt-4"><ReceiptLogger businesses={businesses} /></div>
-                    
+
                     <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
                         <h3 style={{ marginBottom: '1.2rem' }}><i className="fa-solid fa-history" style={{ color: 'var(--accent-secondary)' }}></i> Activity History</h3>
-                        
+
                         {historyLoading ? (
                             <div style={{ textAlign: 'center', padding: '1.5rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
                         ) : history.length === 0 ? (
@@ -404,7 +450,7 @@ const Profile = () => {
                                     const bizName = item.bizName || 'Unknown Business';
                                     const isPurchase = item.type === 'purchase';
                                     const isPending = item.status === 'pending';
-                                    
+
                                     return (
                                         <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -419,8 +465,8 @@ const Profile = () => {
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
-                                                    <div style={{ 
-                                                        fontSize: '0.6rem', 
+                                                    <div style={{
+                                                        fontSize: '0.6rem',
                                                         color: item.status === 'verified' ? '#4caf50' : (isPending ? '#ffb84d' : 'var(--text-secondary)'),
                                                         textTransform: 'uppercase',
                                                         fontWeight: 'bold',
@@ -433,7 +479,7 @@ const Profile = () => {
 
                                             {isPurchase && isPending && (
                                                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const newAmount = prompt("Enter corrected amount (RM):", item.amount);
                                                             if (newAmount && !isNaN(newAmount)) {
@@ -455,8 +501,18 @@ const Profile = () => {
                     </div>
                 </>
             )}
-            
+
             {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+            
+            {showAppEditor && userApplication && (
+                <ApplicationEditor 
+                    application={userApplication}
+                    onClose={() => setShowAppEditor(false)}
+                    onSave={handleUpdateApplication}
+                    isSaving={isSavingApp}
+                    readOnly={userApplication.status === 'approved'}
+                />
+            )}
         </div>
     );
 };

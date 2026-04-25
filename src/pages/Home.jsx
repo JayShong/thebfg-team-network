@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { getSeasonId } from '../utils/badgeLogic';
 
 const Home = () => {
     const { currentUser } = useAuth();
@@ -17,11 +18,11 @@ const Home = () => {
                     return parsed;
                 }
             }
-        } catch (e) { console.warn("Global stats cache corrupt"); }
         return {
             consumers: 0, businesses: 0, checkins: 0, ghostCheckins: 0,
             purchases: 0, purchaseVolume: 0, totalWaste: 0, totalTrees: 0,
-            totalFamilies: 0, gdpPenetration: "0.01%"
+            totalFamilies: 0, gdpPenetration: "0.01%", initiativeParticipation: 0,
+            sentinelBlocks: 0
         };
     });
 
@@ -47,11 +48,12 @@ const Home = () => {
                 const parsed = JSON.parse(saved);
                 return {
                     checkins: parsed.totalCheckins || 0,
-                    purchases: parsed.totalPurchases || 0
+                    purchases: parsed.totalPurchases || 0,
+                    attendanceDays: parsed.attendanceDays || 0
                 };
             }
         } catch (e) { console.warn("Personal stats cache corrupt"); }
-        return { checkins: 0, purchases: 0 };
+        return { checkins: 0, purchases: 0, attendanceDays: 0 };
     });
 
     const [isSyncing, setIsSyncing] = useState(false);
@@ -62,31 +64,29 @@ const Home = () => {
         setIsSyncing(true);
         console.log("REFRESH: Fetching dashboard data...");
         try {
-            // 1. Fetch Global Stats
+            // 1. Fetch Reconciled Global Stats
             const statsDoc = await db.collection('system').doc('stats').get();
             const serverGlobalStats = statsDoc.exists ? statsDoc.data() : {};
-            console.log("REFRESH: Global data received:", serverGlobalStats);
 
-            // Merge server data with local defaults to prevent wiping out counters
-            let currentStats = { ...stats, ...serverGlobalStats };
-
-
-
-            // 2. Finalize dashboard state
+            // 2. Combine with local defaults
+            const currentStats = { ...stats, ...serverGlobalStats };
+            
+            // 3. Update UI and Cache
             setStats(currentStats);
             localStorage.setItem('bfg_global_stats', JSON.stringify(currentStats));
 
-            // 3. Fetch Personal Stats (O(1) from pre-calculated summary)
+            // 3. Fetch Personal Stats (Seasonal)
             if (currentUser) {
-                const summaryDoc = await db.collection('users')
+                const seasonId = getSeasonId();
+                const seasonalDoc = await db.collection('users')
                     .doc(currentUser.uid)
-                    .collection('counters')
-                    .doc('summary')
+                    .collection('seasons')
+                    .doc(seasonId)
                     .get();
 
-                if (summaryDoc.exists) {
-                    const s = summaryDoc.data();
-                    console.log("REFRESH: Personal summary found:", s);
+                if (seasonalDoc.exists) {
+                    const s = seasonalDoc.data();
+                    console.log(`REFRESH: Seasonal summary (${seasonId}) found:`, s);
 
                     const pStats = {
                         totalCheckins: s.totalCheckins || 0,
@@ -94,25 +94,27 @@ const Home = () => {
                         totalWaste: s.totalWaste || 0,
                         totalTrees: s.totalTrees || 0,
                         totalFamilies: s.totalFamilies || 0,
-                        uniqueBizIds: s.uniqueBizIds || {},
-                        uniqueLocations: s.uniqueLocations || {},
-                        uniqueIndustries: s.uniqueIndustries || {},
+                        totalAttendance: s.totalAttendance || 0,
                         lastSynced: new Date().toISOString()
                     };
 
                     setPersonalStats({
                         checkins: pStats.totalCheckins,
-                        purchases: pStats.totalPurchases
+                        purchases: pStats.totalPurchases,
+                        attendanceDays: pStats.totalAttendance
                     });
                     setQuantifiedImpact({
-                        waste: Number(pStats.totalWaste.toFixed(2)),
-                        trees: Math.round(pStats.totalTrees),
-                        families: pStats.totalFamilies
+                        waste: Number((pStats.totalWaste || 0).toFixed(2)),
+                        trees: Math.round(pStats.totalTrees || 0),
+                        families: pStats.totalFamilies || 0
                     });
 
                     localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
                 } else {
-                    console.warn("REFRESH: Personal summary doc is missing for UID:", currentUser.uid);
+                    console.warn(`REFRESH: Seasonal doc (${seasonId}) missing for UID:`, currentUser.uid);
+                    // Fallback to zeros for a new season
+                    setPersonalStats({ checkins: 0, purchases: 0, attendanceDays: 0 });
+                    setQuantifiedImpact({ waste: 0, trees: 0, families: 0 });
                 }
             }
         } catch (error) {
@@ -193,7 +195,7 @@ const Home = () => {
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-store stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>For-Good Businesses</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Founders</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.businesses || 0).toLocaleString()}</p>
                     </div>
                 </div>
@@ -219,7 +221,14 @@ const Home = () => {
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.purchases || 0).toLocaleString()}</p>
                     </div>
                 </div>
-                <div className="stat-card glass-card" style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
+                <div className="stat-card glass-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+                    <i className="fa-solid fa-users-viewfinder stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
+                    <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Movement Actions</h3>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.initiativeParticipation || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="stat-card glass-card" style={{ background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
                     <i className="fa-solid fa-chart-pie stat-icon" style={{ color: '#FFA000', fontSize: '1.5rem' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>The 30% Goal</h3>
@@ -279,6 +288,36 @@ const Home = () => {
                                 <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Purchases</h3>
                                 <p className="stat-value">{personalStats.purchases}</p>
                             </div>
+                        </div>
+                        <div className="stat-card glass-card highlight-border" style={{ borderTopColor: 'var(--accent-primary)' }}>
+                            <i className="fa-solid fa-flag stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Attendance Days</h3>
+                                <p className="stat-value">{personalStats.attendanceDays || 0}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-card mt-4" style={{ 
+                        background: 'linear-gradient(135deg, rgba(255, 68, 68, 0.05) 0%, rgba(255, 68, 68, 0.02) 100%)', 
+                        borderColor: 'rgba(255, 68, 68, 0.2)', 
+                        marginTop: '2rem',
+                        padding: '1.5rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#ff4444' }}>
+                                    <i className="fa-solid fa-shield-halved"></i> 
+                                    Sentinel Interventions
+                                    <i className="fa-solid fa-circle-question" title="This tracks the total number of spam, bot, and spoofing attempts prevented by the Sentinel security engine to ensure network integrity." style={{ fontSize: '0.8rem', cursor: 'help', color: 'var(--text-secondary)', opacity: 0.6 }}></i>
+                                </h3>
+                                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    Safeguarding the network against malicious actors
+                                </p>
+                            </div>
+                            <p className="stat-value" style={{ margin: 0, fontSize: '2rem', fontWeight: 'bold', color: '#ff4444' }}>
+                                {(stats.sentinelBlocks || 0).toLocaleString()}
+                            </p>
                         </div>
                     </div>
                 </>

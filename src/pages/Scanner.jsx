@@ -11,6 +11,7 @@ const Scanner = () => {
     const navigate = useNavigate();
     const { currentUser, ghostId, addLocalActivity } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
+    const [scannedInitiative, setScannedInitiative] = useState(null);
     const [error, setError] = useState('');
     const [scanning, setScanning] = useState(true);
     const [showTutorial, setShowTutorial] = useState(false);
@@ -18,11 +19,11 @@ const Scanner = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     // Sentinel State
     const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
     const [lockoutTimer, setLockoutTimer] = useState(0);
-    
+
     // Milestone State
     const [activeMilestone, setActiveMilestone] = useState(null);
 
@@ -51,7 +52,7 @@ const Scanner = () => {
 
     useEffect(() => {
         if (!currentUser) return;
-        
+
         // Globally Flagged Blocking
         if (currentUser.isFlagged) {
             setLockoutTimer(999999); // Indefinite lockout for flagged identities
@@ -86,7 +87,7 @@ const Scanner = () => {
         if (scanning && !scannedBusiness && !isSuccess && lockoutTimer <= 0) {
             html5QrCode = new Html5Qrcode("reader");
             const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            
+
             html5QrCode.start({ facingMode: "environment" }, config, async (decodedText) => {
                 handleScan(decodedText, html5QrCode);
             }, (error) => {
@@ -99,7 +100,7 @@ const Scanner = () => {
                 html5QrCode.stop().catch(e => console.warn(e));
             }
         };
-    }, [scanning, scannedBusiness, isSuccess, lockoutTimer]);
+    }, [scanning, scannedBusiness, scannedInitiative, isSuccess, lockoutTimer]);
 
     const handleScan = async (decodedText, html5QrCode) => {
         if (html5QrCode) {
@@ -107,6 +108,19 @@ const Scanner = () => {
         }
 
         try {
+            // 1. Check for Initiative QR
+            if (decodedText.includes('/i/')) {
+                const initId = decodedText.split('/i/')[1].split('/')[0].split('?')[0];
+                const doc = await db.collection('initiatives').doc(initId).get();
+                if (doc.exists) {
+                    setScannedInitiative({ id: doc.id, ...doc.data() });
+                    setError('');
+                    setScanning(false);
+                    return;
+                }
+            }
+
+            // 2. Check for Business QR
             let bizId = decodedText.trim();
             if (decodedText.includes('/b/')) {
                 bizId = decodedText.split('/b/')[1].split('/')[0];
@@ -118,7 +132,7 @@ const Scanner = () => {
                 setError('');
                 setScanning(false);
             } else {
-                setError('Invalid ID or QR Code. Business not found.');
+                setError('Invalid ID or QR Code. Record not found.');
                 setScanning(true);
             }
         } catch (e) {
@@ -133,25 +147,26 @@ const Scanner = () => {
         const personalSaved = localStorage.getItem('bfg_personal_stats');
         let pStats = personalSaved ? JSON.parse(personalSaved) : {
             totalCheckins: 0, totalPurchases: 0, totalWaste: 0, totalTrees: 0, totalFamilies: 0,
+            attendanceDays: 0, lastInitiativeAttendance: {},
             uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {}
         };
-        
+
         // Ensure structure exists for legacy data
         if (!pStats.uniqueBizIds) pStats.uniqueBizIds = {};
-        
+
         if (scannedBusiness) {
             const isNewBiz = !pStats.uniqueBizIds[scannedBusiness.id];
             if (isNewBiz) {
                 pStats.uniqueBizIds[scannedBusiness.id] = true;
                 pStats.totalFamilies = (pStats.totalFamilies || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
-                
+
                 // Check for discovery milestone
                 const discoveryCount = Object.keys(pStats.uniqueBizIds).length;
                 if (DISCOVERY_MILESTONES.some(m => m.count === discoveryCount)) {
                     setActiveMilestone({ count: discoveryCount, type: 'discovery' });
                 }
             }
-            
+
             if (type === 'checkin') {
                 pStats.totalCheckins = (pStats.totalCheckins || 0) + 1;
                 // Check for support milestone
@@ -161,17 +176,17 @@ const Scanner = () => {
                 }
             } else if (type === 'purchase') {
                 pStats.totalPurchases = (pStats.totalPurchases || 0) + 1;
-                
+
                 // Check for purchase milestone
                 const purchaseCount = pStats.totalPurchases;
                 if (PURCHASE_MILESTONES.some(m => m.count === purchaseCount)) {
                     setActiveMilestone({ count: purchaseCount, type: 'purchase' });
                 }
-                
+
                 // Calculate incremental impact if business data is available
                 if (scannedBusiness.yearlyAssessments) {
                     let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-                    const assessments = Array.isArray(scannedBusiness.yearlyAssessments) 
+                    const assessments = Array.isArray(scannedBusiness.yearlyAssessments)
                         ? scannedBusiness.yearlyAssessments : Object.values(scannedBusiness.yearlyAssessments);
 
                     assessments.forEach(ya => {
@@ -212,6 +227,46 @@ const Scanner = () => {
         }
     };
 
+    const submitAttendance = async () => {
+        if (!scannedInitiative || isSubmitting) return;
+        setIsSubmitting(true);
+
+        const today = new Date().toISOString().split('T')[0];
+        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        let pStats = personalSaved ? JSON.parse(personalSaved) : { attendanceDays: 0, lastInitiativeAttendance: {} };
+
+        if (pStats.lastInitiativeAttendance?.[scannedInitiative.id] === today) {
+            alert("Conviction noted! You have already registered your attendance for this initiative today.");
+            setIsSubmitting(false);
+            return;
+        }
+
+        try {
+            const attendanceFn = firebase.functions().httpsCallable('recordinitiativeattendance');
+            await attendanceFn({ initiativeId: scannedInitiative.id });
+
+            // Update Local Stats
+            pStats.attendanceDays = (pStats.attendanceDays || 0) + 1;
+            pStats.lastInitiativeAttendance = { ...pStats.lastInitiativeAttendance, [scannedInitiative.id]: today };
+            localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+
+            setIsSuccess(true);
+            setSuccessMsg(`Attendance registered for: ${scannedInitiative.title}. Thank you for mobilising.`);
+
+            addLocalActivity(currentUser?.nickname || currentUser?.name
+                ? `🔥 ${currentUser.nickname || currentUser.name} joined the initiative: ${scannedInitiative.title}`
+                : `🔥 Someone joined the initiative: ${scannedInitiative.title}`
+            );
+
+            setScannedInitiative(null);
+        } catch (e) {
+            console.error("Attendance error", e);
+            alert(e.message || "Could not register attendance. Ensure you are logged in.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const submitCheckin = async () => {
         if (!scannedBusiness || isSubmitting) return;
         setIsSubmitting(true);
@@ -221,7 +276,7 @@ const Scanner = () => {
             try {
                 const ghostCheckin = firebase.functions().httpsCallable('ghostcheckin');
                 const result = await ghostCheckin({ bizId: scannedBusiness.id, ghostId });
-                
+
                 if (result.data.success) {
                     setIsSuccess(true);
                     setSuccessMsg("Ghost Check-in successful! Your anonymous support has been recorded.");
@@ -245,7 +300,7 @@ const Scanner = () => {
 
         if (lastCheckinDate === today) {
             const attempts = (sentinelState.spamAttempts?.[scannedBusiness.id] || 0) + 1;
-            
+
             if (attempts >= 3) {
                 const lockoutDate = new Date(Date.now() + 10 * 60 * 1000);
                 await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
@@ -270,7 +325,7 @@ const Scanner = () => {
         try {
             const batch = db.batch();
             const transactionRef = db.collection('transactions').doc();
-            
+
             batch.set(transactionRef, {
                 type: 'checkin',
                 bizId: scannedBusiness.id,
@@ -293,16 +348,16 @@ const Scanner = () => {
             setSuccessMsg("You just chose conviction over convenience. That matters.");
             updateLocalStats('checkin');
             setScannedBusiness(null);
-            
+
             // Inject local activity for instant newsreel feedback
-            addLocalActivity(currentUser?.nickname || currentUser?.name 
+            addLocalActivity(currentUser?.nickname || currentUser?.name
                 ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${scannedBusiness.name}`
                 : `📍 A guest checked-in at ${scannedBusiness.name}`
             );
-            
+
             const { evaluateBadges } = await import('../utils/badgeEngine');
             await evaluateBadges(currentUser);
-        } catch(e) {
+        } catch (e) {
             console.error(e);
             alert("Network Error: Could not log activity.");
         } finally {
@@ -325,7 +380,7 @@ const Scanner = () => {
 
         const finalAmount = parseFloat(amount);
         setIsSubmitting(true);
-        
+
         if (isNaN(finalAmount) || finalAmount <= 0) {
             alert("Please enter a valid amount.");
             setIsSubmitting(false);
@@ -334,7 +389,7 @@ const Scanner = () => {
 
         try {
             const isGhost = !currentUser;
-            
+
             await db.collection('transactions').add({
                 type: 'purchase',
                 bizId: scannedBusiness.id,
@@ -351,29 +406,29 @@ const Scanner = () => {
             });
 
             setIsSuccess(true);
-            setSuccessMsg(isGhost 
+            setSuccessMsg(isGhost
                 ? "Your support has been recorded. Thank you for choosing conviction over convenience."
                 : "Your purchase has been recorded. This is proof that for-good businesses can win."
             );
-            
+
             updateLocalStats('purchase', finalAmount);
             setScannedBusiness(null);
-            
+
             // Inject local activity for instant newsreel feedback
-            addLocalActivity(currentUser?.nickname || currentUser?.name 
+            addLocalActivity(currentUser?.nickname || currentUser?.name
                 ? `💳 ${currentUser.nickname || currentUser.name} supported ${scannedBusiness.name}`
                 : `💳 A guest supported ${scannedBusiness.name}`
             );
             setPurchaseForm(false);
             setAmount('');
             setReceiptId('');
-            
+
             // Only evaluate badges for registered users
             if (currentUser) {
                 const { evaluateBadges } = await import('../utils/badgeEngine');
                 await evaluateBadges(currentUser);
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
             alert("Failed to log purchase.");
         } finally {
@@ -383,7 +438,7 @@ const Scanner = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
-            
+
             {isSuccess ? (
                 <div className="glass-card slide-up flex-center" style={{ textAlign: 'center', padding: '3rem 2rem', marginTop: '2rem' }}>
                     <div className="success-ripple" style={{ fontSize: '4rem', color: 'var(--accent-success)', marginBottom: '1.5rem', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -395,11 +450,11 @@ const Scanner = () => {
                     </p>
 
                     {!currentUser && (
-                        <div style={{ 
-                            background: 'rgba(255,184,77,0.1)', 
-                            border: '1px solid rgba(255,184,77,0.3)', 
-                            padding: '1.5rem', 
-                            borderRadius: '15px', 
+                        <div style={{
+                            background: 'rgba(255,184,77,0.1)',
+                            border: '1px solid rgba(255,184,77,0.3)',
+                            padding: '1.5rem',
+                            borderRadius: '15px',
                             marginBottom: '2rem',
                             textAlign: 'left'
                         }}>
@@ -418,13 +473,13 @@ const Scanner = () => {
                         Scan Another
                     </button>
                 </div>
-            ) : !scannedBusiness ? (
+            ) : !scannedBusiness && !scannedInitiative ? (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '1rem', marginBottom: '1.5rem' }}>
                         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Scan QR Code</h1>
-                        <button 
-                            onClick={() => { setShowTutorial(true); setTutorialStep(0); }} 
-                            style={{ 
+                        <button
+                            onClick={() => { setShowTutorial(true); setTutorialStep(0); }}
+                            style={{
                                 background: 'rgba(255,255,255,0.05)',
                                 border: '1px solid var(--glass-border)',
                                 borderRadius: 'var(--radius-full)',
@@ -453,20 +508,21 @@ const Scanner = () => {
                     </div>
 
                     <div id="reader" style={{ width: '100%', borderRadius: '20px', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.1)', background: '#000', minHeight: '300px' }}></div>
-                    
+
                     <div style={{ width: '100%', marginTop: '2.5rem', textAlign: 'center' }}>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                             <i className="fa-solid fa-camera" style={{ marginRight: '8px' }}></i> Point your camera at the BFG standee. Every scan helps a for-good business be seen.
                         </p>
                     </div>
-                    
+
+
                     {error && (
                         <div style={{ color: 'var(--accent)', marginTop: '1.5rem', padding: '1rem', background: 'rgba(255,87,87,0.1)', borderRadius: '10px', fontSize: '0.9rem', width: '100%', textAlign: 'center' }}>
                             <i className="fa-solid fa-triangle-exclamation"></i> {error}
                         </div>
                     )}
                 </>
-            ) : (
+            ) : scannedBusiness ? (
                 <div className="glass-card slide-up" style={{ width: '100%', marginTop: '2rem' }}>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
                         <div style={{ width: '60px', height: '60px', background: 'var(--primary)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: '#fff' }}>
@@ -477,7 +533,7 @@ const Scanner = () => {
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{scannedBusiness.industry} | {scannedBusiness.location}</p>
                         </div>
                     </div>
-                    
+
                     <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
                         <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
                             {scannedBusiness.story?.substring(0, 100)}...
@@ -490,24 +546,24 @@ const Scanner = () => {
                                 <h4 style={{ marginBottom: '1rem', color: 'var(--accent-success)' }}><i className="fa-solid fa-receipt"></i> Log Purchase Details</h4>
                                 <div className="form-group">
                                     <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Amount (RM)</label>
-                                    <input 
-                                        type="number" 
-                                        className="input-modern" 
-                                        placeholder="0.00" 
-                                        value={amount} 
-                                        onChange={(e) => setAmount(e.target.value)} 
+                                    <input
+                                        type="number"
+                                        className="input-modern"
+                                        placeholder="0.00"
+                                        value={amount}
+                                        onChange={(e) => setAmount(e.target.value)}
                                         style={{ width: '100%', marginBottom: '1rem' }}
                                         required
                                     />
                                 </div>
                                 <div className="form-group">
                                     <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Receipt / Bill ID</label>
-                                    <input 
-                                        type="text" 
-                                        className="input-modern" 
-                                        placeholder="e.g. INV-12345" 
-                                        value={receiptId} 
-                                        onChange={(e) => setReceiptId(e.target.value)} 
+                                    <input
+                                        type="text"
+                                        className="input-modern"
+                                        placeholder="e.g. INV-12345"
+                                        value={receiptId}
+                                        onChange={(e) => setReceiptId(e.target.value)}
                                         style={{ width: '100%', marginBottom: '1.5rem' }}
                                         required
                                     />
@@ -524,11 +580,11 @@ const Scanner = () => {
                                 <button onClick={submitCheckin} disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
                                     {isSubmitting ? 'Verifying...' : <><i className="fa-solid fa-check"></i> I See You (Check-In)</>}
                                 </button>
- 
+
                                 <button onClick={() => setPurchaseForm(true)} disabled={isSubmitting} className="btn btn-success" style={{ width: '100%' }}>
                                     <i className="fa-solid fa-receipt"></i> I Choose You (Log Purchase)
                                 </button>
-                                
+
                                 <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
                                     Not right? Scan again
                                 </button>
@@ -536,14 +592,40 @@ const Scanner = () => {
                         )}
                     </div>
                 </div>
+            ) : (
+                <div className="glass-card slide-up" style={{ width: '100%', marginTop: '2rem', border: '1px solid var(--accent-primary)' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <div style={{ width: '60px', height: '60px', background: 'var(--accent-primary)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: '#fff' }}>
+                            <i className="fa-solid fa-flag"></i>
+                        </div>
+                        <div>
+                            <p style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 'bold', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>Active Initiative</p>
+                            <h3 style={{ margin: 0 }}>{scannedInitiative.title}</h3>
+                        </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
+                        <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
+                            {scannedInitiative.narrative || scannedInitiative.description || "Mobilising for a collective for-good impact."}
+                        </p>
+                    </div>
+
+                    <button onClick={submitAttendance} disabled={isSubmitting} className="btn btn-primary feature-gradient" style={{ width: '100%', border: 'none', padding: '1.2rem' }}>
+                        {isSubmitting ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-location-dot"></i> Register My Attendance</>}
+                    </button>
+
+                    <button onClick={() => { setScannedInitiative(null); setScanning(true); }} style={{ width: '100%', background: 'none', border: 'none', padding: '1rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        Cancel
+                    </button>
+                </div>
             )}
 
             {/* Milestone Celebration Overlay */}
             {activeMilestone && (
-                <MilestoneCelebration 
-                    count={activeMilestone.count} 
+                <MilestoneCelebration
+                    count={activeMilestone.count}
                     type={activeMilestone.type}
-                    onDismiss={() => setActiveMilestone(null)} 
+                    onDismiss={() => setActiveMilestone(null)}
                 />
             )}
 
@@ -556,18 +638,18 @@ const Scanner = () => {
                                 <i className="fa-solid fa-times"></i>
                             </button>
                         </div>
-                        
+
                         <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
                             <div style={{ fontSize: '3rem', color: TUTORIAL_STEPS[tutorialStep].color, marginBottom: '1rem' }}>
                                 <i className={`fa-solid ${TUTORIAL_STEPS[tutorialStep].icon}`}></i>
                             </div>
                             <h3 style={{ color: '#ffffff' }}>{TUTORIAL_STEPS[tutorialStep].title}</h3>
-                            
+
                             {TUTORIAL_STEPS[tutorialStep].image && (
                                 <div style={{ margin: '1rem 0', borderRadius: '15px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <img 
-                                        src={TUTORIAL_STEPS[tutorialStep].image} 
-                                        alt={TUTORIAL_STEPS[tutorialStep].title} 
+                                    <img
+                                        src={TUTORIAL_STEPS[tutorialStep].image}
+                                        alt={TUTORIAL_STEPS[tutorialStep].title}
                                         style={{ width: '100%', display: 'block' }}
                                     />
                                 </div>
@@ -584,19 +666,19 @@ const Scanner = () => {
                                     <div key={idx} style={{ width: '8px', height: '8px', borderRadius: '50%', background: idx === tutorialStep ? TUTORIAL_STEPS[idx].color : 'rgba(255,255,255,0.2)' }}></div>
                                 ))}
                             </div>
-                            
+
                             {tutorialStep < TUTORIAL_STEPS.length - 1 ? (
-                                <button 
-                                    onClick={() => setTutorialStep(tutorialStep + 1)} 
-                                    className="btn btn-primary" 
+                                <button
+                                    onClick={() => setTutorialStep(tutorialStep + 1)}
+                                    className="btn btn-primary"
                                     style={{ background: TUTORIAL_STEPS[tutorialStep].color, border: 'none', padding: '0.6rem 1.5rem', width: 'auto' }}
                                 >
                                     Next <i className="fa-solid fa-arrow-right"></i>
                                 </button>
                             ) : (
-                                <button 
-                                    onClick={() => setShowTutorial(false)} 
-                                    className="btn btn-primary" 
+                                <button
+                                    onClick={() => setShowTutorial(false)}
+                                    className="btn btn-primary"
                                     style={{ padding: '0.6rem 1.5rem', width: 'auto' }}
                                 >
                                     Got it!
@@ -607,9 +689,9 @@ const Scanner = () => {
                 </div>
             )}
 
-            )}
         </div>
     );
 };
 
 export default Scanner;
+

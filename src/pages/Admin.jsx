@@ -196,7 +196,7 @@ const RoleManager = () => {
 
 const InitiativesManager = () => {
     const [inits, setInits] = useState([]);
-    const [newInit, setNewInit] = useState({ title: '', narrative: '' });
+    const [newInit, setNewInit] = useState({ title: '', narrative: '', mechanism: '', status: 'active' });
 
     useEffect(() => {
         const unsubscribe = db.collection('initiatives').onSnapshot(snap => {
@@ -208,9 +208,13 @@ const InitiativesManager = () => {
     const saveInit = async (e) => {
         e.preventDefault();
         try {
-            await db.collection('initiatives').add({ ...newInit, createdAt: new Date().toISOString() });
-            setNewInit({ title: '', narrative: '' });
-            alert("Initiative created!");
+            await db.collection('initiatives').add({ 
+                ...newInit, 
+                totalAttendance: 0,
+                createdAt: new Date().toISOString() 
+            });
+            setNewInit({ title: '', narrative: '', mechanism: '', status: 'active' });
+            alert("Initiative published to the network!");
         } catch (e) { alert(e.message); }
     };
 
@@ -224,8 +228,14 @@ const InitiativesManager = () => {
                     </div>
                 ))}
             </div>
-            <form onSubmit={saveInit} style={{ marginTop: '1.5rem' }}>
-                <input type="text" className="input-modern" placeholder="New Initiative Title" value={newInit.title} onChange={e => setNewInit({ ...newInit, title: e.target.value })} required />
+            <form onSubmit={saveInit} style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <input type="text" className="input-modern" placeholder="Initiative Title" value={newInit.title} onChange={e => setNewInit({ ...newInit, title: e.target.value })} required />
+                <textarea className="input-modern" placeholder="Narrative (The Mission)" value={newInit.narrative} onChange={e => setNewInit({ ...newInit, narrative: e.target.value })} rows="3" />
+                <textarea className="input-modern" placeholder="Mechanism (How to Participate)" value={newInit.mechanism} onChange={e => setNewInit({ ...newInit, mechanism: e.target.value })} rows="2" />
+                <select className="input-modern" value={newInit.status} onChange={e => setNewInit({ ...newInit, status: e.target.value })}>
+                    <option value="active">Active Campaign</option>
+                    <option value="past">Historical Record</option>
+                </select>
                 <button
                     type="submit"
                     className="nav-btn"
@@ -247,5 +257,3 @@ const InitiativesManager = () => {
         </div>
     );
 };
-
-export default Admin;

@@ -6,10 +6,12 @@ export const CURRENT_SEASON = {
     description: 'The founding season of the Conviction Network.'
 };
 
+export const getSeasonId = () => CURRENT_SEASON.id;
+
 export const BADGE_CATEGORIES = {
-    'Seen':     { label: 'Seen',     icon: 'fa-binoculars',        color: '#3B82F6', description: 'Making for-good businesses discoverable through physical presence.' },
-    'Verified': { label: 'Verified', icon: 'fa-shield-halved',     color: '#10B981', description: 'Supporting officially audited and verified impact.' },
-    'Valued':   { label: 'Valued',   icon: 'fa-hand-holding-heart', color: '#F59E0B', description: 'Demonstrating financial commitment to for-good founders.' }
+    'Seen': { label: 'Seen', icon: 'fa-binoculars', color: '#3B82F6', description: 'Making for-good businesses discoverable through physical presence.' },
+    'Verified': { label: 'Verified', icon: 'fa-shield-halved', color: '#10B981', description: 'Supporting officially audited and verified impact.' },
+    'Valued': { label: 'Valued', icon: 'fa-hand-holding-heart', color: '#F59E0B', description: 'Demonstrating financial commitment to for-good founders.' }
 };
 
 const SECTOR_MAP = {
@@ -95,12 +97,12 @@ UNIVERSAL.forEach(j => {
 
 export const BADGES_CONFIG = [
     ...GENERATED_BADGES,
-    { 
+    {
         id: 'impact_carbon_crusader', title: 'Carbon Crusader', category: 'Verified', icon: 'fa-cloud-arrow-down',
         why: 'The network has verified your contribution to carbon removal.',
         how: 'Offset 10+ trees through verified purchases.'
     },
-    { 
+    {
         id: 'impact_waste_warrior', title: 'Waste Warrior', category: 'Verified', icon: 'fa-trash-arrow-up',
         why: 'The network has verified your contribution to waste diversion.',
         how: 'Divert 50kg+ of waste through verified purchases.'
@@ -115,7 +117,7 @@ export const evaluateTier = (userBadges = {}) => {
     });
 
     const totalUnlocked = unlockedIds.length;
-    
+
     // Calculate category counts
     const categoryCounts = { 'Seen': 0, 'Verified': 0, 'Valued': 0 };
     unlockedIds.forEach(id => {
@@ -166,7 +168,7 @@ import successImg from '../assets/tutorial/success.png';
 
 export const TUTORIAL_STEPS = [
     {
-        title: "Step 1: Find the Founder",
+        title: "Step 1: Locate the Standee",
         icon: "fa-qrcode",
         text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to begin.",
         color: "#3B82F6",
