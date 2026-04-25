@@ -606,6 +606,15 @@ const Scanner = () => {
                     </div>
                 </div>
             )}
+
+            {/* Milestone Celebration Overlay */}
+            {activeMilestone && (
+                <MilestoneCelebration 
+                    count={activeMilestone.count} 
+                    type={activeMilestone.type}
+                    onDismiss={() => setActiveMilestone(null)} 
+                />
+            )}
         </div>
     );
 };

@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
 import { db } from '../services/firebase';
+import FeedbackModal from '../components/profile/FeedbackModal';
 
 const BusinessProfile = () => {
     const { id } = useParams();
@@ -14,6 +15,7 @@ const BusinessProfile = () => {
     const [business, setBusiness] = useState(null);
     const [selectedBranch, setSelectedBranch] = useState(null);
     const [liveAuditLog, setLiveAuditLog] = useState([]);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     useEffect(() => {
         if (!loading && businesses.length > 0) {
@@ -179,9 +181,18 @@ const BusinessProfile = () => {
                 {/* Score & Industry Row */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
                     {business.membershipType === 'full' ? (
-                        <div className="business-score" style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-                            <div><i className="fa-solid fa-star"></i> TheBFG.Team Score: <strong>{scoreStr}</strong></div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-md)', fontFamily: 'monospace' }}>
+                        <div className="business-score" style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem', width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                <div><i className="fa-solid fa-star"></i> TheBFG.Team Score: <strong>{scoreStr}</strong></div>
+                                <button 
+                                    onClick={() => setShowFeedbackModal(true)}
+                                    className="btn btn-secondary" 
+                                    style={{ fontSize: '0.7rem', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                                >
+                                    <i className="fa-solid fa-comment-dots"></i> Share Observation
+                                </button>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-md)', fontFamily: 'monospace', width: '100%' }}>
                                 Sh:{score?.s || '-'} | Em:{score?.e || '-'} | Cu:{score?.c || '-'} | So:{score?.soc || '-'} | Env:{score?.env || '-'}
                             </div>
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem', fontStyle: 'italic' }}>
@@ -419,6 +430,14 @@ const BusinessProfile = () => {
             >
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
+
+            {showFeedbackModal && (
+                <FeedbackModal 
+                    business={business} 
+                    currentUser={currentUser} 
+                    onClose={() => setShowFeedbackModal(false)} 
+                />
+            )}
         </div>
     );
 };

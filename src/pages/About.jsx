@@ -94,6 +94,22 @@ const About = () => {
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Good businesses are losing. Not because they're wrong — but because no one can see them. We're changing that.</p>
             </div>
 
+            {/* Why We Exist - Acumen Gap & Greenwashing */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div className="glass-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)' }}>
+                    <h4 style={{ color: 'var(--primary)', marginBottom: '0.75rem' }}>Bridging the Acumen Gap</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', margin: 0 }}>
+                        Many for-good founders are brilliant at their craft but struggle to communicate their impact. We bridge that gap by making their conviction legible to the market.
+                    </p>
+                </div>
+                <div className="glass-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)' }}>
+                    <h4 style={{ color: 'var(--accent-success)', marginBottom: '0.75rem' }}>Displacing Greenwashing</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', margin: 0 }}>
+                        Anyone can claim to be "sustainable." We replace marketing spin with a transparent, audited signal that can't be bought or faked.
+                    </p>
+                </div>
+            </div>
+
             {/* The Grading Paradigms - ISO53001 Style */}
             <div className="glass-card detail-section" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
