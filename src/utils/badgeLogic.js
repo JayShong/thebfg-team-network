@@ -171,7 +171,7 @@ export const TUTORIAL_STEPS = [
     {
         title: "Step 4: Success!",
         icon: "fa-certificate",
-        text: "Thank you for contributing to the growth of the empathy economy. Your activity is now securely recorded.",
+        text: "Thank you for contributing to the growth of the conviction economy. Your activity is now securely recorded.",
         color: "#8B5CF6",
         image: successImg
     }

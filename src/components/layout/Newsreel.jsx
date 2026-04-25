@@ -66,7 +66,7 @@ const Newsreel = () => {
             });
         } else if (currentUser) {
             queue.push({
-                text: `✨ Welcome back, ${currentUser.nickname || currentUser.name || 'Explorer'}! Your support strengthens the Empathy Economy.`,
+                text: `✨ Welcome back, ${currentUser.nickname || currentUser.name || 'Explorer'}! Your support strengthens the Conviction Network.`,
                 type: 'welcome',
                 action: null
             });

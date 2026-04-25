@@ -409,7 +409,7 @@ const Scanner = () => {
             ) : !scannedBusiness ? (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '1rem', marginBottom: '1.5rem' }}>
-                        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Scanner</h1>
+                        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Cast Your Vote</h1>
                         <button 
                             onClick={() => { setShowTutorial(true); setTutorialStep(0); }} 
                             style={{ 
@@ -444,7 +444,7 @@ const Scanner = () => {
                     
                     <div style={{ width: '100%', marginTop: '2.5rem', textAlign: 'center' }}>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                            <i className="fa-solid fa-camera" style={{ marginRight: '8px' }}></i> Focus your camera on the official BFG standee to record your support.
+                            <i className="fa-solid fa-camera" style={{ marginRight: '8px' }}></i> Point your camera at the BFG standee. Every scan is a vote for the world you want.
                         </p>
                     </div>
                     

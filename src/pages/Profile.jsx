@@ -82,7 +82,7 @@ const Profile = () => {
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                     <h1 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Your Journey</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Member of The Business For Good Team</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>Your journey in the Conviction Network</p>
                 </div>
                 <button onClick={() => navigate('/settings')} className="icon-btn" title="Settings">
                     <i className="fa-solid fa-gear"></i>
@@ -192,9 +192,9 @@ const Profile = () => {
                         <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'left' }}>
                             <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-circle-info"></i> Why Sign Up?</h4>
                             <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.5' }}>
-                                <li style={{ marginBottom: '0.4rem' }}>Record your check-ins and purchases.</li>
-                                <li style={{ marginBottom: '0.4rem' }}>Unlock exclusive empathy badges.</li>
-                                <li style={{ marginBottom: '0.4rem' }}>Reach higher Tiers for premium rewards.</li>
+                                <li style={{ marginBottom: '0.4rem' }}>Every check-in is a signal. Every purchase is a vote. Make yours count permanently.</li>
+                                <li style={{ marginBottom: '0.4rem' }}>Collect Tokens of Empathy and rise through the Ambassador Journey.</li>
+                                <li style={{ marginBottom: '0.4rem' }}>Prove that conviction-driven consumers are real — and growing.</li>
                             </ul>
                             <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none' }}>
                                 Create Free Account

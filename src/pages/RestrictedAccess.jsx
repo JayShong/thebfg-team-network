@@ -27,7 +27,7 @@ const RestrictedAccess = ({ requiredRole }) => {
                         className="btn btn-primary" 
                         onClick={() => navigate('/')}
                     >
-                        <i className="fa-solid fa-house"></i> Return to Dashboard
+                        <i className="fa-solid fa-house"></i> Return to The Network
                     </button>
                     
                     <button 

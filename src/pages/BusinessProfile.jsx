@@ -184,6 +184,9 @@ const BusinessProfile = () => {
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-md)', fontFamily: 'monospace' }}>
                                 Sh:{score?.s || '-'} | Em:{score?.e || '-'} | Cu:{score?.c || '-'} | So:{score?.soc || '-'} | Env:{score?.env || '-'}
                             </div>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                This is a Living Signal — renewed annually and informed by consumer feedback.
+                            </p>
                         </div>
                     ) : (
                         <div className="business-score" style={{ padding: '0.5rem 1rem', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c4b5fd' }}>

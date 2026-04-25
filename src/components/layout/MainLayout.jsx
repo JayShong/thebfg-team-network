@@ -28,7 +28,7 @@ const MainLayout = () => {
                     <button className="icon-btn" onClick={handleRefresh} title="Refresh Activity">
                         <i className="fa-solid fa-sync-alt"></i>
                     </button>
-                    <button className="icon-btn" onClick={() => navigate('/about')} title="About Paradigm">
+                    <button className="icon-btn" onClick={() => navigate('/about')} title="Our Manifesto">
                         <i className="fa-solid fa-info-circle"></i>
                     </button>
                     <button className="icon-btn" onClick={() => navigate('/profile')} title="Account Details">

@@ -29,7 +29,7 @@ const About = () => {
             }}>
                 <h1 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '1rem', color: '#fff' }}>The 30% Mission</h1>
                 <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.9)', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto' }}>
-                    Let's make empathy a core part of Malaysia's commercial world.
+                    We're building the trust infrastructure for Malaysia's conviction economy.
                 </p>
                 
                 {/* Mission Progress Mockup */}
@@ -42,8 +42,50 @@ const About = () => {
                         <div style={{ width: progressWidth, height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent-success))', borderRadius: '6px' }}></div>
                     </div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.8rem' }}>
-                        <i className="fa-solid fa-circle-info"></i> Your activities sends a message that you choose to prioritize empathy over greed.
+                        <i className="fa-solid fa-circle-info"></i> Every activity here is proof that people choose conviction over convenience — when they can see it.
                     </p>
+                </div>
+            </div>
+
+            {/* Seen, Verified, Valued Framework */}
+            <div className="glass-card" style={{ marginTop: '2rem' }}>
+                <h3 style={{ color: '#fff', marginBottom: '1.5rem', textAlign: 'center' }}>
+                    What We Do
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className="fa-solid fa-eye" style={{ color: 'var(--primary)' }}></i>
+                        </div>
+                        <div>
+                            <h4 style={{ color: '#fff', margin: '0 0 0.3rem' }}>Seen</h4>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                We work directly with founders to make their real work legible — not by adding spin, but by bridging the gap between brilliant execution and clear communication.
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className="fa-solid fa-shield-halved" style={{ color: 'var(--accent-success)' }}></i>
+                        </div>
+                        <div>
+                            <h4 style={{ color: '#fff', margin: '0 0 0.3rem' }}>Verified</h4>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                A living verification system grounded in international standards (ISO53001), evaluating businesses across five dimensions. Not a marketing badge — a transparent, annually-renewed signal.
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className="fa-solid fa-heart" style={{ color: 'var(--accent-primary)' }}></i>
+                        </div>
+                        <div>
+                            <h4 style={{ color: '#fff', margin: '0 0 0.3rem' }}>Valued</h4>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                Every check-in and verified purchase is recorded — not as surveillance, but as proof. Proof that conviction-driven businesses can compete, and that people choose purpose when they can see it.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -59,7 +101,7 @@ const About = () => {
                     <h3 style={{ color: '#ffffff', margin: 0 }}>TheBFG.Team Living Standard<br /><span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Powered by ISO53001</span></h3>
                 </div>
                 <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '1.5rem', lineHeight: '1.7' }}>
-                    Businesses in the Conviction Network are scored across 5 core paradigms. Each paradigm receives a grade between <strong style={{color: 'var(--accent-success)'}}>A (Leadership)</strong> and <strong style={{color: 'var(--accent)'}}>D (Exploitative)</strong>. 
+                    Anyone can claim to be "for good." We built a verification system grounded in international standards that evaluates businesses across 5 stakeholder paradigms — from <strong style={{color: 'var(--accent-success)'}}>A (Paradigm-Defining)</strong> to <strong style={{color: 'var(--accent)'}}>D (Exploitative)</strong>. The result is a transparent signal, not a marketing badge. 
                 </p>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -98,6 +140,13 @@ const About = () => {
                             <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>Nurturing the Earth and all non-human life with the same care and conviction as human life.</p>
                         </div>
                     </div>
+                </div>
+
+                {/* Living Signal Distinction */}
+                <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: '1.6' }}>
+                        <strong style={{ color: 'var(--accent-success)' }}>A Living Signal, not a one-time certification.</strong> Unlike static rating systems, BFG grades are renewed annually. Consumer feedback and real-world observations continuously inform the audit process. This means the signal always reflects the current state of a business's conviction.
+                    </p>
                 </div>
             </div>
 
