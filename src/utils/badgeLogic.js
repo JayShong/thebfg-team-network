@@ -166,30 +166,30 @@ import successImg from '../assets/tutorial/success.png';
 
 export const TUTORIAL_STEPS = [
     {
-        title: "Step 1: Locate the Standee",
+        title: "Step 1: Find the Founder",
         icon: "fa-qrcode",
-        text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to start.",
+        text: "Look for the physical theBFG.team standee next to the cashier or counter. Scan the QR code to begin.",
         color: "#3B82F6",
         image: scannerImg
     },
     {
-        title: "Step 2: Selection",
+        title: "Step 2: Say 'I See You'",
         icon: "fa-hand-pointer",
-        text: "Support them by checking in, or record your support by logging a purchase.",
+        text: "Check-in to support them. It tells the founder their conviction is seen and verified by the network.",
         color: "#10B981",
         image: recognitionImg
     },
     {
-        title: "Step 3: Log Purchase",
+        title: "Step 3: Say 'I Choose You'",
         icon: "fa-receipt",
-        text: "When logging a purchase, enter the Receipt ID and the Total Amount (RM) from your bill.",
+        text: "When logging a purchase, enter the Receipt ID and Amount. This is the ultimate proof that you value what they do.",
         color: "#F59E0B",
         image: purchaseImg
     },
     {
         title: "Step 4: Success!",
         icon: "fa-certificate",
-        text: "Thank you for contributing to the growth of the conviction economy. Your activity is now securely recorded.",
+        text: "Thank you for strengthening the conviction network. Your signal is now securely recorded.",
         color: "#8B5CF6",
         image: successImg
     }

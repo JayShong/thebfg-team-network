@@ -82,7 +82,7 @@ const Initiatives = () => {
         <div style={{ paddingBottom: '2rem' }}>
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Initiatives</h1>
-                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>The network mobilises. These are our collective missions.</p>
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>The network mobilises. These are our collective initiatives.</p>
             </div>
 
             <div className="initiatives-container">

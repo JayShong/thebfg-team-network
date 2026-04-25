@@ -30,7 +30,7 @@ const Admin = () => {
             <button className="back-btn" onClick={() => navigate('/profile')} style={{ marginBottom: '1rem' }}>
                 <i className="fa-solid fa-arrow-left"></i> Back to Profile
             </button>
-            
+
             <div className="page-header" style={{ marginBottom: '2rem' }}>
                 <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0 }}>Governance Portal</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>High-Level Network Management</p>
@@ -98,7 +98,7 @@ const FlaggedIdentities = () => {
         <div className="glass-card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
             <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}><i className="fa-solid fa-triangle-exclamation"></i> Sentinel: Flagged Identities</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Users flagged for automated rule violations. Only you can clear these flags.</p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {flaggedUsers.map(user => (
                     <div key={user.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -140,7 +140,7 @@ const RoleManager = () => {
     const handleUpdate = async (targetEmail, roleType, isRemoving = false) => {
         if (!targetEmail || !targetEmail.includes('@')) return alert("Enter a valid email.");
         const action = isRemoving ? 'remove' : 'assign';
-        
+
         try {
             setLoading(true);
             const manageRoleFn = functions.httpsCallable('managerole');
@@ -162,7 +162,7 @@ const RoleManager = () => {
                 <i className={`fa-solid ${icon}`} style={{ color }}></i>
                 <h4 style={{ margin: 0 }}>{title}</h4>
             </div>
-            
+
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <input type="email" className="input-modern" style={{ flex: 1 }} placeholder="Assign email..." value={email} onChange={e => setEmail(e.target.value)} />
                 <button className="nav-btn active" style={{ background: color }} onClick={() => handleUpdate(email, roleType, false)}>Add</button>
@@ -216,7 +216,7 @@ const InitiativesManager = () => {
 
     return (
         <div className="glass-card">
-            <h3><i className="fa-solid fa-hand-holding-heart" style={{color: 'var(--accent-primary)'}}></i> Network Initiatives</h3>
+            <h3><i className="fa-solid fa-hand-holding-heart" style={{ color: 'var(--accent-primary)' }}></i> Network Initiatives</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                 {inits.map(i => (
                     <div key={i.id} style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
@@ -225,13 +225,13 @@ const InitiativesManager = () => {
                 ))}
             </div>
             <form onSubmit={saveInit} style={{ marginTop: '1.5rem' }}>
-                <input type="text" className="input-modern" placeholder="New Initiative Title" value={newInit.title} onChange={e => setNewInit({...newInit, title: e.target.value})} required />
-                <button 
-                    type="submit" 
-                    className="nav-btn" 
-                    style={{ 
-                        marginTop: '1rem', 
-                        width: '100%', 
+                <input type="text" className="input-modern" placeholder="New Initiative Title" value={newInit.title} onChange={e => setNewInit({ ...newInit, title: e.target.value })} required />
+                <button
+                    type="submit"
+                    className="nav-btn"
+                    style={{
+                        marginTop: '1rem',
+                        width: '100%',
                         justifyContent: 'center',
                         height: '55px',
                         borderRadius: 'var(--radius-full)',

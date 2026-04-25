@@ -5,10 +5,10 @@ import BusinessCard from '../components/business/BusinessCard';
 const Directory = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('all');
-    
+
     // Server-side paginated hook
     const { businesses, loading, loadingMore, error, hasMore, loadMore } = useBusinesses(searchQuery, activeFilter);
-    
+
     // Intersection Observer for Infinite Scroll
     const observer = useRef();
     const lastElementRef = (node) => {
@@ -29,13 +29,13 @@ const Directory = () => {
                 <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Network</h1>
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Businesses that chose purpose. Verified by us. Chosen by you.</p>
             </div>
-            
+
             {/* Search Bar */}
             <div className="search-bar" style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <i className="fa-solid fa-search" style={{ color: 'var(--text-secondary)' }}></i>
-                <input 
-                    type="text" 
-                    placeholder="Search for-good businesses..." 
+                <input
+                    type="text"
+                    placeholder="Search for-good businesses..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="input-modern"
@@ -44,12 +44,12 @@ const Directory = () => {
             </div>
 
             {/* Category Filters */}
-            <div className="filters" style={{ 
-                display: 'flex', 
-                gap: '0.6rem', 
-                overflowX: 'auto', 
-                padding: '1rem 0', 
-                scrollbarWidth: 'none', 
+            <div className="filters" style={{
+                display: 'flex',
+                gap: '0.6rem',
+                overflowX: 'auto',
+                padding: '1rem 0',
+                scrollbarWidth: 'none',
                 paddingBottom: '1.5rem',
                 msOverflowStyle: 'none',
                 WebkitOverflowScrolling: 'touch'
@@ -76,12 +76,12 @@ const Directory = () => {
                     { id: 'nature', label: 'Nature' },
                     { id: 'mobility', label: 'Mobility' }
                 ].map(cat => (
-                    <button 
+                    <button
                         key={cat.id}
                         className={`filter-btn ${activeFilter === cat.id ? 'active' : ''}`}
-                        style={{ 
-                            padding: '0.5rem 1.2rem', 
-                            fontSize: '0.85rem', 
+                        style={{
+                            padding: '0.5rem 1.2rem',
+                            fontSize: '0.85rem',
                             whiteSpace: 'nowrap',
                             borderRadius: 'var(--radius-full)',
                             background: activeFilter === cat.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',

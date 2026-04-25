@@ -87,7 +87,7 @@ const Profile = () => {
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                     <h1 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Your Journey</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Your journey in the Conviction Network</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>Your impact in the BFG ecosystem</p>
                 </div>
                 <button onClick={() => navigate('/settings')} className="icon-btn" title="Settings">
                     <i className="fa-solid fa-gear"></i>
@@ -203,14 +203,18 @@ const Profile = () => {
                     )}
                 </div>
 
-                <div className="stats-grid" style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stats-grid" style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                     <div className="stat-card" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div className="stat-value" style={{ fontSize: '1.75rem', color: 'var(--primary)', fontWeight: 'bold' }}>{displayUser.checkins || 0}</div>
-                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Supports</div>
+                        <div className="stat-value" style={{ fontSize: '1.5rem', color: 'var(--primary)', fontWeight: 'bold' }}>{displayUser.checkins || 0}</div>
+                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Supports</div>
                     </div>
                     <div className="stat-card" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div className="stat-value" style={{ fontSize: '1.75rem', color: '#ffb84d', fontWeight: 'bold' }}>{displayUser.purchases || 0}</div>
-                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchases</div>
+                        <div className="stat-value" style={{ fontSize: '1.5rem', color: '#ffb84d', fontWeight: 'bold' }}>{displayUser.purchases || 0}</div>
+                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchases</div>
+                    </div>
+                    <div className="stat-card" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div className="stat-value" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)', fontWeight: 'bold' }}>{userTier.badgeCount}</div>
+                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Badges</div>
                     </div>
                 </div>
 

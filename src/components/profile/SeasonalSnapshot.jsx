@@ -72,7 +72,7 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
                     </div>
                     <h2 style={{ fontSize: '1.4rem', margin: 0, color: '#fff' }}>{CURRENT_SEASON.name}</h2>
                     <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '2px', marginTop: '0.4rem' }}>
-                        Seasonal Impact Snapshot
+                        Movement Impact Snapshot
                     </p>
                 </div>
 
@@ -91,7 +91,7 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
                         </div>
                         <div style={{ textAlign: 'center' }}>
                             <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#3B82F6' }}>{discoveries}</div>
-                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Seen</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Founders</div>
                         </div>
                     </div>
 

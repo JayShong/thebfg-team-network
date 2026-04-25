@@ -10,12 +10,12 @@ const SUPPORT_MILESTONES = [
 ];
 
 const PURCHASE_MILESTONES = [
-    { count: 1, message: "Your first verified purchase. Your money just became a vote." },
+    { count: 1, message: "Your first verified purchase. This is the proof of your conviction." },
     { count: 5, message: "Five times you funded the conviction economy." },
     { count: 10, message: "Ten purchases. You're shifting capital to where it matters." },
     { count: 25, message: "Twenty-five. Founders like this exist because you choose them." },
     { count: 50, message: "Fifty purchases. You're building an economy worth having." },
-    { count: 100, message: "A hundred votes cast with your wallet. Legend status." }
+    { count: 100, message: "A hundred purchases made with intent. Legend status." }
 ];
 
 const DISCOVERY_MILESTONES = [
@@ -42,12 +42,12 @@ const MilestoneCelebration = ({ count, type = 'support', onDismiss }) => {
 
     if (type === 'purchase') {
         milestoneList = PURCHASE_MILESTONES;
-        label = "Purchases";
+        label = "Purchases Made";
         icon = "fa-receipt";
         color = "var(--accent-success)";
     } else if (type === 'discovery') {
         milestoneList = DISCOVERY_MILESTONES;
-        label = "Businesses Seen";
+        label = "Founders Seen";
         icon = "fa-binoculars";
         color = "#3B82F6";
     }

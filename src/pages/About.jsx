@@ -27,7 +27,7 @@ const About = () => {
                 padding: '2rem',
                 textAlign: 'center'
             }}>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '1rem', color: '#fff' }}>The 30% Mission</h1>
+                <h1 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '1rem', color: '#fff' }}>The 30% Goal</h1>
                 <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.9)', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto' }}>
                     We're building the trust infrastructure for Malaysia's conviction economy.
                 </p>

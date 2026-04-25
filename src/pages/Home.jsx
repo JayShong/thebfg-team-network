@@ -69,7 +69,7 @@ const Home = () => {
 
             // Merge server data with local defaults to prevent wiping out counters
             let currentStats = { ...stats, ...serverGlobalStats };
-            
+
 
 
             // 2. Finalize dashboard state
@@ -87,7 +87,7 @@ const Home = () => {
                 if (summaryDoc.exists) {
                     const s = summaryDoc.data();
                     console.log("REFRESH: Personal summary found:", s);
-                    
+
                     const pStats = {
                         totalCheckins: s.totalCheckins || 0,
                         totalPurchases: s.totalPurchases || 0,
@@ -109,7 +109,7 @@ const Home = () => {
                         trees: Math.round(pStats.totalTrees),
                         families: pStats.totalFamilies
                     });
-                    
+
                     localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
                 } else {
                     console.warn("REFRESH: Personal summary doc is missing for UID:", currentUser.uid);
@@ -145,15 +145,15 @@ const Home = () => {
 
 
 
-                <button 
+                <button
                     onClick={refreshDashboard}
                     disabled={isSyncing}
                     className="btn"
-                    style={{ 
-                        background: 'rgba(255,255,255,0.08)', 
-                        color: 'white', 
-                        fontSize: '0.7rem', 
-                        padding: '2px', 
+                    style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        color: 'white',
+                        fontSize: '0.7rem',
+                        padding: '2px',
                         border: '1px solid rgba(255,255,255,0.15)',
                         whiteSpace: 'nowrap',
                         display: 'flex',
@@ -186,7 +186,7 @@ const Home = () => {
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-users stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>People</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Ambassadors</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.consumers || 0).toLocaleString()}</p>
                     </div>
                 </div>
@@ -205,7 +205,7 @@ const Home = () => {
                             <i className="fa-solid fa-circle-question" title="Every support says: I see you, and I choose you. Ghost supports are from anonymous, non-registered visitors." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
                         </h3>
                         <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                            {isLoading ? '...' : (stats.checkins || 0).toLocaleString()} 
+                            {isLoading ? '...' : (stats.checkins || 0).toLocaleString()}
                             <span style={{ color: 'var(--accent-ghost)', fontWeight: '400', fontSize: '1.2rem', marginLeft: '8px' }}>
                                 | {isLoading ? '...' : (stats.ghostCheckins || 0).toLocaleString()}
                             </span>
@@ -233,7 +233,7 @@ const Home = () => {
 
             <div className="glass-card mt-4" style={{ background: 'linear-gradient(145deg, rgba(239, 108, 0, 0.1), rgba(0, 0, 0, 0.4))', borderColor: 'rgba(239, 108, 0, 0.2)', marginTop: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ margin: 0 }}><i className="fa-solid fa-chart-line" style={{color: '#ef6c00'}}></i> Network Quantified Impact</h3>
+                    <h3 style={{ margin: 0 }}><i className="fa-solid fa-chart-line" style={{ color: '#ef6c00' }}></i> Network Quantified Impact</h3>
                     <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.1)', padding: '0.3rem 0.6rem', borderRadius: '1rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 'bold', letterSpacing: '0.5px' }}>ALPHA / WIP</span>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
@@ -264,7 +264,7 @@ const Home = () => {
                     <div className="page-header mt-4" style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Contribution</h2>
                     </div>
-                    
+
                     <div className="stats-grid personal">
                         <div className="stat-card glass-card highlight-border">
                             <i className="fa-solid fa-location-dot stat-icon" style={{ color: 'var(--accent-primary)' }}></i>

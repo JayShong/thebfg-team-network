@@ -56,18 +56,18 @@ const Login = () => {
         <section id="view-login" style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifySelf: 'center', alignItems: 'center', padding: '2rem', background: 'var(--bg-primary)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '400px', width: '100%', marginTop: 'auto', marginBottom: 'auto' }}>
                 <i className="fa-solid fa-leaf text-gradient" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}></i>
-                <h1 style={{ marginBottom: '0.5rem', textAlign: 'center', fontSize: '2rem', fontWeight: '700' }}>Welcome to TheBFG.Team</h1>
+                <h1 style={{ marginBottom: '0.5rem', textAlign: 'center', fontSize: '2rem', fontWeight: '700' }}>Join the Movement</h1>
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2.5rem', lineHeight: '1.5' }}>
-                    Good businesses are losing. Not because they're wrong — but because no one can see them. We're changing that.
+                    Every purchase is a vote. Every signal is a choice. We're reclaiming 30% of the economy for businesses that care.
                 </p>
 
                 <div className="glass-card" style={{ width: '100%', padding: '2rem' }}>
                     <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className="form-group">
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Email Address</label>
-                            <input 
-                                type="email" 
-                                className="input-modern" 
+                            <input
+                                type="email"
+                                className="input-modern"
                                 placeholder="hello@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -77,7 +77,7 @@ const Login = () => {
                         <div className="form-group">
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                 <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Password</label>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={handleForgotPassword}
                                     style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
@@ -85,20 +85,20 @@ const Login = () => {
                                     Forgot password?
                                 </button>
                             </div>
-                            <input 
-                                type="password" 
-                                className="input-modern" 
+                            <input
+                                type="password"
+                                className="input-modern"
                                 placeholder="At least 6 characters"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>
-                        
+
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
-                            <input 
-                                type="checkbox" 
-                                id="login-remember" 
+                            <input
+                                type="checkbox"
+                                id="login-remember"
                                 checked={remember}
                                 onChange={(e) => setRemember(e.target.checked)}
                                 style={{ width: '18px', height: '18px', cursor: 'pointer' }}
@@ -109,9 +109,9 @@ const Login = () => {
                         {error && <div style={{ color: 'var(--accent)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.5rem' }}>{error}</div>}
                         {message && <div style={{ color: 'var(--accent-success)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.5rem' }}>{message}</div>}
 
-                        <button 
-                            type="submit" 
-                            className="btn btn-primary btn-block" 
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-block"
                             disabled={isProcessing}
                             style={{ padding: '1rem', marginTop: '0.5rem' }}
                         >
@@ -120,7 +120,7 @@ const Login = () => {
                     </form>
 
                     <div style={{ textAlign: 'center', marginTop: '1.75rem' }}>
-                        <button 
+                        <button
                             onClick={continueAsGuest}
                             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.95rem', cursor: 'pointer', transition: 'color 0.2s' }}
                             onMouseOver={(e) => e.target.style.color = 'var(--accent-primary)'}
