@@ -127,8 +127,8 @@ export const evaluateTier = (userBadges = {}) => {
     // Calculate category counts
     const categoryCounts = { 'Seen': 0, 'Verified': 0, 'Valued': 0 };
     unlockedIds.forEach(id => {
-        const badge = GENERATED_BADGES.find(b => b.id === id);
-        if (badge) {
+        const badge = BADGES_CONFIG.find(b => b.id === id);
+        if (badge && badge.category) {
             categoryCounts[badge.category] = (categoryCounts[badge.category] || 0) + 1;
         }
     });

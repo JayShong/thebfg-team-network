@@ -12,12 +12,12 @@ const TierShowcase = ({ currentUser }) => {
     const userBadges = currentUser?.badges || {};
     const tierInfo = evaluateTier(userBadges);
 
-    const currentStepIdx = JOURNEY_STEPS.findIndex(s => s.name === tierInfo.name);
+    const currentStepIdx = Math.max(0, JOURNEY_STEPS.findIndex(s => s.name === tierInfo.name));
     const nextStep = JOURNEY_STEPS[currentStepIdx + 1];
 
     let msgText = tierInfo.isMax 
         ? "You have reached the pinnacle of the movement: Legend Status." 
-        : `Unlock ${tierInfo.totalNext - tierInfo.badgeCount} more badges to become a ${nextStep?.name}.`;
+        : `Unlock ${tierInfo.totalNext - tierInfo.badgeCount} more badges to become a ${nextStep?.name || 'Legend'}.`;
     
     if (!tierInfo.isMax && tierInfo.missingCats && tierInfo.missingCats.length > 0) {
         const countDiff = Math.max(0, tierInfo.totalNext - tierInfo.badgeCount);
