@@ -123,6 +123,31 @@ const BusinessPortal = () => {
         );
     }
 
+    const getIndustryIcon = (industry) => {
+        const map = {
+            'Arts & Culture': 'fa-palette',
+            'Business Support Services': 'fa-handshake-angle',
+            'Cafe and Restaurants': 'fa-utensils',
+            'Community': 'fa-users',
+            'Ecological Stewardship': 'fa-earth-americas',
+            'Education & Talent': 'fa-graduation-cap',
+            'Finance': 'fa-coins',
+            'Food Systems': 'fa-wheat-awn',
+            'Gifts & Crafts': 'fa-gift',
+            'Health & Wellness': 'fa-heart-pulse',
+            'Housing & Living': 'fa-house-chimney',
+            'Manufacturing & Logistics': 'fa-industry',
+            'Personal Support Services': 'fa-user-gear',
+            'Pets': 'fa-paw',
+            'Repairs, Recycling & Sharing': 'fa-screwdriver-wrench',
+            'Social Events': 'fa-calendar-day',
+            'Sports': 'fa-volleyball',
+            'Tourism & Nature': 'fa-leaf',
+            'Transportation & Mobility': 'fa-bus'
+        };
+        return map[industry] || 'fa-store';
+    };
+
     return (
         <div style={{ paddingBottom: '3rem' }}>
             <button 
@@ -157,7 +182,7 @@ const BusinessPortal = () => {
             <div className="page-header" style={{ marginBottom: '2.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <div style={{ background: 'var(--primary)', width: '50px', height: '50px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className={`fa-solid ${selectedBiz?.industry === 'F&B' ? 'fa-utensils' : selectedBiz?.industry === 'Retail' ? 'fa-bag-shopping' : 'fa-briefcase'}`} style={{ color: 'white', fontSize: '1.5rem' }}></i>
+                        <i className={`fa-solid ${getIndustryIcon(selectedBiz?.industry)}`} style={{ color: 'white', fontSize: '1.5rem' }}></i>
                     </div>
                     <div>
                         <h1 style={{ fontSize: '2.4rem', fontWeight: '800', margin: 0 }}>
@@ -254,6 +279,46 @@ const BusinessPortal = () => {
                                 <i className="fa-solid fa-download"></i> Download A5 Standee
                             </button>
                         </div>
+
+                        {selectedBiz.onboardingCode && (
+                            <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(var(--primary-rgb), 0.1)', border: '1px solid var(--primary-light)', borderRadius: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+                                    <div style={{ background: 'var(--primary)', padding: '12px', borderRadius: '12px' }}>
+                                        <i className="fa-solid fa-handshake" style={{ color: 'white', fontSize: '1.2rem' }}></i>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <h4 style={{ margin: 0, color: 'white' }}>The Advocate Handshake</h4>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
+                                            Share this unique code with the member who recommended our network to you. When they enter it in their app, they will be recognized as your official <strong>Network Ambassador</strong>.
+                                        </p>
+                                        <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{ 
+                                                background: 'rgba(0,0,0,0.3)', 
+                                                padding: '10px 20px', 
+                                                borderRadius: '8px', 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '1.2rem', 
+                                                letterSpacing: '2px',
+                                                color: 'var(--primary-light)',
+                                                border: '1px dashed var(--primary-light)'
+                                            }}>
+                                                {selectedBiz.onboardingCode}
+                                            </div>
+                                            <button 
+                                                className="btn-icon" 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(selectedBiz.onboardingCode);
+                                                    alert("Code copied to clipboard!");
+                                                }}
+                                                style={{ padding: '10px', borderRadius: '8px' }}
+                                            >
+                                                <i className="fa-solid fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                              <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>

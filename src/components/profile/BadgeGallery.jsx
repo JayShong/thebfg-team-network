@@ -1,16 +1,78 @@
-import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BADGES_CONFIG, BADGE_CATEGORIES } from '../../utils/badgeLogic';
+import { functions } from '../../services/firebase';
 
 const BadgeGallery = () => {
     const { currentUser } = useAuth();
     const [selectedBadge, setSelectedBadge] = useState(null);
+    const [claimCode, setClaimCode] = useState('');
+    const [isClaiming, setIsClaiming] = useState(false);
+    const [claimSuccess, setClaimSuccess] = useState(null);
+    const [claimError, setClaimError] = useState(null);
 
     const categoryOrder = ['Seen', 'Verified', 'Valued'];
     const userBadges = currentUser?.badges || {};
 
+    const handleClaim = async (e) => {
+        e.preventDefault();
+        if (!claimCode) return;
+        setIsClaiming(true);
+        setClaimError(null);
+        setClaimSuccess(null);
+
+        try {
+            const claimFn = functions.httpsCallable('claimbusinessrecommendation');
+            const result = await claimFn({ onboardingCode: claimCode.trim().toUpperCase() });
+            setClaimSuccess(result.data.bizName);
+            setClaimCode('');
+        } catch (err) {
+            setClaimError(err.message);
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+
     return (
         <div style={{ marginTop: '2rem' }}>
+            {/* Ambassador Redemption Section */}
+            {!currentUser?.isGuest && (
+                <div className="glass-card slide-up" style={{ marginBottom: '2rem', border: '1px solid var(--primary-light)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
+                        <div style={{ background: 'var(--primary)', padding: '10px', borderRadius: '10px' }}>
+                            <i className="fa-solid fa-handshake-angle" style={{ color: 'white' }}></i>
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, color: 'white' }}>Claim a Recommendation</h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Enter the unique code from the business owner you onboarded.</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleClaim} style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                            type="text" 
+                            className="input-modern" 
+                            placeholder="e.g. BFG-X9Z2" 
+                            value={claimCode}
+                            onChange={(e) => setClaimCode(e.target.value)}
+                            style={{ flex: 1, textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: '1px' }}
+                        />
+                        <button type="submit" className="btn btn-primary" style={{ width: 'auto', padding: '0 1.5rem' }} disabled={isClaiming || !claimCode}>
+                            {isClaiming ? <i className="fa-solid fa-spinner fa-spin"></i> : "Redeem"}
+                        </button>
+                    </form>
+
+                    {claimSuccess && (
+                        <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', color: '#4caf50', fontSize: '0.8rem', textAlign: 'center' }}>
+                            <i className="fa-solid fa-circle-check"></i> Success! You are now the official advocate for <strong>{claimSuccess}</strong>.
+                        </div>
+                    )}
+                    {claimError && (
+                        <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 68, 68, 0.1)', border: '1px solid #ff4444', color: '#ff4444', fontSize: '0.8rem', textAlign: 'center' }}>
+                            <i className="fa-solid fa-circle-exclamation"></i> {claimError}
+                        </div>
+                    )}
+                </div>
+            )}
             {categoryOrder.map(catKey => {
                 const catInfo = BADGE_CATEGORIES[catKey];
                 const catBadges = BADGES_CONFIG.filter(b => b.category === catKey);

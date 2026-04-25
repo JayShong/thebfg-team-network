@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { functions } from '../services/firebase';
+import { db, functions } from '../services/firebase';
+import ApplicationEditor from '../components/admin/ApplicationEditor';
 
 const CAUSES_LIST = [
     "Poverty Eradication",
@@ -26,6 +27,16 @@ const Settings = () => {
     const [dob, setDob] = useState('');
     const [selectedCauses, setSelectedCauses] = useState([]);
     
+    // Business Onboarding State
+    const [bizName, setBizName] = useState('');
+    const [bizAddress, setBizAddress] = useState('');
+    const [bizPhone, setBizPhone] = useState('');
+    const [bizEmail, setBizEmail] = useState('');
+    const [showEmailWarning, setShowEmailWarning] = useState(false);
+    const [onboardingSuccess, setOnboardingSuccess] = useState(false);
+    const [myApplication, setMyApplication] = useState(null);
+    const [editingApp, setEditingApp] = useState(null);
+    
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
 
@@ -36,8 +47,67 @@ const Settings = () => {
             setCity(currentUser.city || '');
             setDob(currentUser.dob || '');
             setSelectedCauses(currentUser.causes || []);
+            setBizEmail(currentUser.email || '');
         }
     }, [currentUser]);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        const unsubscribe = db.collection('applications')
+            .where('ownerUid', '==', currentUser.uid)
+            .where('status', 'in', ['pending', 'draft'])
+            .limit(1)
+            .onSnapshot(snap => {
+                if (!snap.empty) {
+                    setMyApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                } else {
+                    setMyApplication(null);
+                }
+            });
+        return unsubscribe;
+    }, [currentUser]);
+
+    const handleBizEmailChange = (val) => {
+        setBizEmail(val);
+        setShowEmailWarning(val !== currentUser?.email);
+    };
+
+    const handleOnboardSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const onboardFn = functions.httpsCallable('onboardbusinessapplication');
+            await onboardFn({
+                name: bizName,
+                address: bizAddress,
+                phone: bizPhone,
+                email: bizEmail,
+                ownerUid: currentUser.uid
+            });
+            setOnboardingSuccess(true);
+            setBizName('');
+            setBizAddress('');
+            setBizPhone('');
+        } catch (err) {
+            setMessage({ text: 'Onboarding application failed: ' + err.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateApp = async (updates) => {
+        setLoading(true);
+        try {
+            const updateFn = functions.httpsCallable('updateapplication');
+            await updateFn({ applicationId: editingApp.id, updates });
+            setEditingApp(null);
+            setMessage({ text: 'Onboarding draft updated successfully!', type: 'success' });
+        } catch (err) {
+            setMessage({ text: 'Failed to update draft: ' + err.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleToggleCause = (cause) => {
         setSelectedCauses(prev => 
@@ -199,6 +269,74 @@ const Settings = () => {
                     </div>
                 </div>
 
+                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.25s', border: '1px solid var(--primary-light)' }}>
+                    <h3 style={{ color: '#fff', marginBottom: '0.5rem' }}><i className="fa-solid fa-briefcase" style={{color: 'var(--primary)'}}></i> Onboard Your Business</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                        Apply to list your business in the BFG Network. Once submitted, our team will review your application.
+                    </p>
+                    
+                    {myApplication ? (
+                        <div style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary-light)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <div>
+                                    <h4 style={{ margin: 0 }}>Application for {myApplication.name}</h4>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        Status: <strong style={{ color: 'var(--primary-light)', textTransform: 'uppercase' }}>{myApplication.status}</strong>
+                                    </p>
+                                </div>
+                                <span className="tier-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
+                                    {myApplication.assignedTo ? 'Partner Assigned' : 'Awaiting CS Partner'}
+                                </span>
+                            </div>
+                            
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '1.2rem' }}>
+                                {myApplication.assignedTo 
+                                    ? `Great news! A Customer Success partner (${myApplication.assignedEmail}) is currently handling your application. You can both co-edit the details together.`
+                                    : "Your application is in the pool. Once a Customer Success member picks it up, you'll be able to co-edit the full business profile details here."}
+                            </p>
+
+                            <button type="button" onClick={() => setEditingApp(myApplication)} className="nav-btn active" style={{ width: '100%', justifyContent: 'center' }}>
+                                <i className="fa-solid fa-pen-to-square"></i> Edit My Application Details
+                            </button>
+                        </div>
+                    ) : onboardingSuccess ? (
+                        <div className="success-gradient" style={{ padding: '1.5rem', borderRadius: '12px', textAlign: 'center' }}>
+                            <i className="fa-solid fa-circle-check fa-2x" style={{ marginBottom: '0.5rem' }}></i>
+                            <p style={{ fontWeight: '600' }}>Application Submitted!</p>
+                            <p style={{ fontSize: '0.85rem' }}>A customer success representative will pick up your application shortly.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                            <div className="form-group">
+                                <label>Business Name</label>
+                                <input type="text" className="input-modern" value={bizName} onChange={(e) => setBizName(e.target.value)} placeholder="Official Business Name" />
+                            </div>
+                            <div className="form-group">
+                                <label>Business Address</label>
+                                <textarea className="input-modern" style={{ minHeight: '80px' }} value={bizAddress} onChange={(e) => setBizAddress(e.target.value)} placeholder="Full physical address" />
+                            </div>
+                            <div className="form-group">
+                                <label>Contact Number</label>
+                                <input type="tel" className="input-modern" value={bizPhone} onChange={(e) => setBizPhone(e.target.value)} placeholder="+60..." />
+                            </div>
+                            <div className="form-group">
+                                <label>Business Email</label>
+                                <input type="email" className="input-modern" value={bizEmail} onChange={(e) => handleBizEmailChange(e.target.value)} />
+                                {showEmailWarning && (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.75rem', borderRadius: '8px', backgroundColor: 'rgba(255, 165, 0, 0.1)', border: '1px solid orange' }}>
+                                        <p style={{ color: 'orange', fontSize: '0.75rem', margin: 0 }}>
+                                            <i className="fa-solid fa-triangle-exclamation"></i> <strong>Warning:</strong> If you use a different email, a new account will be created. You will need to manage two separate accounts.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <button type="button" onClick={handleOnboardSubmit} className="btn btn-primary" style={{ marginTop: '0.5rem' }} disabled={loading || !bizName || !bizAddress}>
+                                {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : "Submit Application"}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.3s', border: '1px solid rgba(255, 68, 68, 0.3)' }}>
                     <h3 style={{ color: '#ff4444' }}><i className="fa-solid fa-triangle-exclamation"></i> Danger Zone</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
@@ -224,6 +362,15 @@ const Settings = () => {
                     {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-floppy-disk"></i> Save Changes</>}
                 </button>
             </form>
+
+            {editingApp && (
+                <ApplicationEditor 
+                    application={editingApp} 
+                    onClose={() => setEditingApp(null)} 
+                    onSave={handleUpdateApp}
+                    isSaving={loading}
+                />
+            )}
         </div>
     );
 };

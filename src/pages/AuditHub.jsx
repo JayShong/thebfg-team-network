@@ -9,25 +9,20 @@ const AuditHub = () => {
     const { businesses, loading: bizLoading } = useBusinesses();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('supervisor'); // 'supervisor', 'auditor'
+    const [activeTab, setActiveTab] = useState('inventory'); // 'inventory', 'supervisor', 'auditor'
 
     useEffect(() => {
         if (!currentUser) return;
 
         let query = db.collection('audit_logs');
 
-        // 1. Define Server-side filtering strategy
         if (currentUser.isSuperAdmin) {
-            // Admins see a curated recent slice for oversight
             query = query.orderBy('createdAt', 'desc').limit(50);
         } else if (activeTab === 'supervisor') {
-            // Supervisors see only what they need to act on
             query = query.where('supervisorEmail', '==', currentUser.email)
                          .where('status', '==', 'PENDING_APPROVAL');
-        } else {
-            // Auditors see only their active work-in-progress
+        } else if (activeTab === 'auditor') {
             query = query.where('auditorEmail', '==', currentUser.email);
-            // Note: We filter status locally if needed to avoid complex composite index requirements
         }
 
         const unsubscribe = query.onSnapshot(snapshot => {
@@ -36,8 +31,6 @@ const AuditHub = () => {
                 loaded.push({ id: doc.id, ...doc.data() });
             });
             
-            // 2. Perform final sorting and status pruning locally
-            // This handles cases where we couldn't filter perfectly server-side without manual indexing
             let filtered = loaded;
             if (!currentUser.isSuperAdmin && activeTab === 'auditor') {
                 filtered = loaded.filter(l => ['SYSTEM_DRAFT', 'RETURNED', 'PUBLISHED'].includes(l.status));
@@ -54,12 +47,10 @@ const AuditHub = () => {
         return unsubscribe;
     }, [currentUser, activeTab]);
 
-    // Authorization Guard
     if (!currentUser?.isSuperAdmin && !currentUser?.isAuditor) {
-        return <div style={{ padding: '2rem', textAlign: 'center' }}>Unauthorized Access</div>;
+        return <div style={{ padding: '2rem', textAlign: 'center' }}>Unauthorized Access: Auditors & Admins Only</div>;
     }
 
-    // Filter logic matching legacy app.js:4009-4010
     const myDrafts = logs.filter(l => l.auditorEmail === currentUser.email && (l.status === 'SYSTEM_DRAFT' || l.status === 'RETURNED'));
     const pendingForMe = logs.filter(l => {
         const isAssignedToMe = l.supervisorEmail === currentUser.email || (l.supervisorEmails && l.supervisorEmail === undefined && l.supervisorEmails.includes(currentUser.email));
@@ -69,21 +60,16 @@ const AuditHub = () => {
     const approveAudit = async (log) => {
         if (!window.confirm(`Approve and publish audit for ${log.bizName}?`)) return;
         try {
-            // 1. Update the log status
             await db.collection('audit_logs').doc(log.id).update({
                 status: 'PUBLISHED',
                 approvedAt: new Date().toISOString(),
                 approvedBy: currentUser.email
             });
-
-            // 2. Reflect on business doc matching legacy app.js:143
             await db.collection('businesses').doc(log.bizId).update({
                 score: log.scores || log.score,
-                yearlyAssessments: log.yearlyAssessments || [],
                 isVerified: true,
                 lastAuditDate: new Date().toISOString()
             });
-
             alert("Audit published successfully.");
         } catch (e) {
             alert("Approval failed: " + e.message);
@@ -93,7 +79,6 @@ const AuditHub = () => {
     const rejectAudit = async (log) => {
         const comment = window.prompt("Enter rejection comment / feedback for the auditor:");
         if (!comment) return;
-
         try {
             await db.collection('audit_logs').doc(log.id).update({
                 status: 'RETURNED',
@@ -122,14 +107,31 @@ const AuditHub = () => {
         }
     };
 
+    const initiateAudit = (biz) => {
+        const scores = prompt("Enter initial BFG Paradigm scores (e.g. ABABA):", biz.score || 'CCCCC');
+        if (!scores) return;
+        
+        db.collection('audit_logs').add({
+            bizId: biz.id,
+            bizName: biz.name,
+            auditorEmail: currentUser.email,
+            status: 'SYSTEM_DRAFT',
+            scores: scores,
+            createdAt: new Date().toISOString()
+        }).then(() => {
+            setActiveTab('auditor');
+            alert("Audit draft created.");
+        });
+    };
+
     return (
         <div style={{ paddingBottom: '3rem' }}>
             <div className="page-header" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <i className="fa-solid fa-clipboard-check fa-2x" style={{ color: '#4caf50' }}></i>
+                    <i className="fa-solid fa-clipboard-check fa-2x" style={{ color: 'var(--color-compliance)' }}></i>
                     <div>
                         <h2 style={{ margin: 0 }}>Verification Hub</h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ISO53001 Compliance Workflow</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ISO53001 Compliance & Business Scoring</p>
                     </div>
                 </div>
                 <button onClick={() => window.history.back()} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
@@ -139,12 +141,20 @@ const AuditHub = () => {
 
             <div className="stats-grid" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
                 <div 
+                    className={`stat-card glass-card ${activeTab === 'inventory' ? 'active-border' : ''}`} 
+                    onClick={() => setActiveTab('inventory')}
+                    style={{ cursor: 'pointer', borderLeft: '4px solid #3b82f6' }}
+                >
+                    <h3>{businesses.length}</h3>
+                    <p>Network Inventory</p>
+                </div>
+                <div 
                     className={`stat-card glass-card ${activeTab === 'auditor' ? 'active-border' : ''}`} 
                     onClick={() => setActiveTab('auditor')}
-                    style={{ cursor: 'pointer', borderLeft: '4px solid #81C784' }}
+                    style={{ cursor: 'pointer', borderLeft: '4px solid var(--color-compliance)' }}
                 >
                     <h3>{myDrafts.length}</h3>
-                    <p>My Action Items</p>
+                    <p>My Active Audits</p>
                 </div>
                 <div 
                     className={`stat-card glass-card ${activeTab === 'supervisor' ? 'active-border' : ''}`} 
@@ -156,140 +166,85 @@ const AuditHub = () => {
                 </div>
             </div>
 
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                    <i className="fa-solid fa-spinner fa-spin fa-2x"></i>
-                    <p style={{ marginTop: '1rem' }}>Sychronizing verification logs...</p>
-                </div>
-            ) : (
-                <div className="slide-up">
-                    {activeTab === 'supervisor' ? (
-                        <>
-                            <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-user-check"></i> Approvals Assigned to Me</h3>
-                            {pendingForMe.length === 0 ? (
-                                <p style={{ color: 'var(--text-secondary)' }}>No logs currently awaiting your authorization.</p>
-                            ) : (
-                                pendingForMe.map(log => (
-                                    <div key={log.id} className="glass-card mt-3" style={{ borderLeft: '4px solid var(--accent-primary)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <div>
-                                                <h4 style={{ margin: 0 }}>{log.bizName}</h4>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Auditor: {log.auditorEmail}</p>
-                                            </div>
-                                            <span className="tier-badge" style={{ 
-                                                background: log.status === 'VERIFICATION_STARTED' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.2)', 
-                                                color: log.status === 'VERIFICATION_STARTED' ? '#F59E0B' : 'var(--accent-primary)' 
-                                            }}>
-                                                {log.status === 'VERIFICATION_STARTED' ? 'Audit in Progress' : 'Pending Approval'}
-                                            </span>
-                                        </div>
-                                        <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                            <p style={{ fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Public Summary:</p>
-                                            <p style={{ fontStyle: 'italic', fontSize: '0.9rem' }}>"{log.publicSummary}"</p>
-                                            <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,0.1)', margin: '0.8rem 0' }} />
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Details: {log.details || 'Baseline Assessment'}</p>
-                                        </div>
-                                        <div style={{ marginTop: '1.2rem', display: 'flex', gap: '0.8rem' }}>
-                                            <button 
-                                                className="nav-btn" 
-                                                style={{ 
-                                                    flex: 1, 
-                                                    justifyContent: 'center', 
-                                                    height: '50px',
-                                                    borderRadius: 'var(--radius-full)',
-                                                    background: 'rgba(0,0,0,0.2)',
-                                                    border: '1px solid var(--accent-success)',
-                                                    color: 'var(--accent-success)',
-                                                    fontWeight: '700'
-                                                }} 
-                                                onClick={() => approveAudit(log)}
-                                            >
-                                                <i className="fa-solid fa-check-double"></i> Approve & Publish
-                                            </button>
-                                            <button 
-                                                className="nav-btn" 
-                                                style={{ 
-                                                    flex: 1, 
-                                                    justifyContent: 'center', 
-                                                    height: '50px',
-                                                    borderRadius: 'var(--radius-full)',
-                                                    background: 'rgba(255, 67, 54, 0.05)',
-                                                    border: '1px solid #f44336',
-                                                    color: '#f44336',
-                                                    fontWeight: '700'
-                                                }} 
-                                                onClick={() => rejectAudit(log)}
-                                            >
-                                                <i className="fa-solid fa-xmark"></i> Reject
-                                            </button>
+            <div className="slide-up">
+                {activeTab === 'inventory' && (
+                    <>
+                        <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-store"></i> All Businesses</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                            {businesses.map(biz => (
+                                <div key={biz.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ margin: 0 }}>{biz.name}</h4>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{biz.industry} • {biz.location}</p>
+                                        <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', letterSpacing: '2px', color: 'var(--primary-light)' }}>
+                                            {biz.score || 'PENDING'}
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-pen-nib"></i> My Action Items</h3>
-                            {myDrafts.length === 0 ? (
-                                <p style={{ color: 'var(--text-secondary)' }}>You have no active drafts or returned items.</p>
-                            ) : (
-                                myDrafts.map(log => {
-                                    const isReturned = log.status === 'RETURNED';
-                                    return (
-                                        <div key={log.id} className="glass-card mt-3" style={{ borderLeft: `4px solid ${isReturned ? '#ffb84d' : '#81C784'}` }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <div>
-                                                    <h4 style={{ margin: 0 }}>{log.bizName}</h4>
-                                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Created: {new Date(log.createdAt).toLocaleDateString()}</p>
-                                                </div>
-                                                <span className="tier-badge" style={{ background: isReturned ? 'rgba(255,184,77,0.1)' : 'rgba(129,199,132,0.1)', color: isReturned ? '#ffb84d' : '#81C784' }}>{log.status}</span>
-                                            </div>
-                                            
-                                            {isReturned && (
-                                                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(244,67,54,0.05)', borderRadius: '8px', border: '1px solid rgba(244,67,54,0.2)' }}>
-                                                    <p style={{ color: '#ffb84d', fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.3rem' }}>Rejection Comment from {log.rejectedBy}:</p>
-                                                    <p style={{ fontSize: '0.9rem' }}>{log.rejectionComment}</p>
-                                                </div>
-                                            )}
+                                    <button onClick={() => initiateAudit(biz)} className="btn btn-primary" style={{ fontSize: '0.7rem', width: 'auto', padding: '0.5rem 1rem' }}>
+                                        Initiate Audit
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
 
-                                            <div style={{ marginTop: '1.2rem' }}>
-                                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Public Summary (Compliance Timeline Narrative)</label>
-                                                <textarea 
-                                                    id={`summary-${log.id}`} 
-                                                    className="input-modern" 
-                                                    rows="2" 
-                                                    defaultValue={log.publicSummary || ''} 
-                                                    style={{ width: '100%', marginBottom: '1rem' }}
-                                                    placeholder="A human-readable explanation of why this audit was performed..."
-                                                ></textarea>
-                                                
-                                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Select Supervisor</label>
-                                                <select id={`sup-${log.id}`} className="input-modern" style={{ width: '100%', marginBottom: '1rem' }}>
-                                                    {(log.supervisorEmails || PLATFORM_CONFIG.DEFAULT_SUPERVISORS).map(email => (
-                                                        <option key={email} value={email}>{email}</option>
-                                                    ))}
-                                                </select>
-
-                                                <button 
-                                                    className="nav-btn active" 
-                                                    style={{ width: '100%', justifyContent: 'center' }}
-                                                    onClick={() => {
-                                                        const sum = document.getElementById(`summary-${log.id}`).value;
-                                                        const sup = document.getElementById(`sup-${log.id}`).value;
-                                                        submitToSupervisor(log, sum, sup);
-                                                    }}
-                                                >
-                                                    Submit for Verification
-                                                </button>
-                                            </div>
+                {activeTab === 'supervisor' && (
+                    <>
+                        <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-user-check"></i> Pending Approvals</h3>
+                        {pendingForMe.length === 0 ? (
+                            <p style={{ color: 'var(--text-secondary)' }}>Queue is clear.</p>
+                        ) : (
+                            pendingForMe.map(log => (
+                                <div key={log.id} className="glass-card mt-3" style={{ borderLeft: '4px solid var(--accent-primary)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <h4 style={{ margin: 0 }}>{log.bizName}</h4>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scores: {log.scores}</p>
                                         </div>
-                                    );
-                                })
-                            )}
-                        </>
-                    )}
-                </div>
-            )}
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button onClick={() => approveAudit(log)} className="btn-icon" title="Approve"><i className="fa-solid fa-check" style={{color: 'var(--color-compliance)'}}></i></button>
+                                            <button onClick={() => rejectAudit(log)} className="btn-icon" title="Reject"><i className="fa-solid fa-xmark" style={{color: '#f44336'}}></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'auditor' && (
+                    <>
+                        <h3 style={{ marginBottom: '1rem' }}><i className="fa-solid fa-pen-nib"></i> My Action Items</h3>
+                        {myDrafts.length === 0 ? (
+                            <p style={{ color: 'var(--text-secondary)' }}>No active drafts.</p>
+                        ) : (
+                            myDrafts.map(log => (
+                                <div key={log.id} className="glass-card mt-3">
+                                    <h4 style={{ margin: 0 }}>{log.bizName}</h4>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status: {log.status}</p>
+                                    <div style={{ marginTop: '1rem' }}>
+                                        <textarea 
+                                            id={`sum-${log.id}`} 
+                                            className="input-modern" 
+                                            placeholder="Audit Summary..." 
+                                            defaultValue={log.publicSummary}
+                                            style={{ marginBottom: '0.5rem' }}
+                                        />
+                                        <button 
+                                            className="nav-btn active" 
+                                            style={{ width: '100%', justifyContent: 'center' }}
+                                            onClick={() => submitToSupervisor(log, document.getElementById(`sum-${log.id}`).value, PLATFORM_CONFIG.DEFAULT_SUPERVISORS[0])}
+                                        >
+                                            Submit for Verification
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };

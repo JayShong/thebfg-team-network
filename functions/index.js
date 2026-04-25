@@ -63,8 +63,16 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
             const data = doc.data();
             shardWaste += (data.totalWaste || 0);
             shardTrees += (data.totalTrees || 0);
-            // Clear shard after reading
-            batch.delete(doc.ref);
+            
+            // SECURITY FIX: Subtract the amount we just processed instead of deleting the doc
+            // This prevents losing increments that happen between the 'get' and the 'delete'
+            const resetBatch = {};
+            if (data.totalWaste) resetBatch.totalWaste = admin.firestore.FieldValue.increment(-data.totalWaste);
+            if (data.totalTrees) resetBatch.totalTrees = admin.firestore.FieldValue.increment(-data.totalTrees);
+            
+            if (Object.keys(resetBatch).length > 0) {
+                batch.set(doc.ref, resetBatch, { merge: true });
+            }
         });
 
         // Add shard deltas to main stats
@@ -146,7 +154,17 @@ exports.reconcilenetworkstats = onSchedule("every 30 minutes", async (event) => 
                     ghostCheckinsInc += (s.ghostCheckinsCount || 0);
                     purchasesInc += (s.purchasesCount || 0);
                     volumeInc += (s.purchaseVolume || 0);
-                    shardBatch.delete(sDoc.ref);
+
+                    // SECURITY FIX: Subtract the amount we just processed instead of deleting
+                    const bReset = {};
+                    if (s.checkinsCount) bReset.checkinsCount = admin.firestore.FieldValue.increment(-s.checkinsCount);
+                    if (s.ghostCheckinsCount) bReset.ghostCheckinsCount = admin.firestore.FieldValue.increment(-s.ghostCheckinsCount);
+                    if (s.purchasesCount) bReset.purchasesCount = admin.firestore.FieldValue.increment(-s.purchasesCount);
+                    if (s.purchaseVolume) bReset.purchaseVolume = admin.firestore.FieldValue.increment(-s.purchaseVolume);
+
+                    if (Object.keys(bReset).length > 0) {
+                        shardBatch.set(sDoc.ref, bReset, { merge: true });
+                    }
                 });
 
                 if (shardsSnap.size > 0) {
@@ -195,15 +213,37 @@ exports.onbusinessdeleted = onDocumentDeleted('businesses/{bizId}', async (event
 
 const { BADGES_CONFIG, evaluateTier, evaluateBadges } = require('./badgeEngine');
 
+/**
+ * Determine the current season and year based on timestamp.
+ * Special Rule: Season 1 of 2026 ends on Dec 31, 2026.
+ */
+const getSeasonContext = (timestamp) => {
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date();
+    const year = date.getFullYear();
+    const month = date.getMonth(); // 0-indexed
+
+    let seasonId;
+    if (year === 2026) {
+        seasonId = '2026_GENESIS'; // Special extended first season
+    } else {
+        // Standard rule: S1 (Jan-Jun), S2 (Jul-Dec)
+        const sNum = month < 6 ? 1 : 2;
+        seasonId = `${year}_S${sNum}`;
+    }
+
+    return { year: year.toString(), seasonId };
+};
+
 // 3. Transaction Triggers (Sanitized Feed & The Sentinel)
 exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (event) => {
     const txn = event.data.data();
     if (!txn.userId) return null;
     const today = new Date().toISOString().split('T')[0];
+    const { year, seasonId } = getSeasonContext(txn.timestamp);
 
     try {
         // A. The Sentinel: Background Verification
-        // ... (existing sentinel logic) ...
+        // ... (Sentinel logic remains unchanged) ...
         const dailyQuery = await db.collection('transactions')
             .where('userId', '==', txn.userId)
             .where('bizId', '==', txn.bizId)
@@ -235,90 +275,93 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
         // B. SCALE-FIRST: Update User Stats & Evaluate Badges
         if (!txn.isGhost) {
             const statsRef = db.collection('users').doc(txn.userId).collection('counters').doc('summary');
+            const annualRef = db.collection('users').doc(txn.userId).collection('annual').doc(year);
+            const seasonalRef = db.collection('users').doc(txn.userId).collection('seasons').doc(seasonId);
             const userRef = db.collection('users').doc(txn.userId);
+            
             const bizDoc = await db.collection('businesses').doc(txn.bizId).get();
             const biz = bizDoc.exists ? bizDoc.data() : null;
             
             await db.runTransaction(async (transaction) => {
                 const statsDoc = await transaction.get(statsRef);
+                const annualDoc = await transaction.get(annualRef);
+                const seasonalDoc = await transaction.get(seasonalRef);
                 const userDoc = await transaction.get(userRef);
                 
-                let stats = statsDoc.exists ? statsDoc.data() : {
-                    totalCheckins: 0,
-                    totalPurchases: 0,
-                    totalWaste: 0,
-                    totalTrees: 0,
-                    totalFamilies: 0,
-                    uniqueBizIds: {},
-                    uniqueLocations: {},
-                    uniqueIndustries: {},
-                    bizVisits: {}
-                };
+                const updateLayer = (doc) => {
+                    const stats = doc.exists ? doc.data() : {
+                        totalCheckins: 0, totalPurchases: 0, totalWaste: 0,
+                        totalTrees: 0, totalFamilies: 0,
+                        uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {},
+                        uniqueImpactfulBizIds: {}, uniqueVerifiedBizIds: {}, uniqueTransparentBizIds: {},
+                        bizVisits: {}
+                    };
 
-                // Initialize fields if missing in old documents
-                stats.totalWaste = stats.totalWaste || 0;
-                stats.totalTrees = stats.totalTrees || 0;
-                stats.totalFamilies = stats.totalFamilies || 0;
-
-                const isNewBiz = !stats.uniqueBizIds?.[txn.bizId];
-
-                // Update counters
-                if (txn.type === 'checkin') stats.totalCheckins = (stats.totalCheckins || 0) + 1;
-                if (txn.type === 'purchase') {
-                    stats.totalPurchases = (stats.totalPurchases || 0) + 1;
-                    // Quantified impact (Waste/Trees) moved to verification stage
-                }
-                
-                // Update maps for unique badges & family impact
-                if (txn.bizId) {
-                    stats.uniqueBizIds = stats.uniqueBizIds || {};
-                    if (isNewBiz) {
-                        stats.uniqueBizIds[txn.bizId] = true;
-                        if (biz) stats.totalFamilies += (parseInt(biz.impactJobs) || 0);
-                    }
+                    const isNewBiz = !stats.uniqueBizIds?.[txn.bizId];
+                    if (txn.type === 'checkin') stats.totalCheckins = (stats.totalCheckins || 0) + 1;
+                    if (txn.type === 'purchase') stats.totalPurchases = (stats.totalPurchases || 0) + 1;
                     
-                    stats.bizVisits = stats.bizVisits || {};
-                    stats.bizVisits[txn.bizId] = (stats.bizVisits[txn.bizId] || 0) + 1;
-                    
-                    if (txn.bizLocation) {
-                        stats.uniqueLocations = stats.uniqueLocations || {};
-                        stats.uniqueLocations[txn.bizLocation] = true;
-                    }
-                    if (txn.bizIndustry) {
-                        stats.uniqueIndustries = stats.uniqueIndustries || {};
-                        stats.uniqueIndustries[txn.bizIndustry] = true;
-                    }
-                }
-
-                // C. UPDATE GLOBAL NETWORK TOTALS (Using Sharding to prevent hotspots)
-                // RULE: Only Check-ins and Reach (Families) are incremented instantly.
-                // Purchases and Quantified Impact wait for Merchant Verification.
-                const shardId = Math.floor(Math.random() * NUM_SHARDS).toString();
-                const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
-                
-                const globalBatch = {
-                    checkins: txn.type === 'checkin' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
-                    totalFamilies: isNewBiz && biz ? admin.firestore.FieldValue.increment(parseInt(biz.impactJobs) || 0) : admin.firestore.FieldValue.increment(0)
-                    // Note: 'purchases', 'totalWaste', and 'totalTrees' are moved to ontransactionupdated
-                };
-                
-                transaction.set(statsRef, stats);
-                transaction.set(shardRef, globalBatch, { merge: true });
-
-                // D. Tier & Badge Evaluation
-                // RULE: Only evaluate instantly for Check-ins. Purchases wait for verification.
-                if (txn.type === 'checkin') {
-                    const badgesToUnlock = evaluateBadges({ ...userDoc.data(), ...stats });
-                    if (badgesToUnlock.length > 0) {
-                        const currentBadges = userDoc.data().badges || {};
-                        badgesToUnlock.forEach(bTitle => {
-                            const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
-                            if (bId && !currentBadges[bId]) {
-                                currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
+                    if (txn.bizId) {
+                        stats.uniqueBizIds = stats.uniqueBizIds || {};
+                        if (isNewBiz) {
+                            stats.uniqueBizIds[txn.bizId] = true;
+                            if (biz) {
+                                stats.totalFamilies = (stats.totalFamilies || 0) + (parseInt(biz.impactJobs) || 0);
+                                if (parseInt(biz.impactJobs) >= 5) {
+                                    stats.uniqueImpactfulBizIds = stats.uniqueImpactfulBizIds || {};
+                                    stats.uniqueImpactfulBizIds[txn.bizId] = true;
+                                }
+                                if (biz.isVerified) {
+                                    stats.uniqueVerifiedBizIds = stats.uniqueVerifiedBizIds || {};
+                                    stats.uniqueVerifiedBizIds[txn.bizId] = true;
+                                }
+                                if (Object.keys(biz.yearlyAssessments || {}).length > 0) {
+                                    stats.uniqueTransparentBizIds = stats.uniqueTransparentBizIds || {};
+                                    stats.uniqueTransparentBizIds[txn.bizId] = true;
+                                }
                             }
-                        });
-                        transaction.update(userRef, { badges: currentBadges });
+                        }
+                        
+                        stats.bizVisits = stats.bizVisits || {};
+                        stats.bizVisits[txn.bizId] = (stats.bizVisits[txn.bizId] || 0) + 1;
+
+                        if (txn.type === 'purchase') {
+                            stats.bizPurchases = stats.bizPurchases || {};
+                            stats.bizPurchases[txn.bizId] = (stats.bizPurchases[txn.bizId] || 0) + 1;
+                        }
+                        if (txn.bizLocation) {
+                            stats.uniqueLocations = stats.uniqueLocations || {};
+                            stats.uniqueLocations[txn.bizLocation] = true;
+                        }
+                        if (txn.bizIndustry) {
+                            stats.uniqueIndustries = stats.uniqueIndustries || {};
+                            stats.uniqueIndustries[txn.bizIndustry] = true;
+                        }
                     }
+                    return stats;
+                };
+
+                const updatedLifetime = updateLayer(statsDoc);
+                const updatedAnnual = updateLayer(annualDoc);
+                const updatedSeasonal = updateLayer(seasonalDoc);
+
+                // C. Badge Evaluation (Strictly Seasonal)
+                const { updatedBadges, newlyUnlocked, tier } = evaluateBadges(txn, updatedSeasonal, updatedSeasonal.badges || {});
+                updatedSeasonal.badges = updatedBadges;
+
+                // D. Write Updates
+                transaction.set(statsRef, updatedLifetime);
+                transaction.set(annualRef, updatedAnnual);
+                transaction.set(seasonalRef, updatedSeasonal);
+
+                // Sync lifetime tier to root user doc for primary display
+                transaction.update(userRef, { 
+                    currentTier: tier,
+                    lastActiveSeason: seasonId 
+                });
+
+                if (newlyUnlocked.length > 0) {
+                    console.log(`Badge Unlocked for ${txn.userId}: ${newlyUnlocked.join(', ')}`);
                 }
             });
         }
@@ -445,16 +488,17 @@ exports.ontransactionupdated = onDocumentUpdated('transactions/{txnId}', async (
                         });
 
                         // Re-evaluate Badges with the NEW verified totals
-                        const badgesToUnlock = evaluateBadges({ ...uSnap.data(), ...stats, totalWaste: newWaste, totalTrees: newTrees });
-                        if (badgesToUnlock.length > 0) {
-                            const currentBadges = uSnap.data().badges || {};
-                            badgesToUnlock.forEach(bTitle => {
-                                const bId = BADGES_CONFIG.find(bc => bc.title === bTitle)?.id;
-                                if (bId && !currentBadges[bId]) {
-                                    currentBadges[bId] = { unlocked: true, date: new Date().toISOString(), title: bTitle };
-                                }
+                        const { updatedBadges, newlyUnlocked, tier } = evaluateBadges(
+                            after, 
+                            { ...stats, totalWaste: newWaste, totalTrees: newTrees }, 
+                            uSnap.data().badges || {}
+                        );
+
+                        if (newlyUnlocked.length > 0) {
+                            transaction.update(userRef, { 
+                                badges: updatedBadges,
+                                tier: tier
                             });
-                            transaction.update(userRef, { badges: currentBadges });
                         }
                     }
                 });
@@ -536,7 +580,7 @@ exports.managerole = functions.https.onCall(async (data, context) => {
     // 4. Sync Role Flags to User Document (Optimizes client-side RBAC)
     const userSnap = await db.collection('users').where('email', '==', cleanEmail).get();
     if (!userSnap.empty) {
-        const flagField = roleType === 'merchant' ? 'isMerchantAssistant' : 'isAuditor';
+        const flagField = roleType === 'merchant' ? 'isCustomerSuccess' : 'isAuditor';
         await userSnap.docs[0].ref.update({ [flagField]: action === 'assign' });
     }
 
@@ -596,24 +640,9 @@ async function runImpactAggregation() {
         // 2. Fetch Business Data for Impact Proportions
         // We still fetch business docs as they contain the 'yearlyAssessments' formulas
         const bizSnap = await db.collection('businesses')
-            .select('impactJobs', 'yearlyAssessments', 'name')
+            .select('impactJobs', 'yearlyAssessments', 'name', 'purchaseVolume')
             .get();
         
-        // At scale, we fetch biz-specific volumes via aggregation or synced counters
-        // For the Alpha/Beta phase, we'll use the purchase transactions to build the map
-        // but limit memory usage by only pulling the necessary fields.
-        const purchaseTransSnap = await db.collection('transactions')
-            .where('type', '==', 'purchase')
-            .where('status', 'in', ['verified', 'approved'])
-            .select('bizId', 'amount')
-            .get();
-
-        const bizPurchases = {};
-        purchaseTransSnap.forEach(doc => {
-            const t = doc.data();
-            bizPurchases[t.bizId] = (bizPurchases[t.bizId] || 0) + (parseFloat(t.amount) || 0);
-        });
-
         let totalWaste = 0;
         let totalTrees = 0;
         let totalFamilies = 0;
@@ -623,7 +652,10 @@ async function runImpactAggregation() {
             const biz = doc.data();
             totalFamilies += (parseInt(biz.impactJobs) || 0);
 
-            if (bizPurchases[doc.id]) {
+            // Use the aggregated purchaseVolume already stored on the business doc
+            const bizVolume = parseFloat(biz.purchaseVolume) || 0;
+
+            if (bizVolume > 0) {
                 let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
                 const assessments = Array.isArray(biz.yearlyAssessments) 
                     ? biz.yearlyAssessments : Object.values(biz.yearlyAssessments || {});
@@ -638,7 +670,7 @@ async function runImpactAggregation() {
                 });
 
                 if (latestRev > 0) {
-                    const proportion = bizPurchases[doc.id] / latestRev;
+                    const proportion = bizVolume / latestRev;
                     totalWaste += (proportion * latestWaste);
                     totalTrees += (proportion * latestTrees);
                 }
@@ -1083,5 +1115,250 @@ exports.automatedbusinessaudit = onSchedule("0 1 * * *", async (event) => {
         console.log(`CRON: Business audit complete. ${report.flaggedBusinesses.length} issues detected.`);
     } catch (e) {
         console.error("CRON: Business audit failed", e);
+    }
+});
+
+/**
+ * 9. Business Onboarding Application Pool
+ * Allows members to apply to list their business.
+ */
+exports.onboardbusinessapplication = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in to apply.');
+    }
+
+    const { name, address, phone, email, ownerUid } = data;
+    if (!name || !address || !phone) {
+        throw new functions.https.HttpsError('invalid-argument', 'Name, address, and phone are required.');
+    }
+
+    try {
+        const appRef = db.collection('applications').doc();
+        await appRef.set({
+            name,
+            address,
+            phone,
+            email,
+            ownerUid,
+            applicantUid: context.auth.uid,
+            status: 'pending',
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return { success: true, id: appRef.id };
+    } catch (err) {
+        throw new functions.https.HttpsError('internal', err.message);
+    }
+});
+
+/**
+ * 11. Business Onboarding: Collaborative Lifecycle
+ */
+
+// A. CS Member picks up an application
+exports.assignapplication = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    const userEmail = context.auth.token.email;
+    const { applicationId } = data;
+
+    // Verify CS/Admin status
+    const maSnap = await db.doc('system/merchant_roles').get();
+    const isAuthorized = userEmail === 'jayshong@gmail.com' || maSnap.data()?.emails?.includes(userEmail);
+    if (!isAuthorized) throw new functions.https.HttpsError('permission-denied', 'Unauthorized. Must be a Customer Success member.');
+
+    await db.collection('applications').doc(applicationId).update({
+        assignedTo: context.auth.uid,
+        assignedEmail: userEmail,
+        status: 'draft',
+        pickedUpAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true };
+});
+
+// B. Collaborative Update (Owner or assigned CS can edit)
+exports.updateapplication = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    const { applicationId, updates } = data;
+
+    const appRef = db.collection('applications').doc(applicationId);
+    const appSnap = await appRef.get();
+    if (!appSnap.exists) throw new functions.https.HttpsError('not-found', 'Application not found.');
+    
+    const appData = appSnap.data();
+    const isOwner = appData.ownerUid === context.auth.uid;
+    const isAssignedCS = appData.assignedTo === context.auth.uid;
+
+    if (!isOwner && !isAssignedCS) {
+        throw new functions.https.HttpsError('permission-denied', 'Only the owner or assigned CS can edit.');
+    }
+
+    // Merge updates into the application's draft state
+    await appRef.update({
+        ...updates,
+        lastEditedBy: context.auth.uid,
+        lastEditedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true };
+});
+
+// C. Final Publish (Refined from approve)
+exports.publishapplication = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    const { applicationId } = data;
+
+    const appRef = db.collection('applications').doc(applicationId);
+    const appSnap = await appRef.get();
+    const appData = appSnap.data();
+
+    if (appData.assignedTo !== context.auth.uid && context.auth.token.email !== 'jayshong@gmail.com') {
+        throw new functions.https.HttpsError('permission-denied', 'Only the assigned CS can publish.');
+    }
+
+    const onboardingCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const bizRef = db.collection('businesses').doc();
+
+    await db.runTransaction(async (transaction) => {
+        // 1. Sanitize Data Carryover (Housekeeping)
+        const sanitizedBizData = {
+            name: appData.name,
+            address: appData.address,
+            phone: appData.phone,
+            email: appData.email,
+            ownerUid: appData.ownerUid,
+            industry: appData.industry,
+            location: appData.location,
+            impactJobs: appData.impactJobs,
+            yearlyAssessments: appData.yearlyAssessments || {},
+            story: appData.story || "",
+            purpose: appData.purpose || "",
+            imageUrl: appData.imageUrl || null,
+            videoUrl: appData.videoUrl || null,
+            icon: appData.icon || "store"
+        };
+
+        // 2. Create live business
+        transaction.set(bizRef, {
+            ...sanitizedBizData,
+            id: bizRef.id,
+            onboardingCode,
+            status: 'live',
+            isVerified: true, // CS visit counts as verification
+            publishedBy: context.auth.token.email,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 2. Mark app as approved
+        transaction.update(appRef, { status: 'approved', businessId: bizRef.id });
+
+        // 4. FOUNDER SELF-REWARD: Add this biz to owner's seasonal recommended list
+        const { seasonId } = getSeasonContext();
+        const seasonalRef = db.collection('users').doc(appData.ownerUid).collection('seasons').doc(seasonId);
+        const sSnap = await transaction.get(seasonalRef);
+        
+        // Use full seasonal stats for badge evaluation (Fixing scaling bug)
+        const seasonalStats = sSnap.exists ? sSnap.data() : { 
+            uniqueRecommendedBizIds: {},
+            bizVisits: {},
+            bizPurchases: {},
+            totalCheckins: 0,
+            totalPurchases: 0
+        };
+        
+        seasonalStats.uniqueRecommendedBizIds = seasonalStats.uniqueRecommendedBizIds || {};
+        seasonalStats.uniqueRecommendedBizIds[bizRef.id] = true;
+        
+        // Evaluate badges for founder (Seasonal progression)
+        const userRef = db.collection('users').doc(appData.ownerUid);
+        const uSnap = await transaction.get(userRef);
+        const { updatedBadges, tier } = evaluateBadges({ type: 'onboarding' }, seasonalStats, seasonalStats.badges || {});
+
+        transaction.set(seasonalRef, { 
+            ...seasonalStats,
+            badges: updatedBadges 
+        }, { merge: true });
+
+        // Sync latest season tier to root for display
+        transaction.update(userRef, { currentTier: tier });
+    });
+
+    return { success: true, bizId: bizRef.id, code: onboardingCode };
+});
+
+/**
+ * 10. Business Recommendation Claim
+ * Allows a member to claim they recommended a business by providing the unique code.
+ */
+exports.claimbusinessrecommendation = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    
+    const { onboardingCode } = data;
+    if (!onboardingCode) throw new functions.https.HttpsError('invalid-argument', 'Onboarding code required.');
+
+    try {
+        // 1. Find the business with this code
+        const bizQuery = await db.collection('businesses')
+            .where('onboardingCode', '==', onboardingCode)
+            .limit(1)
+            .get();
+
+        if (bizQuery.empty) {
+            throw new functions.https.HttpsError('not-found', 'Invalid onboarding code.');
+        }
+
+        const bizDoc = bizQuery.docs[0];
+        const bizData = bizDoc.data();
+
+        // 2. Prevent self-recommendation
+        if (bizData.ownerUid === context.auth.uid) {
+            throw new functions.https.HttpsError('failed-precondition', 'You cannot recommend your own business.');
+        }
+
+        // 3. Link referrer and update user stats in a transaction
+        const { year, seasonId } = getSeasonContext();
+        const seasonalRef = db.collection('users').doc(context.auth.uid).collection('seasons').doc(seasonId);
+
+        await db.runTransaction(async (transaction) => {
+            const sSnap = await transaction.get(seasonalRef);
+            
+            // Use full seasonal stats for evaluation (Housekeeping)
+            const seasonalStats = sSnap.exists ? sSnap.data() : { 
+                uniqueRecommendedBizIds: {},
+                bizVisits: {},
+                bizPurchases: {},
+                totalCheckins: 0,
+                totalPurchases: 0
+            };
+            
+            seasonalStats.uniqueRecommendedBizIds = seasonalStats.uniqueRecommendedBizIds || {};
+            if (seasonalStats.uniqueRecommendedBizIds[bizDoc.id]) {
+                throw new Error('You have already claimed this recommendation.');
+            }
+
+            seasonalStats.uniqueRecommendedBizIds[bizDoc.id] = true;
+            
+            // Re-evaluate badges for the Ambassador journey (Seasonal progression)
+            const userRef = db.collection('users').doc(context.auth.uid);
+            
+            const { updatedBadges, tier } = evaluateBadges({ type: 'claim' }, seasonalStats, seasonalStats.badges || {});
+
+            transaction.set(seasonalRef, {
+                ...seasonalStats,
+                badges: updatedBadges
+            }, { merge: true });
+
+            // Sync latest season tier to root for display
+            transaction.update(userRef, { currentTier: tier });
+            
+            // Add to the business's list of referrers (Support multiple)
+            transaction.update(bizDoc.ref, { 
+                referrerUids: admin.firestore.FieldValue.arrayUnion(context.auth.uid) 
+            });
+        });
+
+        return { success: true, bizName: bizData.name };
+    } catch (err) {
+        console.error("Claim failed:", err);
+        throw new functions.https.HttpsError('internal', err.message);
     }
 });

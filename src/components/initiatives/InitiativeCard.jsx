@@ -7,14 +7,14 @@ const InitiativeCard = ({ initiative }) => {
     return (
         <div className={`glass-card ${hasEnded ? 'initiative-past' : ''}`} style={{ marginTop: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, color: 'var(--primary)' }}>{initiative.title}</h3>
+                <h3 style={{ margin: 0, color: 'var(--accent-primary)' }}>{initiative.title}</h3>
                 <span className={`tier-badge ${hasEnded ? 'tier-badge-expired' : 'tier-badge-standard'}`}>
                     {hasEnded ? 'Completed' : 'Active'}
                 </span>
             </div>
             
             {initiative.narrative && (
-                <p style={{ marginTop: '1rem', color: '#ffffff', lineHeight: '1.5' }}>
+                <p style={{ marginTop: '1rem', color: 'var(--text-primary)', lineHeight: '1.5' }}>
                     {initiative.narrative}
                 </p>
             )}

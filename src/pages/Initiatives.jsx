@@ -8,11 +8,19 @@ import InitiativeCard from '../components/initiatives/InitiativeCard';
  * Currently, user participation is inferred by general network activity (check-ins/purchases).
  */
 
+const InitiativeSkeleton = () => (
+    <div className="glass-card shimmer-item" style={{ marginTop: '1rem', height: '140px', opacity: 0.5 }}>
+        <div style={{ height: '24px', width: '60%', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></div>
+        <div style={{ height: '60px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginTop: '1rem' }}></div>
+    </div>
+);
+
 const Initiatives = () => {
     const [initiatives, setInitiatives] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [lastDoc, setLastDoc] = useState(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
     const observer = useRef();
     const PAGE_SIZE = 5;
 
@@ -20,7 +28,6 @@ const Initiatives = () => {
         if (loading || !hasMore) return;
         
         setLoading(true);
-        console.log("INFINITE_SCROLL: Fetching initiatives...");
         try {
             let query = db.collection('initiatives').orderBy('createdAt', 'desc');
 
@@ -35,7 +42,6 @@ const Initiatives = () => {
                 setInitiatives(prev => [...prev, ...newInitiatives]);
                 setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
                 
-                // If we got fewer items than PAGE_SIZE, we've reached the end
                 if (snapshot.docs.length < PAGE_SIZE) {
                     setHasMore(false);
                 }
@@ -46,6 +52,7 @@ const Initiatives = () => {
             console.error("Failed fetching initiatives", e);
         } finally {
             setLoading(false);
+            setIsInitialLoad(false);
         }
     }, [loading, hasMore, lastDoc]);
 
@@ -79,19 +86,28 @@ const Initiatives = () => {
             </div>
 
             <div className="initiatives-container">
-                {activeInitiatives.length > 0 && (
+                {isInitialLoad ? (
                     <>
-                        <h3 style={{ marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', color: 'var(--text-primary)' }}>Active Campaigns</h3>
-                        {activeInitiatives.map(init => <InitiativeCard key={init.id} initiative={init} />)}
+                        <h3 style={{ marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', color: 'var(--text-primary)' }}>Scanning Network...</h3>
+                        {[1, 2, 3].map(i => <InitiativeSkeleton key={i} />)}
                     </>
-                )}
-
-                {pastInitiatives.length > 0 && (
+                ) : (
                     <>
-                        <h3 style={{ marginTop: '2rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', opacity: 0.7 }}>Historical Record</h3>
-                        <div style={{ opacity: 0.7 }}>
-                            {pastInitiatives.map(init => <InitiativeCard key={init.id} initiative={init} />)}
-                        </div>
+                        {activeInitiatives.length > 0 && (
+                            <div className="fade-in">
+                                <h3 style={{ marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', color: 'var(--text-primary)' }}>Active Campaigns</h3>
+                                {activeInitiatives.map(init => <InitiativeCard key={init.id} initiative={init} />)}
+                            </div>
+                        )}
+
+                        {pastInitiatives.length > 0 && (
+                            <div className="fade-in" style={{ marginTop: '2rem' }}>
+                                <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', opacity: 0.7 }}>Historical Record</h3>
+                                <div style={{ opacity: 0.7 }}>
+                                    {pastInitiatives.map(init => <InitiativeCard key={init.id} initiative={init} />)}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 
@@ -100,26 +116,27 @@ const Initiatives = () => {
                     ref={lastElementRef} 
                     style={{ 
                         textAlign: 'center', 
-                        padding: '2rem', 
+                        padding: '3rem 1rem', 
                         color: 'var(--text-secondary)',
                         marginTop: '1rem'
                     }}
                 >
-                    {loading ? (
+                    {loading && !isInitialLoad ? (
                         <div className="loading-shimmer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                             <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
-                            <span style={{ fontSize: '0.8rem', letterSpacing: '1px' }}>LOADING IMPACT...</span>
+                            <span style={{ fontSize: '0.8rem', letterSpacing: '1px', opacity: 0.8 }}>LOADING MORE IMPACT...</span>
                         </div>
                     ) : (
                         !hasMore && initiatives.length > 0 && (
-                            <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>
-                                <i className="fa-solid fa-flag-checkered" style={{ marginBottom: '0.5rem' }}></i>
-                                <p>You've reached the foundation of the network record.</p>
+                            <div style={{ opacity: 0.5, fontSize: '0.85rem' }}>
+                                <i className="fa-solid fa-flag-checkered" style={{ fontSize: '1.2rem', marginBottom: '0.75rem', color: 'var(--accent-primary)' }}></i>
+                                <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Foundations Reached</p>
+                                <p style={{ fontSize: '0.75rem' }}>You've reached the earliest records of the conviction network.</p>
                             </div>
                         )
                     )}
 
-                    {!loading && initiatives.length === 0 && (
+                    {!loading && !isInitialLoad && initiatives.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                             <i className="fa-solid fa-flag fa-3x" style={{ opacity: 0.2, marginBottom: '1rem' }}></i>
                             <p>No initiatives found yet. Stay tuned for future impact.</p>

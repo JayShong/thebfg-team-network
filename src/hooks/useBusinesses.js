@@ -26,9 +26,25 @@ export const useBusinesses = (searchQuery = '', activeFilter = 'all') => {
             // 1. Apply Server-Side Filters
             if (activeFilter !== 'all') {
                 const industryMap = {
-                    'fnb': 'Food & Beverage',
-                    'retail': 'Retail',
-                    'services': 'Services'
+                    'arts': 'Arts & Culture',
+                    'support': 'Business Support Services',
+                    'fnb': 'Cafe and Restaurants',
+                    'community': 'Community',
+                    'climate': 'Ecological Stewardship',
+                    'education': 'Education & Talent',
+                    'finance': 'Finance',
+                    'foodsystems': 'Food Systems',
+                    'gifts': 'Gifts & Crafts',
+                    'health': 'Health & Wellness',
+                    'housing': 'Housing & Living',
+                    'manufacturing': 'Manufacturing & Logistics',
+                    'personal': 'Personal Support Services',
+                    'pets': 'Pets',
+                    'repairs': 'Repairs, Recycling & Sharing',
+                    'events': 'Social Events',
+                    'sports': 'Sports',
+                    'nature': 'Tourism & Nature',
+                    'mobility': 'Transportation & Mobility'
                 };
                 query = query.where('industry', '==', industryMap[activeFilter]);
             }
