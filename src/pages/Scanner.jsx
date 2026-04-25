@@ -588,6 +588,11 @@ const Scanner = () => {
                                 <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
                                     Not right? Scan again
                                 </button>
+
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '1rem', lineHeight: '1.4' }}>
+                                    <i className="fa-solid fa-shield-halved" style={{ marginRight: '6px', color: 'var(--accent-success)' }}></i>
+                                    Your activity is recorded as proof — not surveillance. It's evidence that conviction-driven businesses can win.
+                                </p>
                             </>
                         )}
                     </div>

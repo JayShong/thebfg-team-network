@@ -58,6 +58,7 @@ const Home = () => {
 
     const [isSyncing, setIsSyncing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [festiveLabel, setFestiveLabel] = useState('');
 
 
     const refreshDashboard = async () => {
@@ -132,6 +133,30 @@ const Home = () => {
         } else {
             setIsLoading(false);
         }
+
+        // Task 9: Fetch Seasonal Context from Public Holiday API
+        const fetchHolidays = async () => {
+            try {
+                const year = new Date().getFullYear();
+                const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/MY`);
+                if (res.ok) {
+                    const holidays = await res.json();
+                    const now = new Date();
+                    // Find holidays within +/- 7 days of today
+                    const activeHoliday = holidays.find(h => {
+                        const hDate = new Date(h.date);
+                        const diffDays = Math.abs(now - hDate) / (1000 * 60 * 60 * 24);
+                        return diffDays <= 7;
+                    });
+                    if (activeHoliday) {
+                        setFestiveLabel(activeHoliday.localName || activeHoliday.name);
+                    }
+                }
+            } catch (e) {
+                console.warn("Festive API fetch failed", e);
+            }
+        };
+        fetchHolidays();
     }, [currentUser]);
 
     const gdpPenetration = stats.gdpPenetration || "0%";
@@ -140,6 +165,25 @@ const Home = () => {
         <div style={{ width: '100%', paddingBottom: '2rem' }}>
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
+                    {festiveLabel && (
+                        <div style={{ 
+                            fontSize: '0.7rem', 
+                            background: 'rgba(255,255,255,0.05)', 
+                            color: 'var(--accent-primary)', 
+                            padding: '0.2rem 0.6rem', 
+                            borderRadius: '2rem', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '5px', 
+                            marginBottom: '0.5rem',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            letterSpacing: '1px',
+                            textTransform: 'uppercase',
+                            fontWeight: '700'
+                        }}>
+                            <i className="fa-solid fa-calendar-day"></i> {festiveLabel}
+                        </div>
+                    )}
                     <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Network</h1>
                     <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Every number here is someone who chose conviction over convenience.</p>
                 </div>

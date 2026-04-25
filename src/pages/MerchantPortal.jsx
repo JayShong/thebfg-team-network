@@ -131,7 +131,7 @@ const MerchantPortal = () => {
             
             <div className="page-header" style={{ marginBottom: '2rem' }}>
                 <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0 }}>Merchant Portal</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Merchant Assistant Operational Dashboard</p>
+                <p style={{ color: 'var(--text-secondary)' }}>Network Operations & Business Management</p>
             </div>
 
             {/* Merchant Database */}

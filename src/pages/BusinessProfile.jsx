@@ -16,6 +16,49 @@ const BusinessProfile = () => {
     const [selectedBranch, setSelectedBranch] = useState(null);
     const [liveAuditLog, setLiveAuditLog] = useState([]);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [recommendCount, setRecommendCount] = useState(0);
+
+    useEffect(() => {
+        if (!id) return;
+        const unsubscribe = db.collection('feedback')
+            .where('bizId', '==', id)
+            .where('type', '==', 'Recommendation')
+            .onSnapshot(snap => {
+                setRecommendCount(snap.size);
+            });
+        return () => unsubscribe();
+    }, [id]);
+
+    const handleShare = async () => {
+        const url = `${window.location.origin}/business/${id}`;
+        const text = `Check out ${name} on TheBFG.Team — a verified for-good business. ${url}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: name, text, url });
+            } catch (e) {
+                console.error("Share failed", e);
+            }
+        } else {
+            await navigator.clipboard.writeText(text);
+            alert("Link copied! Share it with someone who chooses conviction.");
+        }
+    };
+
+    const handleRecommend = async () => {
+        if (!currentUser) return alert("Please log in to recommend this business.");
+        try {
+            await db.collection('feedback').add({
+                type: 'Recommendation',
+                bizId: id,
+                userId: currentUser.uid,
+                userName: currentUser.displayName || getNickname(currentUser.email),
+                timestamp: new Date().toISOString()
+            });
+            alert("Your recommendation strengthens this business's signal in the network.");
+        } catch (e) {
+            alert("Failed to recommend: " + e.message);
+        }
+    };
 
     useEffect(() => {
         if (!loading && businesses.length > 0) {
@@ -178,6 +221,24 @@ const BusinessProfile = () => {
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem', fontStyle: 'italic' }}>
                                 This is a Living Signal — renewed annually and informed by consumer feedback.
                             </p>
+                            {business.lastAuditDate && (() => {
+                                const auditDate = new Date(business.lastAuditDate);
+                                const now = new Date();
+                                const monthsAgo = Math.floor((now - auditDate) / (1000 * 60 * 60 * 24 * 30));
+                                const isExpiring = monthsAgo >= 10;
+                                const isExpired = monthsAgo >= 12;
+                                return (
+                                    <p style={{ fontSize: '0.7rem', color: isExpired ? '#EF4444' : isExpiring ? '#F59E0B' : 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                        <i className={`fa-solid ${isExpired ? 'fa-triangle-exclamation' : 'fa-clock'}`} style={{ marginRight: '4px' }}></i>
+                                        {isExpired
+                                            ? 'Grade renewal overdue. Annual renewal required.'
+                                            : isExpiring
+                                            ? `Grade due for renewal (audited ${monthsAgo} months ago).`
+                                            : `Last audited ${monthsAgo} month${monthsAgo !== 1 ? 's' : ''} ago.`
+                                        }
+                                    </p>
+                                );
+                            })()}
                         </div>
                     ) : (
                         <div className="business-score" style={{ padding: '0.5rem 1rem', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c4b5fd' }}>
@@ -353,6 +414,15 @@ const BusinessProfile = () => {
                     >
                         <i className="fa-solid fa-camera"></i> Visit this Merchant
                     </button>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                        <button onClick={handleShare} className="btn btn-secondary" style={{ flex: 1, background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: 'var(--accent-primary)', fontSize: '0.85rem' }}>
+                            <i className="fa-solid fa-share-nodes"></i> Share
+                        </button>
+                        <button onClick={handleRecommend} className="btn btn-secondary" style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--accent-success)', fontSize: '0.85rem' }}>
+                            <i className="fa-solid fa-thumbs-up"></i> Recommend
+                        </button>
+                    </div>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                         To support this business, please visit them in person and scan their official BFG standee.
                     </p>
@@ -373,6 +443,12 @@ const BusinessProfile = () => {
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Verified Support</div>
                         </div>
                     </div>
+                    {recommendCount > 0 && (
+                        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>
+                            <i className="fa-solid fa-heart" style={{ color: 'var(--accent-primary)', marginRight: '6px' }}></i>
+                            {recommendCount} people recommend this business
+                        </p>
+                    )}
                 </div>
 
                 {/* Symmetric Loyalty Connection */}

@@ -19,6 +19,7 @@ export const PLATFORM_CONFIG = {
         SUPER_ADMIN: 'isSuperAdmin',
         ADMIN: 'isAdmin',
         AUDITOR: 'isAuditor',
-        OWNER: 'isOwner'
+        OWNER: 'isOwner',
+        CUSTOMER_SUCCESS: 'isCustomerSuccess'
     }
 };

@@ -3,6 +3,7 @@ import { db } from '../services/firebase';
 
 const About = () => {
     const [stats, setStats] = useState({ gdpPenetration: '0%' });
+    const [showManifesto, setShowManifesto] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -89,6 +90,27 @@ const About = () => {
                 </div>
             </div>
 
+            {/* Task 7: For-Good vs Conviction-Driven Definitions */}
+            <div className="glass-card" style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ padding: '0.5rem' }}>
+                    <h4 style={{ color: 'var(--accent-success)', marginBottom: '0.75rem', fontSize: '1.1rem' }}>For-Good Businesses</h4>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                        Enterprises prioritizing positive externalities over pure profit; rejecting short-termism.
+                    </p>
+                </div>
+                <div style={{ padding: '0.5rem' }}>
+                    <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.75rem', fontSize: '1.1rem' }}>Conviction-Driven Founders</h4>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                        People who decided on an outcome — a fairer supply chain, a healthier community, a cleaner environment — and then built a business as the means to get there. The business is the vehicle. The conviction is the engine.
+                    </p>
+                </div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', margin: 0, fontStyle: 'italic', textAlign: 'center' }}>
+                        "These founders don't need charity. They need to be seen, verified, and valued — on equal footing with every other business in the market."
+                    </p>
+                </div>
+            </div>
+
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '2.5rem' }}>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Manifesto</h2>
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Good businesses are losing. Not because they're wrong — but because no one can see them. We're changing that.</p>
@@ -164,6 +186,64 @@ const About = () => {
                         <strong style={{ color: 'var(--accent-success)' }}>A Living Signal, not a one-time certification.</strong> Unlike static rating systems, BFG grades are renewed annually. Consumer feedback and real-world observations continuously inform the audit process. This means the signal always reflects the current state of a business's conviction.
                     </p>
                 </div>
+
+                {/* Task 2: Trust Signal Comparison Table */}
+                <div style={{ marginTop: '2.5rem' }}>
+                    <h3 style={{ color: '#fff', marginBottom: '0.5rem' }}>How We Compare</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                        The BFG Network is not merely another certification — it is the Relational Trust Infrastructure for the conviction economy.
+                    </p>
+                    
+                    <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                    <th style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Criterion</th>
+                                    <th style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>ESG Ratings</th>
+                                    <th style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>B Corp</th>
+                                    <th style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--accent-primary)', fontWeight: 'bold' }}>theBFG.team</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: 'bold' }}>Primary Audience</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Investors & Regulators</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Consumers & Investors</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Relational Networks</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: 'bold' }}>Logic</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Risk Management</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Holistic Performance</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Conviction Alignment</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: 'bold' }}>Frequency</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Annual</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Triennial (3-Year)</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Annual + Living Signal</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: 'bold' }}>Verification</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Opaque Analyst Review</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Third-Party (B Lab)</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Relational Accountability</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>Market Signal</td>
+                                    <td style={{ padding: '0.75rem' }}>Quantitative Score</td>
+                                    <td style={{ padding: '0.75rem' }}>Composite Badge</td>
+                                    <td style={{ padding: '0.75rem', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Five-Letter Grading String</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <p style={{ margin: '0 0 0.25rem' }}>• Traditional models prioritize data over relationships.</p>
+                        <p style={{ margin: '0 0 0.25rem' }}>• Certifications often focus on past performance rather than directional intent.</p>
+                        <p style={{ margin: 0 }}>• High entry costs for existing frameworks exclude smaller conviction-driven enterprises.</p>
+                    </div>
+                </div>
             </div>
 
             {/* Participation */}
@@ -189,6 +269,108 @@ const About = () => {
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Join the Mission</div>
                     </div>
                 </div>
+            </div>
+
+            {/* Task 1: Full Manifesto (Collapsible) */}
+            <div className="glass-card" style={{ marginTop: '1.5rem', padding: 0, overflow: 'hidden', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                <button 
+                    onClick={() => setShowManifesto(!showManifesto)}
+                    style={{ 
+                        width: '100%', 
+                        padding: '1.5rem', 
+                        background: 'none', 
+                        border: 'none', 
+                        color: '#fff', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        cursor: 'pointer' 
+                    }}
+                >
+                    <h3 style={{ margin: 0 }}>Read the Full Manifesto</h3>
+                    <i className={`fa-solid fa-chevron-${showManifesto ? 'up' : 'down'}`}></i>
+                </button>
+
+                {showManifesto && (
+                    <div className="slide-up" style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>The Problem No One Talks About</h4>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    The world is full of for-good businesses that are invisible to the people who want them to succeed. We call this the Acumen Gap. Founders who have the conviction to build something better often lack the resources to prove it to a market that has been trained to be cynical by decades of greenwashing.
+                                </p>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    When conviction is invisible, convenience wins. When convenience wins, the status quo remains unchallenged.
+                                </p>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    The result? Brilliant, necessary enterprises fail—not because their model was wrong, but because their signal was too weak to be heard over the noise of corporate marketing.
+                                </p>
+                            </section>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>What We Believe</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem', margin: 0 }}>
+                                        <strong>For-Good:</strong> An enterprise that prioritizes positive externalities—the health of the community, the dignity of the worker, the restoration of the environment—over the maximization of short-term profit.
+                                    </p>
+                                    <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem', margin: 0 }}>
+                                        <strong>Conviction-Driven:</strong> A founder who has decided on an outcome and built a business as the means to achieve it. For them, the business is the vehicle; the conviction is the engine.
+                                    </p>
+                                </div>
+                            </section>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>Why This Matters to You</h4>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    Every time you spend a Ringgit, you are voting for the kind of world you want to live in. But you can't vote for what you can't see.
+                                </p>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    TheBFG.Team exists to give you sight. We provide the infrastructure of trust that allows you to find, verify, and value the businesses that share your convictions.
+                                </p>
+                            </section>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>What We Do</h4>
+                                <ul style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem', paddingLeft: '1.2rem' }}>
+                                    <li><strong>Seen:</strong> We make the invisible work of for-good founders legible to the market.</li>
+                                    <li><strong>Verified:</strong> We provide a rigorous, transparent audit of conviction based on the ISO53001 standard.</li>
+                                    <li><strong>Valued:</strong> We create a network where your support is recorded as proof that conviction-driven businesses can win.</li>
+                                </ul>
+                            </section>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>The World We're Building Toward</h4>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    We are building toward a Malaysia where for-good businesses account for 30% of the national GDP. A world where "business as usual" means business that is good for everyone.
+                                </p>
+                            </section>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                            <section>
+                                <h4 style={{ color: '#fff', marginBottom: '0.75rem' }}>An Invitation</h4>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem' }}>
+                                    This isn't a platform you sign up for and forget. It's a network you participate in. You just need to start choosing—consciously, visibly—to support the businesses that are trying to make things better.
+                                </p>
+                                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.7', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                    Accept the invitation. Join the movement.
+                                </p>
+                            </section>
+
+                            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: 'var(--accent-primary)', fontStyle: 'italic', marginTop: '1rem' }}>
+                                "Making For-Good and Conviction-Driven Businesses be Seen, Verified, and Valued."
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

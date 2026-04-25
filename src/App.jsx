@@ -88,7 +88,7 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/onboarding-hub" element={
-          <ProtectedRoute requiredRole="member">
+          <ProtectedRoute requiredRole="customerSuccess">
             <OnboardingHub />
           </ProtectedRoute>
         } />

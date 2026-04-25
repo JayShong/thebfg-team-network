@@ -32,6 +32,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         if (requiredRole === 'auditor' && !currentUser.isSuperAdmin && !currentUser.isAuditor) {
             return <RestrictedAccess requiredRole="Auditor" />;
         }
+
+        if (requiredRole === 'customerSuccess' && !currentUser.isSuperAdmin && !currentUser.isCustomerSuccess) {
+            return <RestrictedAccess requiredRole="Customer Success" />;
+        }
     }
  
     // If no role is required or user meets the requirements, render the children

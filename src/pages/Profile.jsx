@@ -92,13 +92,13 @@ const Profile = () => {
     if (!currentUser && !isGuest) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4rem' }}>
-                <i className="fa-solid fa-user-lock fa-4x" style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}></i>
-                <h2>Identity Required</h2>
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '300px', marginBottom: '2rem' }}>
-                    Every action you take here is a choice for the world you want. Create your identity to make it count.
+                <i className="fa-solid fa-envelope-open-text fa-4x" style={{ color: 'var(--accent-primary)', marginBottom: '1rem', opacity: 0.8 }}></i>
+                <h2 style={{ letterSpacing: '1px', textTransform: 'uppercase', fontSize: '1.2rem', color: 'var(--accent-primary)' }}>The Invitation</h2>
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '300px', marginBottom: '2rem', lineHeight: '1.6' }}>
+                    This is not a platform to join—it is an invitation to accept. Every action you take here is a choice for the world you want.
                 </p>
-                <button onClick={() => setShowAuthModal(true)} className="btn btn-primary" style={{ padding: '1rem 2rem', border: 'none' }}>
-                    Establish Identity
+                <button onClick={() => setShowAuthModal(true)} className="btn btn-primary feature-gradient" style={{ padding: '1rem 2rem', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: '800' }}>
+                    Accept the Invitation
                 </button>
 
                 {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
@@ -255,7 +255,7 @@ const Profile = () => {
                 <div className="badge-footer">
                     {displayUser.isGuest ? (
                         <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'left' }}>
-                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-circle-info"></i> Why Sign Up?</h4>
+                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-envelope-open-text"></i> Why Accept the Invitation?</h4>
                             <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.5' }}>
                                 <li style={{ marginBottom: '0.4rem' }}>Every check-in is a signal. Every purchase is a vote. Make yours count permanently.</li>
                                 <li style={{ marginBottom: '0.4rem' }}>Collect Tokens of Empathy and rise through the Ambassador Journey.</li>

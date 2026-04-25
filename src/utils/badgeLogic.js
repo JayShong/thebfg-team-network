@@ -109,6 +109,12 @@ export const BADGES_CONFIG = [
     }
 ];
 
+/**
+ * Privilege Tiers — Ambassador Journey Naming Convention
+ * The Design Manifesto §5 references "Blue, Silver, Gold, Platinum" as overall tiers.
+ * These were superseded by the Ambassador Journey names: Scout → Steward → Guardian → Legend.
+ * This is an intentional evolution documented here for manifesto reconciliation.
+ */
 export const evaluateTier = (userBadges = {}) => {
     // Handle both { id: true } and { id: { unlocked: true } } formats
     const unlockedIds = Object.keys(userBadges).filter(id => {

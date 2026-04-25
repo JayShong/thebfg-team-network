@@ -10,6 +10,19 @@ const AuditHub = () => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('inventory'); // 'inventory', 'supervisor', 'auditor'
+    
+    // Task 4: New state for structured audit
+    const [selectedBiz, setSelectedBiz] = useState(null);
+    const [showInitiateModal, setShowInitiateModal] = useState(false);
+    const [auditScores, setAuditScores] = useState({ s: 'C', e: 'C', c: 'C', soc: 'C', env: 'C' });
+
+    const PILLARS = [
+        { id: 's', label: 'Shareholders', icon: 'fa-gem' },
+        { id: 'e', label: 'Employees', icon: 'fa-people-carry-box' },
+        { id: 'c', label: 'Customers', icon: 'fa-handshake' },
+        { id: 'soc', label: 'Society', icon: 'fa-earth-asia' },
+        { id: 'env', label: 'Natural Environment', icon: 'fa-leaf' }
+    ];
 
     useEffect(() => {
         if (!currentUser) return;
@@ -65,8 +78,12 @@ const AuditHub = () => {
                 approvedAt: new Date().toISOString(),
                 approvedBy: currentUser.email
             });
+            
+            // Ensure we handle both string and object scores
+            const finalScore = log.scores || log.score;
+            
             await db.collection('businesses').doc(log.bizId).update({
-                score: log.scores || log.score,
+                score: finalScore,
                 isVerified: true,
                 lastAuditDate: new Date().toISOString()
             });
@@ -92,14 +109,18 @@ const AuditHub = () => {
         }
     };
 
-    const submitToSupervisor = async (log, summary, supervisor) => {
+    const submitToSupervisor = async (log, summary, pillarComments, checklist, supervisor) => {
         if (!summary) return alert("Please provide a public summary.");
         try {
             await db.collection('audit_logs').doc(log.id).update({
                 publicSummary: summary,
+                pillarCommentary: pillarComments,
+                verificationChecklist: checklist,
                 supervisorEmail: supervisor,
                 status: 'PENDING_APPROVAL',
-                submittedAt: new Date().toISOString()
+                submittedAt: new Date().toISOString(),
+                // Sync scores in case they changed in the draft UI
+                scores: log.scores
             });
             alert("Submitted for review.");
         } catch (e) {
@@ -108,21 +129,54 @@ const AuditHub = () => {
     };
 
     const initiateAudit = (biz) => {
-        const scores = prompt("Enter initial BFG Paradigm scores (e.g. ABABA):", biz.score || 'CCCCC');
-        if (!scores) return;
-        
-        db.collection('audit_logs').add({
-            bizId: biz.id,
-            bizName: biz.name,
-            auditorEmail: currentUser.email,
-            status: 'SYSTEM_DRAFT',
-            scores: scores,
-            createdAt: new Date().toISOString()
-        }).then(() => {
+        setSelectedBiz(biz);
+        // Default to C if no score exists
+        const baseScore = typeof biz.score === 'object' ? biz.score : { s: 'C', e: 'C', c: 'C', soc: 'C', env: 'C' };
+        setAuditScores(baseScore);
+        setShowInitiateModal(true);
+    };
+
+    const confirmInitiate = async () => {
+        if (!selectedBiz) return;
+        try {
+            await db.collection('audit_logs').add({
+                bizId: selectedBiz.id,
+                bizName: selectedBiz.name,
+                auditorEmail: currentUser.email,
+                status: 'SYSTEM_DRAFT',
+                scores: auditScores,
+                createdAt: new Date().toISOString()
+            });
+            setShowInitiateModal(false);
             setActiveTab('auditor');
             alert("Audit draft created.");
-        });
+        } catch (e) {
+            alert("Failed to initiate: " + e.message);
+        }
     };
+
+    const GradeSelector = ({ currentScores, onSelect, pillarId }) => (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['A', 'B', 'C', 'D'].map(grade => (
+                <button
+                    key={grade}
+                    onClick={() => onSelect(pillarId, grade)}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '20px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: currentScores[pillarId] === grade ? 'var(--color-compliance)' : 'rgba(255,255,255,0.05)',
+                        color: currentScores[pillarId] === grade ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '700'
+                    }}
+                >
+                    {grade}
+                </button>
+            ))}
+        </div>
+    );
 
     return (
         <div style={{ paddingBottom: '3rem' }}>
@@ -219,31 +273,130 @@ const AuditHub = () => {
                         {myDrafts.length === 0 ? (
                             <p style={{ color: 'var(--text-secondary)' }}>No active drafts.</p>
                         ) : (
-                            myDrafts.map(log => (
-                                <div key={log.id} className="glass-card mt-3">
-                                    <h4 style={{ margin: 0 }}>{log.bizName}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status: {log.status}</p>
-                                    <div style={{ marginTop: '1rem' }}>
-                                        <textarea 
-                                            id={`sum-${log.id}`} 
-                                            className="input-modern" 
-                                            placeholder="Audit Summary..." 
-                                            defaultValue={log.publicSummary}
-                                            style={{ marginBottom: '0.5rem' }}
-                                        />
-                                        <button 
-                                            className="nav-btn active" 
-                                            style={{ width: '100%', justifyContent: 'center' }}
-                                            onClick={() => submitToSupervisor(log, document.getElementById(`sum-${log.id}`).value, PLATFORM_CONFIG.DEFAULT_SUPERVISORS[0])}
-                                        >
-                                            Submit for Verification
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
+                            myDrafts.map(log => {
+                                // Local state for each draft to manage commentary and checklist
+                                return <DraftEditor 
+                                    key={log.id} 
+                                    log={log} 
+                                    PILLARS={PILLARS} 
+                                    GradeSelector={GradeSelector} 
+                                    onSubmit={submitToSupervisor}
+                                    supervisors={PLATFORM_CONFIG.DEFAULT_SUPERVISORS}
+                                />;
+                            })
                         )}
                     </>
                 )}
+            </div>
+
+            {/* Task 4a: Initiation Modal */}
+            {showInitiateModal && (
+                <div className="modal flex-center" style={{ display: 'flex', background: 'rgba(0,0,0,0.9)', zIndex: 1000 }}>
+                    <div className="glass-card slide-up" style={{ maxWidth: '500px', width: '90%', padding: '2rem' }}>
+                        <h2 style={{ marginBottom: '0.5rem' }}>Initiate Audit</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{selectedBiz?.name} • {selectedBiz?.industry}</p>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                            {PILLARS.map(p => (
+                                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem' }}>
+                                        <i className={`fa-solid ${p.icon}`} style={{ color: 'var(--primary)', width: '20px' }}></i>
+                                        {p.label}
+                                    </div>
+                                    <GradeSelector 
+                                        currentScores={auditScores} 
+                                        pillarId={p.id} 
+                                        onSelect={(id, val) => setAuditScores(prev => ({ ...prev, [id]: val }))} 
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setShowInitiateModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                            <button onClick={confirmInitiate} className="btn btn-primary" style={{ flex: 1 }}>Create Draft</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Helper component for structured draft editing
+const DraftEditor = ({ log, PILLARS, GradeSelector, onSubmit, supervisors }) => {
+    const [scores, setScores] = useState(log.scores || { s: 'C', e: 'C', c: 'C', soc: 'C', env: 'C' });
+    const [pillarComments, setPillarComments] = useState(log.pillarCommentary || { s: '', e: '', c: '', soc: '', env: '' });
+    const [summary, setSummary] = useState(log.publicSummary || '');
+    const [checklist, setChecklist] = useState(log.verificationChecklist || { intent: false, excellence: false, consistency: false });
+
+    return (
+        <div className="glass-card mt-3" style={{ borderLeft: '4px solid var(--color-compliance)' }}>
+            <h4 style={{ marginBottom: '1rem' }}>{log.bizName} <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '10px' }}>{log.status}</span></h4>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Score & Pillar Commentary */}
+                {PILLARS.map(p => (
+                    <div key={p.id} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: '700' }}>
+                                <i className={`fa-solid ${p.icon}`} style={{ color: 'var(--primary)', width: '20px' }}></i>
+                                {p.label}
+                            </div>
+                            <GradeSelector 
+                                currentScores={scores} 
+                                pillarId={p.id} 
+                                onSelect={(id, val) => setScores(prev => ({ ...prev, [id]: val }))} 
+                            />
+                        </div>
+                        <textarea 
+                            className="input-modern"
+                            placeholder="What evidence supports this grade? What would need to change for it to improve?"
+                            value={pillarComments[p.id]}
+                            onChange={(e) => setPillarComments(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            style={{ fontSize: '0.85rem', minHeight: '60px' }}
+                        />
+                    </div>
+                ))}
+
+                {/* Overall Summary */}
+                <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Overall Summary for Supervisor</label>
+                    <textarea 
+                        className="input-modern" 
+                        placeholder="Comprehensive summary for supervisors and third parties..." 
+                        value={summary}
+                        onChange={(e) => setSummary(e.target.value)}
+                        style={{ minHeight: '100px' }}
+                    />
+                </div>
+
+                {/* Checklist */}
+                <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '1rem', borderRadius: '10px' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--accent-success)', fontWeight: '700', display: 'block', marginBottom: '0.75rem' }}>Verification Principles Checklist</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem' }}>
+                            <input type="checkbox" checked={checklist.intent} onChange={e => setChecklist(prev => ({...prev, intent: e.target.checked}))} />
+                            Directional Intent verified (Reaction vs. Planned)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem' }}>
+                            <input type="checkbox" checked={checklist.excellence} onChange={e => setChecklist(prev => ({...prev, excellence: e.target.checked}))} />
+                            Technical Excellence verified (Precision vs. Vague)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem' }}>
+                            <input type="checkbox" checked={checklist.consistency} onChange={e => setChecklist(prev => ({...prev, consistency: e.target.checked}))} />
+                            Internal Consistency verified (Culture vs. Surface-only)
+                        </label>
+                    </div>
+                </div>
+
+                <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '1rem' }}
+                    onClick={() => onSubmit({...log, scores}, summary, pillarComments, checklist, supervisors[0])}
+                >
+                    Submit for Verification
+                </button>
             </div>
         </div>
     );
