@@ -105,7 +105,7 @@ const Home = () => {
                         purchases: pStats.totalPurchases
                     });
                     setQuantifiedImpact({
-                        waste: pStats.totalWaste % 1 !== 0 ? parseFloat(pStats.totalWaste.toFixed(2)) : pStats.totalWaste,
+                        waste: Number(pStats.totalWaste.toFixed(2)),
                         trees: Math.round(pStats.totalTrees),
                         families: pStats.totalFamilies
                     });
@@ -138,8 +138,8 @@ const Home = () => {
         <div style={{ width: '100%', paddingBottom: '2rem' }}>
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Dashboard</h1>
-                    <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Conviction Network impact overview</p>
+                    <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Network</h1>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Every number here is someone who chose conviction over convenience.</p>
                 </div>
 
 
@@ -177,20 +177,23 @@ const Home = () => {
                 <p style={{ fontSize: '1.05rem', lineHeight: '1.6', color: 'rgba(255,255,255,0.9)' }}>
                     Make for-good and conviction-driven businesses be seen, verified, and valued.
                 </p>
+                <p style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'rgba(255,255,255,0.6)', marginTop: '0.75rem' }}>
+                    There are founders who chose to do right. This network makes sure they don't finish last.
+                </p>
             </div>
 
             <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-users stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Consumers</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>People</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.consumers || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-store stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Businesses</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>For-Good Businesses</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.businesses || 0).toLocaleString()}</p>
                     </div>
                 </div>
@@ -198,8 +201,8 @@ const Home = () => {
                     <i className="fa-solid fa-location-dot stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            Total Check-ins
-                            <i className="fa-solid fa-circle-question" title="Ghost Check-ins are acknowledgments from anonymous, non-registered supporters. Member Check-ins are from registered identities." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
+                            Supports
+                            <i className="fa-solid fa-circle-question" title="Every support says: I see you, and I choose you. Ghost supports are from anonymous, non-registered visitors." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
                         </h3>
                         <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                             {isLoading ? '...' : (stats.checkins || 0).toLocaleString()} 
@@ -212,17 +215,17 @@ const Home = () => {
                 <div className="stat-card glass-card success-gradient">
                     <i className="fa-solid fa-receipt stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-success)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Total Purchases</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Economic Proof</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.purchases || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card" style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
                     <i className="fa-solid fa-chart-pie stat-icon" style={{ color: '#FFA000', fontSize: '1.5rem' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>National Transformation</h3>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>The 30% Goal</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: '#FFA000' }}>{gdpPenetration}</p>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.75rem', fontStyle: 'italic' }}>
-                            The goal is have 30% of Malaysia's GDP to be part of the humane empathy economy.
+                            The share of Malaysia's economy we're working to reclaim for businesses that care.
                         </p>
                     </div>
                 </div>
@@ -259,14 +262,14 @@ const Home = () => {
             {currentUser && (
                 <>
                     <div className="page-header mt-4" style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Impact</h2>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Contribution</h2>
                     </div>
                     
                     <div className="stats-grid personal">
                         <div className="stat-card glass-card highlight-border">
                             <i className="fa-solid fa-location-dot stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
                             <div className="stat-info" style={{ marginTop: '0.75rem' }}>
-                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Check-ins</h3>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your Supports</h3>
                                 <p className="stat-value">{personalStats.checkins}</p>
                             </div>
                         </div>

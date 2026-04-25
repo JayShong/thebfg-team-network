@@ -26,8 +26,8 @@ const Directory = () => {
         <div style={{ width: '100%', paddingBottom: '3rem' }}>
             {/* Header & Impact Stats */}
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>Directory</h1>
-                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Discover humanistic businesses</p>
+                <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Network</h1>
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Businesses that chose purpose. Verified by us. Chosen by you.</p>
             </div>
             
             {/* Search Bar */}
@@ -35,7 +35,7 @@ const Directory = () => {
                 <i className="fa-solid fa-search" style={{ color: 'var(--text-secondary)' }}></i>
                 <input 
                     type="text" 
-                    placeholder="Search paradigm businesses..." 
+                    placeholder="Search for-good businesses..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="input-modern"
@@ -44,35 +44,56 @@ const Directory = () => {
             </div>
 
             {/* Category Filters */}
-            <div className="filters" style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', padding: '1rem 0', scrollbarWidth: 'none', paddingBottom: '1.5rem' }}>
-                <button 
-                    className="btn btn-secondary"
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', width: 'auto', borderRadius: 'var(--radius-full)', background: activeFilter === 'all' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                    onClick={() => setActiveFilter('all')}
-                >
-                    All
-                </button>
-                <button 
-                    className="btn btn-secondary"
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', width: 'auto', borderRadius: 'var(--radius-full)', background: activeFilter === 'fnb' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                    onClick={() => setActiveFilter('fnb')}
-                >
-                    F&B
-                </button>
-                <button 
-                    className="btn btn-secondary"
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', width: 'auto', borderRadius: 'var(--radius-full)', background: activeFilter === 'retail' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                    onClick={() => setActiveFilter('retail')}
-                >
-                    Retail
-                </button>
-                <button 
-                    className="btn btn-secondary"
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', width: 'auto', borderRadius: 'var(--radius-full)', background: activeFilter === 'services' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                    onClick={() => setActiveFilter('services')}
-                >
-                    Services
-                </button>
+            <div className="filters" style={{ 
+                display: 'flex', 
+                gap: '0.6rem', 
+                overflowX: 'auto', 
+                padding: '1rem 0', 
+                scrollbarWidth: 'none', 
+                paddingBottom: '1.5rem',
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch'
+            }}>
+                {[
+                    { id: 'all', label: 'All' },
+                    { id: 'arts', label: 'Arts' },
+                    { id: 'support', label: 'Biz Support' },
+                    { id: 'fnb', label: 'Cafe & Dining' },
+                    { id: 'community', label: 'Community' },
+                    { id: 'climate', label: 'Ecological Stewardship' },
+                    { id: 'education', label: 'Talent' },
+                    { id: 'finance', label: 'Finance' },
+                    { id: 'foodsystems', label: 'Food Systems' },
+                    { id: 'gifts', label: 'Gifts & Crafts' },
+                    { id: 'health', label: 'Health' },
+                    { id: 'housing', label: 'Housing' },
+                    { id: 'manufacturing', label: 'Manufacturing' },
+                    { id: 'personal', label: 'Personal Support' },
+                    { id: 'pets', label: 'Pets' },
+                    { id: 'repairs', label: 'Repairs & Sharing' },
+                    { id: 'events', label: 'Social Events' },
+                    { id: 'sports', label: 'Sports' },
+                    { id: 'nature', label: 'Nature' },
+                    { id: 'mobility', label: 'Mobility' }
+                ].map(cat => (
+                    <button 
+                        key={cat.id}
+                        className={`filter-btn ${activeFilter === cat.id ? 'active' : ''}`}
+                        style={{ 
+                            padding: '0.5rem 1.2rem', 
+                            fontSize: '0.85rem', 
+                            whiteSpace: 'nowrap',
+                            borderRadius: 'var(--radius-full)',
+                            background: activeFilter === cat.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                            color: activeFilter === cat.id ? 'white' : 'var(--text-secondary)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            flexShrink: 0
+                        }}
+                        onClick={() => setActiveFilter(cat.id)}
+                    >
+                        {cat.label}
+                    </button>
+                ))}
             </div>
 
             {/* Business List Container */}
@@ -80,7 +101,7 @@ const Directory = () => {
                 {loading && businesses.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         <i className="fa-solid fa-circle-notch fa-spin fa-2x"></i>
-                        <p style={{ marginTop: '1rem' }}>Loading network entities...</p>
+                        <p style={{ marginTop: '1rem' }}>Finding businesses that care...</p>
                     </div>
                 )}
 
@@ -93,7 +114,7 @@ const Directory = () => {
 
                 {!loading && businesses.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                        <p>No paradigm businesses match your search.</p>
+                        <p>No businesses found. Try a different search — the network is growing every day.</p>
                     </div>
                 )}
 

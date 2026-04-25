@@ -49,7 +49,7 @@ const About = () => {
 
             <div className="page-header" style={{ marginBottom: '1.5rem', marginTop: '2.5rem' }}>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '0.25rem' }}>The Manifesto</h2>
-                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>A private commercial Conviction Network connecting socially conscious consumers with empathetic businesses.</p>
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Good businesses are losing. Not because they're wrong — but because no one can see them. We're changing that.</p>
             </div>
 
             {/* The Grading Paradigms - ISO53001 Style */}
@@ -105,19 +105,18 @@ const About = () => {
             <div className="glass-card detail-section" style={{ marginTop: '1.5rem', background: 'rgba(255,255,255,0.03)' }}>
                 <h3 style={{ color: '#ffffff', marginBottom: '1rem' }}>How Participation Works</h3>
                 <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', fontSize: '0.95rem' }}>
-                    Check-ins are a free way for you to say exploitative businesses got to go. 
-                    Your purchases will make the businesses you support to survive and outlast.
+                    A check-in says: I found a business that cares, and I want the world to know. A purchase says: I'm putting my money where my conviction is.
                 </p>
                 <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', flex: 1, minWidth: '140px' }}>
                         <div style={{ fontSize: '1.2rem', color: 'var(--primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-qrcode"></i></div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Check-In</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Log Visibility</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Support</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>I See You</div>
                     </div>
                     <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', flex: 1, minWidth: '140px' }}>
                         <div style={{ fontSize: '1.2rem', color: 'var(--accent-success)', marginBottom: '0.5rem' }}><i className="fa-solid fa-receipt"></i></div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Verify Spend</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Log Impact</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Purchase</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>I Choose You</div>
                     </div>
                     <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', flex: 1, minWidth: '140px' }}>
                         <div style={{ fontSize: '1.2rem', color: '#F59E0B', marginBottom: '0.5rem' }}><i className="fa-solid fa-medal"></i></div>

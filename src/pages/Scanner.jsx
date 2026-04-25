@@ -5,6 +5,7 @@ import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { TUTORIAL_STEPS } from '../utils/badgeLogic';
 import firebase from 'firebase/compat/app';
+import MilestoneCelebration, { MILESTONES } from '../components/MilestoneCelebration';
 
 const Scanner = () => {
     const navigate = useNavigate();
@@ -21,6 +22,9 @@ const Scanner = () => {
     // Sentinel State
     const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
     const [lockoutTimer, setLockoutTimer] = useState(0);
+    
+    // Milestone State
+    const [milestoneCount, setMilestoneCount] = useState(null);
 
     useEffect(() => {
         // Detect bizId from URL for Native Camera Scans
@@ -144,6 +148,11 @@ const Scanner = () => {
             
             if (type === 'checkin') {
                 pStats.totalCheckins = (pStats.totalCheckins || 0) + 1;
+                // Check for milestone
+                const newCount = pStats.totalCheckins;
+                if (MILESTONES.some(m => m.count === newCount)) {
+                    setMilestoneCount(newCount);
+                }
             } else if (type === 'purchase') {
                 pStats.totalPurchases = (pStats.totalPurchases || 0) + 1;
                 
@@ -269,7 +278,7 @@ const Scanner = () => {
 
             await batch.commit();
             setIsSuccess(true);
-            setSuccessMsg("Check-in verified! Your impact is being recorded.");
+            setSuccessMsg("You just chose conviction over convenience. That matters.");
             updateLocalStats('checkin');
             setScannedBusiness(null);
             
@@ -331,8 +340,8 @@ const Scanner = () => {
 
             setIsSuccess(true);
             setSuccessMsg(isGhost 
-                ? "Your guest purchase has been recorded! Thank you for supporting the Empathy Economy. (Impact verified upon merchant approval)"
-                : "Your purchase has been recorded! Global impact and badges will be updated once the merchant verifies your receipt."
+                ? "Your support has been recorded. Thank you for choosing conviction over convenience."
+                : "Your purchase has been recorded. This is proof that for-good businesses can win."
             );
             
             updateLocalStats('purchase', finalAmount);
@@ -365,12 +374,12 @@ const Scanner = () => {
             
             {isSuccess ? (
                 <div className="glass-card slide-up flex-center" style={{ textAlign: 'center', padding: '3rem 2rem', marginTop: '2rem' }}>
-                    <div style={{ fontSize: '4rem', color: 'var(--accent-success)', marginBottom: '1.5rem' }}>
-                        <i className="fa-solid fa-circle-check"></i>
+                    <div className="success-ripple" style={{ fontSize: '4rem', color: 'var(--accent-success)', marginBottom: '1.5rem', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="fa-solid fa-circle-check success-icon-animated"></i>
                     </div>
-                    <h2 style={{ marginBottom: '0.5rem' }}>Acknowledgment Received!</h2>
+                    <h2 style={{ marginBottom: '0.5rem' }}>Your Support Is In.</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                        {successMsg || "Your support for the Empathy Economy has been recorded."}
+                        {successMsg || "You just chose conviction over convenience. That matters."}
                     </p>
 
                     {!currentUser && (
@@ -386,7 +395,7 @@ const Scanner = () => {
                                 <i className="fa-solid fa-ghost"></i> Ghost Check-in Successful
                             </h4>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-                                Thank you for your ghost check-in. If you would like to retain your check-in activities when you become a member later, please do it soon before your device deletes your records.
+                                Your support was recorded anonymously. Create an identity to make every future support count permanently.
                             </p>
                             <button onClick={() => navigate('/settings')} className="btn btn-primary mt-3 feature-gradient" style={{ width: '100%', border: 'none', padding: '0.8rem' }}>
                                 Secure My Impact Permanently
@@ -501,11 +510,11 @@ const Scanner = () => {
                         ) : (
                             <>
                                 <button onClick={submitCheckin} disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
-                                    {isSubmitting ? 'Verifying...' : <><i className="fa-solid fa-check"></i> Found Them (Check-In)</>}
+                                    {isSubmitting ? 'Verifying...' : <><i className="fa-solid fa-check"></i> I See You (Check-In)</>}
                                 </button>
  
                                 <button onClick={() => setPurchaseForm(true)} disabled={isSubmitting} className="btn btn-success" style={{ width: '100%' }}>
-                                    <i className="fa-solid fa-receipt"></i> Bought from Them (Log Purchase)
+                                    <i className="fa-solid fa-receipt"></i> I Choose You (Log Purchase)
                                 </button>
                                 
                                 <button onClick={() => { setScannedBusiness(null); setScanning(true); }} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '1rem', borderRadius: '50px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -515,6 +524,14 @@ const Scanner = () => {
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* Milestone Celebration Overlay */}
+            {milestoneCount && (
+                <MilestoneCelebration 
+                    count={milestoneCount} 
+                    onDismiss={() => setMilestoneCount(null)} 
+                />
             )}
 
             {/* Tutorial Modal */}

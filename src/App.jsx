@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 // Layout
@@ -18,10 +18,12 @@ import AuditHub from './pages/AuditHub';
 import BusinessPortal from './pages/BusinessPortal';
 import Settings from './pages/Settings';
 import BusinessProfile from './pages/BusinessProfile';
+import OnboardingHub from './pages/OnboardingHub';
 
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import WelcomeOverlay from './components/WelcomeOverlay';
 
 function App() {
   const { currentUser, isGuest } = useAuth();
@@ -30,7 +32,23 @@ function App() {
     return <Login />;
   }
 
+  // First-time welcome overlay logic
+  const [showWelcome, setShowWelcome] = useState(false);
+  
+  useEffect(() => {
+    if (currentUser && !localStorage.getItem('bfg_welcomed')) {
+      setShowWelcome(true);
+    }
+  }, [currentUser]);
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem('bfg_welcomed', 'true');
+  };
+
   return (
+    <>
+      {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}
     <Routes>
       <Route element={<MainLayout />}>
         {/* Core Routes mapping to Bottom Nav */}
@@ -68,6 +86,11 @@ function App() {
             <AuditHub />
           </ProtectedRoute>
         } />
+        <Route path="/onboarding-hub" element={
+          <ProtectedRoute requiredRole="member">
+            <OnboardingHub />
+          </ProtectedRoute>
+        } />
         <Route path="/business-portal" element={
           <ProtectedRoute requiredRole="merchant" allowStaff={true}>
             <BusinessPortal />
@@ -80,6 +103,7 @@ function App() {
         } />
       </Route>
     </Routes>
+    </>
   );
 }
 

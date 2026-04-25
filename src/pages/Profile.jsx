@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import useBusinesses from '../hooks/useBusinesses';
 import AuthModal from '../components/auth/AuthModal';
 import ReceiptLogger from '../components/profile/ReceiptLogger';
+import MilestoneCelebration, { MILESTONES } from '../components/MilestoneCelebration';
 import { db } from '../services/firebase';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -19,6 +20,20 @@ const Profile = () => {
 
     const [history, setHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(true);
+    const [replayMilestone, setReplayMilestone] = useState(null);
+
+    // Read total supports from localStorage for milestone gallery
+    const getUserSupports = () => {
+        try {
+            const saved = localStorage.getItem('bfg_personal_stats');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return parsed.totalCheckins || 0;
+            }
+        } catch (e) {}
+        return 0;
+    };
+    const totalSupports = getUserSupports();
 
     useEffect(() => {
         if (!currentUser?.uid) return;
@@ -42,7 +57,7 @@ const Profile = () => {
                 <i className="fa-solid fa-user-lock fa-4x" style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}></i>
                 <h2>Identity Required</h2>
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '300px', marginBottom: '2rem' }}>
-                    Join the Conviction Network to track your impact, earn badges, and verify purchases.
+                    Every action you take here is a choice for the world you want. Create your identity to make it count.
                 </p>
                 <button onClick={() => setShowAuthModal(true)} className="btn btn-primary" style={{ padding: '1rem 2rem', border: 'none' }}>
                     Establish Identity
@@ -66,8 +81,8 @@ const Profile = () => {
         <div style={{ paddingBottom: '2rem' }}>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                    <h1 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Your Badge</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>TheBFG.Team Member</p>
+                    <h1 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Your Journey</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Member of The Business For Good Team</p>
                 </div>
                 <button onClick={() => navigate('/settings')} className="icon-btn" title="Settings">
                     <i className="fa-solid fa-gear"></i>
@@ -164,7 +179,7 @@ const Profile = () => {
                 <div className="stats-grid" style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="stat-card" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <div className="stat-value" style={{ fontSize: '1.75rem', color: 'var(--primary)', fontWeight: 'bold' }}>{displayUser.checkins || 0}</div>
-                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Check-ins</div>
+                        <div className="stat-label" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Supports</div>
                     </div>
                     <div className="stat-card" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <div className="stat-value" style={{ fontSize: '1.75rem', color: '#ffb84d', fontWeight: 'bold' }}>{displayUser.purchases || 0}</div>
@@ -224,14 +239,14 @@ const Profile = () => {
                                 )}
 
                                 {displayUser.isCustomerSuccess && (
-                                    <button onClick={() => navigate('/admin')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-user-tag"></i> Customer Success Portal
+                                    <button onClick={() => navigate('/onboarding-hub')} className="btn btn-secondary">
+                                        <i className="fa-solid fa-user-tag"></i> Onboarding Hub
                                     </button>
                                 )}
 
                                 {(displayUser.isSuperAdmin || displayUser.isAuditor) && (
                                     <button onClick={() => navigate('/audit-hub')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-clipboard-check"></i> Audit Hub
+                                        <i className="fa-solid fa-clipboard-check"></i> Verification Hub
                                     </button>
                                 )}
                                 
@@ -249,6 +264,89 @@ const Profile = () => {
                     )}
                 </div>
             </div>
+
+            {/* Milestone Gallery */}
+            {!displayUser.isGuest && (
+                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.05s' }}>
+                    <h3 style={{ marginBottom: '0.5rem' }}>
+                        <i className="fa-solid fa-star" style={{ color: '#F59E0B' }}></i> Your Milestones
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                        {totalSupports > 0 
+                            ? `${totalSupports} supports and counting. Tap an unlocked milestone to relive the moment.`
+                            : 'Support a for-good business to unlock your first milestone.'
+                        }
+                    </p>
+                    <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gap: '0.75rem' 
+                    }}>
+                        {MILESTONES.map(m => {
+                            const isUnlocked = totalSupports >= m.count;
+                            return (
+                                <div 
+                                    key={m.count}
+                                    onClick={() => isUnlocked && setReplayMilestone(m.count)}
+                                    style={{
+                                        background: isUnlocked 
+                                            ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.12))'
+                                            : 'rgba(255,255,255,0.02)',
+                                        border: isUnlocked 
+                                            ? '1px solid rgba(139, 92, 246, 0.3)'
+                                            : '1px dashed rgba(255,255,255,0.08)',
+                                        borderRadius: '14px',
+                                        padding: '1rem 0.5rem',
+                                        textAlign: 'center',
+                                        cursor: isUnlocked ? 'pointer' : 'default',
+                                        transition: 'all 0.2s ease',
+                                        opacity: isUnlocked ? 1 : 0.4,
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {isUnlocked && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            right: '6px',
+                                            fontSize: '0.55rem',
+                                            color: 'var(--accent-primary)',
+                                            opacity: 0.7
+                                        }}>
+                                            <i className="fa-solid fa-play"></i>
+                                        </div>
+                                    )}
+                                    <div style={{ 
+                                        fontSize: isUnlocked ? '1.5rem' : '1.2rem', 
+                                        fontWeight: '800',
+                                        color: isUnlocked ? '#fff' : 'rgba(255,255,255,0.3)',
+                                        marginBottom: '0.3rem'
+                                    }}>
+                                        {isUnlocked ? m.count : '???'}
+                                    </div>
+                                    <div style={{ 
+                                        fontSize: '0.6rem', 
+                                        color: isUnlocked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '1px'
+                                    }}>
+                                        {isUnlocked ? 'Supports' : 'Locked'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Milestone Replay Overlay */}
+            {replayMilestone && (
+                <MilestoneCelebration 
+                    count={replayMilestone} 
+                    onDismiss={() => setReplayMilestone(null)} 
+                />
+            )}
 
             {/* Purchase Logging Component */}
             {!displayUser.isGuest && (

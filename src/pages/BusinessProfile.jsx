@@ -97,7 +97,7 @@ const BusinessProfile = () => {
             <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
                 <i className="fa-solid fa-triangle-exclamation fa-3x"></i>
                 <p style={{ marginTop: '1rem' }}>Business not found in this sector.</p>
-                <button className="btn btn-secondary mt-3" onClick={() => navigate('/directory')}>Back to Directory</button>
+                <button className="btn btn-secondary mt-3" onClick={() => navigate('/directory')}>Back to Network</button>
             </div>
         );
     }

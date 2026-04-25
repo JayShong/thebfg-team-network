@@ -58,7 +58,7 @@ const Login = () => {
                 <i className="fa-solid fa-leaf text-gradient" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}></i>
                 <h1 style={{ marginBottom: '0.5rem', textAlign: 'center', fontSize: '2rem', fontWeight: '700' }}>Welcome to TheBFG.Team</h1>
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2.5rem', lineHeight: '1.5' }}>
-                    A private commercial Conviction Network connecting socially conscious consumers with empathetic businesses.
+                    Good businesses are losing. Not because they're wrong — but because no one can see them. We're changing that.
                 </p>
 
                 <div className="glass-card" style={{ width: '100%', padding: '2rem' }}>
@@ -115,7 +115,7 @@ const Login = () => {
                             disabled={isProcessing}
                             style={{ padding: '1rem', marginTop: '0.5rem' }}
                         >
-                            {isProcessing ? 'Processing...' : 'Join the Conviction Network / Login'}
+                            {isProcessing ? 'Processing...' : 'Join the Movement'}
                         </button>
                     </form>
 
@@ -126,7 +126,7 @@ const Login = () => {
                             onMouseOver={(e) => e.target.style.color = 'var(--accent-primary)'}
                             onMouseOut={(e) => e.target.style.color = 'var(--text-secondary)'}
                         >
-                            <i className="fa-solid fa-magnifying-glass" style={{ marginRight: '0.5rem' }}></i> Continue as Guest Explorer
+                            <i className="fa-solid fa-magnifying-glass" style={{ marginRight: '0.5rem' }}></i>Explore as Guest
                         </button>
                     </div>
                 </div>

@@ -19,7 +19,7 @@ const BottomNav = () => {
                 onClick={() => navigate('/directory')}
             >
                 <i className="fa-solid fa-store"></i>
-                <span>Directory</span>
+                <span>Network</span>
             </button>
             
             <button 
