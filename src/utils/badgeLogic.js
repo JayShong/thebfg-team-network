@@ -1,3 +1,8 @@
+import scannerImg from '../assets/tutorial/scanner.png';
+import recognitionImg from '../assets/tutorial/recognition.png';
+import purchaseImg from '../assets/tutorial/purchase.png';
+import successImg from '../assets/tutorial/success.png';
+
 export const CURRENT_SEASON = {
     id: '2026_S1',
     name: 'Season 1: Genesis',
@@ -166,11 +171,6 @@ export const evaluateTier = (userBadges = {}) => {
         missingCats
     };
 };
-
-import scannerImg from '../assets/tutorial/scanner.png';
-import recognitionImg from '../assets/tutorial/recognition.png';
-import purchaseImg from '../assets/tutorial/purchase.png';
-import successImg from '../assets/tutorial/success.png';
 
 export const TUTORIAL_STEPS = [
     {
