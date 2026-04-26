@@ -118,12 +118,9 @@ const Directory = () => {
             <div className="filters" style={{
                 display: 'flex',
                 gap: '0.6rem',
-                overflowX: 'auto',
+                flexWrap: 'wrap',
                 padding: '1rem 0',
-                scrollbarWidth: 'none',
-                paddingBottom: '0.5rem',
-                msOverflowStyle: 'none',
-                WebkitOverflowScrolling: 'touch'
+                paddingBottom: '1.5rem'
             }}>
                 {[
                     { id: 'all', label: 'All' },
@@ -157,8 +154,7 @@ const Directory = () => {
                             borderRadius: 'var(--radius-full)',
                             background: activeFilter === cat.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
                             color: activeFilter === cat.id ? 'white' : 'var(--text-secondary)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            flexShrink: 0
+                            border: '1px solid rgba(255,255,255,0.1)'
                         }}
                         onClick={() => setActiveFilter(cat.id)}
                     >
@@ -168,7 +164,7 @@ const Directory = () => {
             </div>
 
             {/* Paradigm Filters (H2-2) */}
-            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '1.5rem', scrollbarWidth: 'none' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', paddingBottom: '1.5rem' }}>
                 {[
                     { id: 's', label: 'Strong Shareholders' },
                     { id: 'e', label: 'Strong Employees' },

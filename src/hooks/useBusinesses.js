@@ -67,8 +67,9 @@ export const useBusinesses = (searchQuery = '', activeFilter = 'all') => {
                 setBusinesses(filtered);
                 setHasMore(false); // Search results are usually contained in the batch
             } else {
-                // Default logic for browsable directory (Ordered by impact)
-                query = query.orderBy('smiles', 'desc');
+                // Default logic for browsable directory (Ordered by newest first)
+                // This ensures businesses without a 'smiles' score yet are NOT hidden.
+                query = query.orderBy('createdAt', 'desc');
                 
                 if (isLoadMore && lastVisible.current) {
                     query = query.startAfter(lastVisible.current);
