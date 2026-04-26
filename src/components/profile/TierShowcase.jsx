@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { evaluateTier, CURRENT_SEASON, BADGE_CATEGORIES } from '../../utils/badgeLogic';
 
 const JOURNEY_STEPS = [

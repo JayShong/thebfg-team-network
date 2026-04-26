@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import BadgeGallery from '../components/profile/BadgeGallery';
 import TierShowcase from '../components/profile/TierShowcase';
 import { useAuth } from '../contexts/AuthContext';
