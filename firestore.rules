@@ -53,6 +53,11 @@ service cloud.firestore {
       match /settings/{docId} {
         allow read, write: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
       }
+
+      // Allow users to record their own scan sentinel state (rate limiting)
+      match /sentinel/{docId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+      }
     }
     
     // Role Documents - Partitioned Visibility
@@ -145,6 +150,32 @@ service cloud.firestore {
     match /feedback/{feedbackId} {
       allow create: if true; // Allow guests and users to submit observations
       allow read, update, delete: if isAuditor() || isSuperAdmin();
+    }
+
+    // User Applications
+    match /applications/{appId} {
+      allow read: if request.auth != null && (
+        request.auth.token.email == resource.data.email || 
+        isMerchantAssistant() || 
+        isAuditor()
+      );
+      allow create: if request.auth != null && request.auth.token.email == request.resource.data.email;
+      allow update: if request.auth != null && (
+        (request.auth.token.email == resource.data.email && resource.data.status != 'approved') ||
+        isMerchantAssistant() || 
+        isAuditor()
+      );
+    }
+
+    // Gratitude Bonds (Business Intelligence)
+    match /gratitude_bond_records/{bondId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId || 
+        isMerchantAssistant() || 
+        isAuditor() ||
+        request.auth.token.email == get(/databases/$(database)/documents/businesses/$(resource.data.bizId)).data.ownerEmail
+      );
+      allow write: if false; // System only via Cloud Functions
     }
   }
 }
