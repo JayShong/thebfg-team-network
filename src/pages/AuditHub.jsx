@@ -53,7 +53,11 @@ const AuditHub = () => {
             setLogs(filtered);
             setLoading(false);
         }, err => {
-            console.error("Audit Hub Subscription failed:", err);
+            if (err.message?.includes('index')) {
+                console.warn("⏳ AUDIT: Verification Hub is waiting for database index to finish building...");
+            } else {
+                console.error("❌ AUDIT: Subscription failed:", err);
+            }
             setLoading(false);
         });
 

@@ -54,7 +54,11 @@ const Profile = () => {
                 setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setHistoryLoading(false);
             }, err => {
-                console.warn("History fetch failed:", err);
+                if (err.message?.includes('index')) {
+                    console.warn("⏳ PROFILE: Transaction history is waiting for database index to finish building...");
+                } else {
+                    console.error("❌ PROFILE: History fetch failed:", err);
+                }
                 setHistoryLoading(false);
             });
         return () => unsubscribe();
