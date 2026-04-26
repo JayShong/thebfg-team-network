@@ -9,6 +9,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isClaimsResolving, setIsClaimsResolving] = useState(false);
     const [isGuest, setIsGuest] = useState(localStorage.getItem('bfg_guest_mode') === 'true');
     const [ghostId, setGhostId] = useState(() => {
         let gid = localStorage.getItem('bfg_ghost_id');
@@ -91,20 +92,19 @@ export const AuthProvider = ({ children }) => {
                     currentClaims = initialToken.claims;
 
                     if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
+                        setIsClaimsResolving(true);
                         console.warn("🔐 AUTH: Root Admin detected. Requesting Master Key from server...");
                         try {
-                            // Import functions directly from our service to ensure correct region/init
                             const { functions } = await import('../services/firebase');
                             const bootstrapFunc = functions.httpsCallable('bootstraprootadmin');
-                            const result = await bootstrapFunc();
-                            console.log("🔐 AUTH: Server response:", result.data);
-                            
-                            // FORCE refresh the token to pick up the new claims
+                            await bootstrapFunc();
                             const refreshedToken = await user.getIdTokenResult(true);
                             currentClaims = refreshedToken.claims;
-                            console.log("🔐 AUTH: Master Key successfully installed in local session.");
+                            console.log("🔐 AUTH: Master Key successfully installed.");
                         } catch (err) {
                             console.error("❌ AUTH: Master Key activation failed:", err.message);
+                        } finally {
+                            setIsClaimsResolving(false);
                         }
                     } else if (currentClaims.isSuperAdmin) {
                         console.log("🛡️ AUTH: Secure Master Key confirmed.");
@@ -190,8 +190,14 @@ export const AuthProvider = ({ children }) => {
                 }
 
                 setCurrentUser(finalProfile);
-                fetchRecentActivity(); 
-                fetchPendingAudits(finalProfile);
+                
+                // Only trigger secondary data fetches if we aren't currently resolving claims
+                if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
+                    console.log("⏳ AUTH: Delaying activity sync until Master Key is ready...");
+                } else {
+                    fetchRecentActivity(); 
+                    fetchPendingAudits(finalProfile);
+                }
             } else {
                 setCurrentUser(null);
             }
@@ -262,6 +268,7 @@ export const AuthProvider = ({ children }) => {
 
     const value = {
         currentUser,
+        isClaimsResolving,
         isGuest,
         ghostId,
         recentActivity,

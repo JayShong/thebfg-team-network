@@ -5,7 +5,7 @@ import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { getSeasonId } from '../utils/badgeLogic';
 
 const Home = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, isClaimsResolving } = useAuth();
 
 
     // Initialize states from localStorage with robust fallbacks
@@ -127,6 +127,12 @@ const Home = () => {
 
     useEffect(() => {
         // Trigger refresh if local storage is missing OR global stats are effectively zero
+        // AND we aren't currently resolving security claims
+        if (isClaimsResolving) {
+            console.log("⏳ HOME: Dashboard refresh paused for security warm-up...");
+            return;
+        }
+
         if (!localStorage.getItem('bfg_global_stats') || stats.consumers === 0) {
             refreshDashboard();
         } else {
