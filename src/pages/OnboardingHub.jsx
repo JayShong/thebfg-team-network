@@ -241,14 +241,20 @@ const DirectoryManagementTab = ({ onEdit }) => {
             <div className="glass-card" style={{ padding: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Network Inventory</h3>
-                    <div style={{ display: 'flex', gap: '0.75rem', width: '380px' }}>
-                        <div style={{ position: 'relative', flex: 1 }}>
-                            <i className="fa-solid fa-search" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}></i>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '500px' }}>
+                        <div style={{ position: 'relative' }}>
+                            <i className="fa-solid fa-search" style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '1rem' }}></i>
                             <input 
                                 type="text" 
-                                placeholder="Search by name or ID..." 
+                                placeholder="Find any business by name or ID..." 
                                 className="input-modern" 
-                                style={{ width: '100%', paddingLeft: '2.75rem', height: '44px' }}
+                                style={{ 
+                                    width: '100%', 
+                                    paddingLeft: '3.25rem', 
+                                    height: '56px', 
+                                    fontSize: '1.1rem',
+                                    borderRadius: '16px'
+                                }}
                                 value={inputValue}
                                 onChange={e => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
@@ -257,9 +263,15 @@ const DirectoryManagementTab = ({ onEdit }) => {
                         <button 
                             onClick={handleSearchSubmit}
                             className="btn btn-primary"
-                            style={{ height: '44px', padding: '0 1.25rem', fontSize: '0.85rem' }}
+                            style={{ 
+                                height: '48px', 
+                                width: '140px',
+                                fontSize: '0.95rem',
+                                borderRadius: 'var(--radius-full)',
+                                alignSelf: 'flex-start'
+                            }}
                         >
-                            Search
+                            Commit Search
                         </button>
                     </div>
                 </div>
