@@ -81,11 +81,32 @@ export const AuthProvider = ({ children }) => {
             if (user) {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
-                // Fetch full profile from DB
+
+                // 1. BOOTSTRAP GATE (Runs BEFORE any Firestore reads)
+                // If you are the root admin, we ensure claims are set first.
+                const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
+                let currentClaims = {};
+                try {
+                    const initialToken = await user.getIdTokenResult();
+                    currentClaims = initialToken.claims;
+
+                    if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
+                        console.warn("AUTH: Root Admin detected. Activating Secure Master Key...");
+                        const bootstrapFunc = firebase.functions().httpsCallable('bootstraprootadmin');
+                        await bootstrapFunc();
+                        // MUST force refresh token to put claims into the local session
+                        const refreshedToken = await user.getIdTokenResult(true);
+                        currentClaims = refreshedToken.claims;
+                        console.log("AUTH: Master Key Activated.");
+                    }
+                } catch (e) {
+                    console.error("AUTH: Bootstrap/Claims check failed", e);
+                }
+
+                // 2. Fetch profile from DB
                 let userDoc = await db.collection('users').doc(user.uid).get();
                 
-                // AUTO-PROVISIONING: If user exists in Auth but not in Firestore (e.g. legacy or failed signup)
-                // we create a default profile now to ensure they are counted in the Network Impact.
+                // AUTO-PROVISIONING: If user exists in Auth but not in Firestore
                 if (!userDoc.exists) {
                     console.log("Auto-provisioning profile for:", user.email);
                     const defaultProfile = {
@@ -101,18 +122,6 @@ export const AuthProvider = ({ children }) => {
                 }
 
                 // 3. SECURE ROLE RESOLUTION: Use Custom Claims (The secure layer)
-                let claims = {};
-                try {
-                    const idTokenResult = await user.getIdTokenResult(true); // Force refresh to get latest claims
-                    claims = idTokenResult.claims;
-                } catch (e) {
-                    console.error("AUTH: Failed to fetch custom claims", e);
-                }
-
-                // Hardcoded Root Admin Email is ONLY used here to trigger the initial bootstrap
-                // After the first run, the 'isSuperAdmin' claim will handle everything.
-                const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
-                
                 let profile = {
                     uid: user.uid,
                     email: user.email,
@@ -122,28 +131,9 @@ export const AuthProvider = ({ children }) => {
                 };
 
                 // Use Claims as the Primary Source of Truth for roles
-                profile.isSuperAdmin = !!claims.isSuperAdmin;
-                profile.isAuditor = !!claims.isAuditor || !!claims.isSuperAdmin;
-                profile.isCustomerSuccess = !!claims.isCustomerSuccess || !!claims.isSuperAdmin;
-
-                // SELF-HEALING BOOTSTRAP:
-                // If you are the root admin but don't have the claims yet (first time after update)
-                // we trigger the server-side bootstrap automatically.
-                if (user.email === BOOTSTRAP_TARGET && !profile.isSuperAdmin) {
-                    console.warn("AUTH: Root Admin detected without secure claims. Triggering Bootstrap...");
-                    try {
-                        const bootstrapFunc = firebase.functions().httpsCallable('bootstraprootadmin');
-                        await bootstrapFunc();
-                        // Re-fetch claims after bootstrap
-                        const refreshedToken = await user.getIdTokenResult(true);
-                        profile.isSuperAdmin = true;
-                        profile.isAuditor = true;
-                        profile.isCustomerSuccess = true;
-                        console.log("AUTH: Root Admin successfully bootstrapped with Custom Claims.");
-                    } catch (err) {
-                        console.error("AUTH: Bootstrap failed", err);
-                    }
-                }
+                profile.isSuperAdmin = !!currentClaims.isSuperAdmin;
+                profile.isAuditor = !!currentClaims.isAuditor || !!currentClaims.isSuperAdmin;
+                profile.isCustomerSuccess = !!currentClaims.isCustomerSuccess || !!currentClaims.isSuperAdmin;
 
                 let finalProfile = {
                     ...profile
