@@ -219,8 +219,20 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
 };
 
 const DirectoryManagementTab = ({ onEdit }) => {
-    const [localQuery, setLocalQuery] = useState('');
-    const { businesses, loading } = useBusinesses(localQuery); // Using server-side search now
+    const [inputValue, setInputValue] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const { businesses, loading } = useBusinesses(searchQuery);
+
+    const handleSearchSubmit = (e) => {
+        if (e) e.preventDefault();
+        setSearchQuery(inputValue);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleSearchSubmit();
+        }
+    };
 
     if (loading && businesses.length === 0) return <div style={{ padding: '4rem 0', textAlign: 'center' }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
@@ -229,16 +241,26 @@ const DirectoryManagementTab = ({ onEdit }) => {
             <div className="glass-card" style={{ padding: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Network Inventory</h3>
-                    <div style={{ position: 'relative', width: '300px' }}>
-                        <i className="fa-solid fa-search" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}></i>
-                        <input 
-                            type="text" 
-                            placeholder="Find any business by name or ID..." 
-                            className="input-modern" 
-                            style={{ width: '100%', paddingLeft: '2.75rem', height: '44px' }}
-                            value={localQuery}
-                            onChange={e => setLocalQuery(e.target.value)}
-                        />
+                    <div style={{ display: 'flex', gap: '0.75rem', width: '380px' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <i className="fa-solid fa-search" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}></i>
+                            <input 
+                                type="text" 
+                                placeholder="Search by name or ID..." 
+                                className="input-modern" 
+                                style={{ width: '100%', paddingLeft: '2.75rem', height: '44px' }}
+                                value={inputValue}
+                                onChange={e => setInputValue(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                            />
+                        </div>
+                        <button 
+                            onClick={handleSearchSubmit}
+                            className="btn btn-primary"
+                            style={{ height: '44px', padding: '0 1.25rem', fontSize: '0.85rem' }}
+                        >
+                            Search
+                        </button>
                     </div>
                 </div>
 
