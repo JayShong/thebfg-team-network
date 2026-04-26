@@ -11,7 +11,9 @@ import CustomerIntelligenceModal from '../components/portal/CustomerIntelligence
 import { useNavigate } from 'react-router-dom';
 
 const BusinessPortal = () => {
-    const { currentUser, getStewardshipLevel } = useAuth();
+    const auth = useAuth();
+    const { currentUser } = auth;
+    const { getStewardshipLevel } = auth;
     const { businesses, loading: bizLoading } = useBusinesses();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -55,7 +57,7 @@ const BusinessPortal = () => {
         }
     }, [businesses, currentUser, adminEditId]);
 
-    const stewardshipLevel = getStewardshipLevel(selectedBiz);
+    const stewardshipLevel = selectedBiz ? getStewardshipLevel(selectedBiz) : null;
     const canEditProfile = stewardshipLevel === 'founder' || stewardshipLevel === 'support';
     const canSeeIntelligence = stewardshipLevel === 'founder' || stewardshipLevel === 'manager' || stewardshipLevel === 'support';
     const canVerifyPurchases = stewardshipLevel !== null;

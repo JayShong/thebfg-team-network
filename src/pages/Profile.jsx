@@ -12,7 +12,7 @@ import { evaluateTier } from '../utils/badgeLogic';
 import ApplicationEditor from '../components/admin/ApplicationEditor';
 
 const Profile = () => {
-    const { currentUser, isGuest, logout } = useAuth();
+    const { currentUser, isGuest, isClaimsResolving, logout } = useAuth();
     const { businesses } = useBusinesses();
     const navigate = useNavigate();
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -45,37 +45,69 @@ const Profile = () => {
     const totalSupports = getUserSupports();
 
     useEffect(() => {
-        if (!currentUser?.uid) return;
-        const unsubscribe = db.collection('transactions')
-            .where('userId', '==', currentUser.uid)
-            .orderBy('timestamp', 'desc')
-            .limit(50)
-            .onSnapshot(snap => {
-                setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                setHistoryLoading(false);
-            }, err => {
-                if (err.message?.includes('index')) {
-                    console.warn("⏳ PROFILE: Transaction history is waiting for database index to finish building...");
-                } else {
-                    console.error("❌ PROFILE: History fetch failed:", err);
-                }
-                setHistoryLoading(false);
-            });
-        return () => unsubscribe();
-    }, [currentUser]);
+        if (!currentUser?.uid || isClaimsResolving) return;
+        let unsubscribe = null;
+
+        const subscribe = () => {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('transactions')
+                .where('userId', '==', currentUser.uid)
+                .orderBy('timestamp', 'desc')
+                .limit(50)
+                .onSnapshot(snap => {
+                    setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setHistoryLoading(false);
+                }, err => {
+                    if (err.message?.includes('index')) {
+                        console.warn("⏳ PROFILE: Transaction history is waiting for database index to finish building...");
+                    } else {
+                        console.error("❌ PROFILE: History fetch failed:", err);
+                    }
+                    setHistoryLoading(false);
+                });
+        };
+
+        subscribe();
+
+        const handleResumption = () => {
+            if (document.visibilityState === 'visible') subscribe();
+        };
+
+        document.addEventListener('visibilitychange', handleResumption);
+        return () => {
+            if (unsubscribe) unsubscribe();
+            document.removeEventListener('visibilitychange', handleResumption);
+        };
+    }, [currentUser, isClaimsResolving]);
 
     useEffect(() => {
-        if (!currentUser?.email) return;
-        const unsubscribe = db.collection('applications')
-            .where('email', '==', currentUser.email)
-            .limit(1)
-            .onSnapshot(snap => {
-                if (!snap.empty) {
-                    setUserApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
-                }
-            });
-        return () => unsubscribe();
-    }, [currentUser]);
+        if (!currentUser?.email || isClaimsResolving) return;
+        let unsubscribe = null;
+
+        const subscribe = () => {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('applications')
+                .where('email', '==', currentUser.email)
+                .limit(1)
+                .onSnapshot(snap => {
+                    if (!snap.empty) {
+                        setUserApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                    }
+                });
+        };
+
+        subscribe();
+
+        const handleResumption = () => {
+            if (document.visibilityState === 'visible') subscribe();
+        };
+
+        document.addEventListener('visibilitychange', handleResumption);
+        return () => {
+            if (unsubscribe) unsubscribe();
+            document.removeEventListener('visibilitychange', handleResumption);
+        };
+    }, [currentUser, isClaimsResolving]);
 
     const handleUpdateApplication = async (updates) => {
         setIsSavingApp(true);

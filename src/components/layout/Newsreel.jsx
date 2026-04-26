@@ -11,15 +11,36 @@ const Newsreel = () => {
     const [announcements, setAnnouncements] = useState([]);
 
     useEffect(() => {
-        const unsubscribe = db.collection('announcements')
-            .where('status', '==', 'active')
-            .onSnapshot(snap => {
-                setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            }, err => {
-                console.warn("Announcements sub failed:", err);
-                setAnnouncements([]);
-            });
-        return () => unsubscribe();
+        let unsubscribe = null;
+
+        const subscribe = () => {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('announcements')
+                .where('status', '==', 'active')
+                .onSnapshot(snap => {
+                    setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, err => {
+                    console.warn("Announcements sub failed:", err);
+                    setAnnouncements([]);
+                });
+        };
+
+        // Initial sub
+        subscribe();
+
+        // Resumption Guard: Re-subscribe when user returns to tab
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log("📡 NEWSREEL: Tab visible, refreshing stream...");
+                subscribe();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            if (unsubscribe) unsubscribe();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     // Build the queue of messages to rotate through

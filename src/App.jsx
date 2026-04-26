@@ -24,6 +24,7 @@ import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import WelcomeOverlay from './components/WelcomeOverlay';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   const { currentUser, isGuest } = useAuth();
@@ -48,6 +49,7 @@ function App() {
 
   return (
     <>
+      <ScrollToTop />
       {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}
     <Routes>
       <Route element={<MainLayout />}>

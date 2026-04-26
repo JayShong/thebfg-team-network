@@ -9,7 +9,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isClaimsResolving, setIsClaimsResolving] = useState(false);
+    const [isClaimsResolving, setIsClaimsResolving] = useState(true);
     const [isGuest, setIsGuest] = useState(localStorage.getItem('bfg_guest_mode') === 'true');
     const [ghostId, setGhostId] = useState(() => {
         let gid = localStorage.getItem('bfg_ghost_id');
@@ -19,9 +19,24 @@ export const AuthProvider = ({ children }) => {
         }
         return gid;
     });
-    const [recentActivity, setRecentActivity] = useState([]);
     const [localActivities, setLocalActivities] = useState([]);
+    const [recentActivity, setRecentActivity] = useState([]);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+
+    // Safety: Force resolution/loading if it hangs (e.g. 3rd party cookie block, network issues)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (loading) {
+                console.warn("⚠️ AUTH: Initialization timeout. Forcing loading to false.");
+                setLoading(false);
+            }
+            if (isClaimsResolving) {
+                console.warn("⚠️ AUTH: Claims resolution timeout. Forcing resolution to false.");
+                setIsClaimsResolving(false);
+            }
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [loading, isClaimsResolving]);
 
     const fetchPendingAudits = async (user) => {
         const activeUser = user || currentUser;
@@ -83,63 +98,103 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
 
-                // 1. BOOTSTRAP GATE (Runs BEFORE any Firestore reads)
+                // 1. BOOTSTRAP GATE (Deterministic Security resolution)
                 const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
                 let currentClaims = {};
                 
-                try {
-                    const initialToken = await user.getIdTokenResult();
-                    currentClaims = initialToken.claims;
-
-                    if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
-                        setIsClaimsResolving(true);
-                        console.warn("🔐 AUTH: Root Admin detected. Requesting Master Key from server...");
-                        try {
-                            const { functions } = await import('../services/firebase');
-                            const bootstrapFunc = functions.httpsCallable('bootstraprootadmin');
-                            await bootstrapFunc();
-                            const refreshedToken = await user.getIdTokenResult(true);
-                            currentClaims = refreshedToken.claims;
-                            console.log("🔐 AUTH: Master Key successfully installed.");
-                        } catch (err) {
-                            console.error("❌ AUTH: Master Key activation failed:", err.message);
-                        } finally {
-                            setIsClaimsResolving(false);
+                const activateMasterKey = async (targetUser, retryCount = 0) => {
+                    try {
+                        const { functions } = await import('../services/firebase');
+                        const bootstrapFunc = functions.httpsCallable('bootstraprootadmin');
+                        
+                        // Use exponential backoff for retries
+                        if (retryCount > 0) {
+                            await new Promise(r => setTimeout(r, Math.pow(2, retryCount) * 1500));
+                        } else {
+                            await new Promise(r => setTimeout(r, 1000)); // Increased base delay
                         }
+                        
+                        // FORCE TOKEN REFRESH before calling
+                        // This ensures the Functions SDK has a fresh, valid token in its context
+                        console.log(`🔐 AUTH: Refreshing identity token (Attempt ${retryCount + 1})...`);
+                        await targetUser.getIdToken(true);
+                        
+                        await bootstrapFunc();
+                        const refreshedToken = await targetUser.getIdTokenResult(true);
+                        const claims = refreshedToken.claims;
+                        
+                        if (claims.isSuperAdmin) {
+                            console.log("🔐 AUTH: Master Key successfully installed.");
+                            // Update the current user state with new claims
+                            setCurrentUser(prev => prev ? {
+                                ...prev,
+                                isSuperAdmin: true,
+                                isAuditor: true,
+                                isCustomerSuccess: true
+                            } : null);
+                        }
+                    } catch (err) {
+                        console.error(`❌ AUTH: Master Key activation attempt ${retryCount + 1} failed:`, err.message);
+                        // Final attempt failed - Force logout to clear stale session
+                        if (retryCount >= 2) {
+                            console.error("🚨 AUTH: Master Key activation critically failed. Purging stale session...");
+                            alert("Security Session Expired. Please log in again to activate the Master Key.");
+                            auth.signOut();
+                        } else {
+                            activateMasterKey(targetUser, retryCount + 1);
+                        }
+                    }
+                };
+
+                // 1. BOOTSTRAP GATE (Deterministic Security resolution)
+                try {
+                    setIsClaimsResolving(true);
+                    let tokenResult = await user.getIdTokenResult();
+                    currentClaims = tokenResult.claims;
+
+                    const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/';
+                    
+                    if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin && !isLoginPage) {
+                        console.warn("🔐 AUTH: Root Admin detected. Initiating background Master Key activation...");
+                        activateMasterKey(user);
                     } else if (currentClaims.isSuperAdmin) {
                         console.log("🛡️ AUTH: Secure Master Key confirmed.");
                     }
                 } catch (e) {
                     console.error("⚠️ AUTH: Claims check failed", e);
+                } finally {
+                    setIsClaimsResolving(false);
                 }
 
-                // 2. Fetch profile from DB
-                // Only proceed if we aren't in the middle of a bootstrap failure
+                // 2. Fetch profile from DB (Proceed immediately, it will re-fetch or catch up)
                 let userDoc;
                 try {
                     userDoc = await db.collection('users').doc(user.uid).get();
                 } catch (e) {
-                    console.error("❌ AUTH: Firestore profile read failed. This usually means permissions are missing.", e);
-                    // Fallback: create a skeleton profile so the app doesn't crash
+                    console.error("❌ AUTH: Firestore profile read failed. Permissions insufficient?", e);
                     userDoc = { exists: false, data: () => ({}) };
                 }
                 
-                // AUTO-PROVISIONING: If user exists in Auth but not in Firestore
-                if (!userDoc.exists) {
+                // AUTO-PROVISIONING
+                if (!userDoc.exists && !isClaimsResolving) {
                     console.log("Auto-provisioning profile for:", user.email);
-                    const defaultProfile = {
-                        email: user.email,
-                        name: user.email.split('@')[0], // Fallback nickname
-                        purchases: 0,
-                        checkins: 0,
-                        purchaseVolume: 0,
-                        created_at: new Date().toISOString()
-                    };
-                    await db.collection('users').doc(user.uid).set(defaultProfile);
-                    userDoc = await db.collection('users').doc(user.uid).get();
+                    try {
+                        const defaultProfile = {
+                            email: user.email,
+                            name: user.email.split('@')[0],
+                            purchases: 0,
+                            checkins: 0,
+                            purchaseVolume: 0,
+                            created_at: new Date().toISOString()
+                        };
+                        await db.collection('users').doc(user.uid).set(defaultProfile);
+                        userDoc = await db.collection('users').doc(user.uid).get();
+                    } catch (err) {
+                        console.warn("Provisioning failed - likely security rules catch-up");
+                    }
                 }
 
-                // 3. SECURE ROLE RESOLUTION: Use Custom Claims (The secure layer)
+                // 3. SECURE ROLE RESOLUTION
                 let profile = {
                     uid: user.uid,
                     email: user.email,

@@ -18,6 +18,7 @@ const Home = () => {
                     return parsed;
                 }
             }
+        } catch (e) { console.warn("Global stats cache corrupt"); }
         return {
             consumers: 0, businesses: 0, checkins: 0, ghostCheckins: 0,
             purchases: 0, purchaseVolume: 0, totalWaste: 0, totalTrees: 0,
@@ -145,16 +146,18 @@ const Home = () => {
                 const year = new Date().getFullYear();
                 const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/MY`);
                 if (res.ok) {
-                    const holidays = await res.json();
-                    const now = new Date();
-                    // Find holidays within +/- 7 days of today
-                    const activeHoliday = holidays.find(h => {
-                        const hDate = new Date(h.date);
-                        const diffDays = Math.abs(now - hDate) / (1000 * 60 * 60 * 24);
-                        return diffDays <= 7;
-                    });
-                    if (activeHoliday) {
-                        setFestiveLabel(activeHoliday.localName || activeHoliday.name);
+                    const text = await res.text();
+                    if (text) {
+                        const holidays = JSON.parse(text);
+                        const now = new Date();
+                        const activeHoliday = holidays.find(h => {
+                            const hDate = new Date(h.date);
+                            const diffDays = Math.abs(now - hDate) / (1000 * 60 * 60 * 24);
+                            return diffDays <= 7;
+                        });
+                        if (activeHoliday) {
+                            setFestiveLabel(activeHoliday.localName || activeHoliday.name);
+                        }
                     }
                 }
             } catch (e) {
@@ -162,7 +165,7 @@ const Home = () => {
             }
         };
         fetchHolidays();
-    }, [currentUser]);
+    }, [currentUser, isClaimsResolving]);
 
     const gdpPenetration = stats.gdpPenetration || "0%";
 

@@ -1,21 +1,18 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 
-class ErrorBoundary extends React.Component {
+class ErrorBoundaryInner extends React.Component {
     constructor(props) {
         super(props);
         this.state = { hasError: false, error: null };
     }
 
     static getDerivedStateFromError(error) {
-        // Update state so the next render will show the fallback UI.
         return { hasError: true, error };
     }
 
     componentDidCatch(error, errorInfo) {
-        // You can also log the error to an error reporting service here
         console.error("Critical Platform Error Captured:", error, errorInfo);
-        
-        // Log to local storage for debug tracking
         const logs = JSON.parse(localStorage.getItem('bfg_error_logs') || '[]');
         logs.push({
             timestamp: new Date().toISOString(),
@@ -26,8 +23,14 @@ class ErrorBoundary extends React.Component {
         localStorage.setItem('bfg_error_logs', JSON.stringify(logs.slice(-5)));
     }
 
+    componentDidUpdate(prevProps) {
+        if (this.state.hasError && prevProps.location?.pathname !== this.props.location?.pathname) {
+            console.log("ErrorBoundary: Resetting on route change");
+            this.setState({ hasError: false, error: null });
+        }
+    }
+
     handleRepair = () => {
-        // The "Panic Button" logic
         console.warn("Initiating Platform Self-Repair...");
         localStorage.clear();
         sessionStorage.clear();
@@ -100,5 +103,10 @@ class ErrorBoundary extends React.Component {
         return this.props.children; 
     }
 }
+
+const ErrorBoundary = (props) => {
+    const location = useLocation();
+    return <ErrorBoundaryInner location={location} {...props} />;
+};
 
 export default ErrorBoundary;

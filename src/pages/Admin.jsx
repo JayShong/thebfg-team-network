@@ -257,3 +257,4 @@ const InitiativesManager = () => {
         </div>
     );
 };
+export default Admin;

@@ -21,12 +21,12 @@ window.repairApp = () => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <AuthProvider>
-        <BrowserRouter>
+    <BrowserRouter>
+      <ErrorBoundary>
+        <AuthProvider>
           <App />
-        </BrowserRouter>
-      </AuthProvider>
-    </ErrorBoundary>
+        </AuthProvider>
+      </ErrorBoundary>
+    </BrowserRouter>
   </React.StrictMode>,
 )
