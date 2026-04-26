@@ -576,7 +576,7 @@ exports.managerole = functions.https.onCall(async (data, context) => {
     // 1. Verify Requester
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
     const requesterEmail = context.auth.token.email;
-    const isRoot = context.auth.token.isSuperAdmin === true || requesterEmail === 'jayshong@gmail.com';
+    const isRoot = context.auth.token.isSuperAdmin === true;
 
     const { targetEmail, roleType, action } = data; // roleType: 'merchant' or 'compliance'
     const cleanEmail = targetEmail.trim().toLowerCase();
@@ -584,15 +584,9 @@ exports.managerole = functions.https.onCall(async (data, context) => {
 
     // 2. Authorization Rules
     if (!isRoot) {
-        // Merchant Assistants can ONLY manage other Merchant Assistants
-        if (roleType === 'merchant') {
-            const maSnap = await db.doc('system/merchant_roles').get();
-            if (!maSnap.data()?.emails?.includes(requesterEmail)) {
-                throw new functions.https.HttpsError('permission-denied', 'Unauthorized.');
-            }
-        } else {
-            throw new functions.https.HttpsError('permission-denied', 'Only Superadmins can manage Compliance roles.');
-        }
+        // Platform Staff (CS) can only manage their own role type if granted specific sub-admin rights
+        // (Currently strictly root-only for simplicity, but logic remains for future scalability)
+        throw new functions.https.HttpsError('permission-denied', 'Only Superadmins can manage Network roles.');
     }
 
     // 3. Update Roles
@@ -640,37 +634,41 @@ exports.managerole = functions.https.onCall(async (data, context) => {
     return { success: true };
 });
 
-// 4.1 One-time Bootstrap for Root Admin (Self-Service)
-exports.bootstraprootadmin = functions.https.onCall(async (data, context) => {
+// 4.1 Dynamic Claims Synchronization (Self-Service)
+exports.syncuserclaims = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
     
-    const email = context.auth.token.email;
     const uid = context.auth.uid;
-
-    // Strict Hardcoded Gate (Server-side only)
-    if (email !== 'jayshong@gmail.com') {
-        throw new functions.https.HttpsError('permission-denied', 'Unauthorized bootstrap attempt.');
+    const userDoc = await db.collection('users').doc(uid).get();
+    
+    if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'User profile not found.');
     }
 
-    console.log(`BOOTSTRAP: Elevating ${email} to SuperAdmin Custom Claims.`);
+    const userData = userDoc.data();
+    const claims = {};
 
-    const claims = {
-        isSuperAdmin: true,
-        isAuditor: true,
-        isCustomerSuccess: true
-    };
+    // 1. Resolve Roles from Firestore intent
+    if (userData.isSuperAdmin === true) {
+        claims.isSuperAdmin = true;
+        claims.isAuditor = true;
+        claims.isCustomerSuccess = true;
+    } else {
+        if (userData.isAuditor === true) claims.isAuditor = true;
+        if (userData.isCustomerSuccess === true) claims.isCustomerSuccess = true;
+    }
 
+    if (Object.keys(claims).length === 0) {
+        console.warn(`SYNC: No elevated roles found for user ${uid}.`);
+        // If they had claims but now don't have flags in Firestore, clear them
+        await admin.auth().setCustomUserClaims(uid, null);
+        return { success: true, message: 'Claims cleared (no roles found).' };
+    }
+
+    console.log(`SYNC: Updating claims for user ${uid}:`, claims);
     await admin.auth().setCustomUserClaims(uid, claims);
     
-    // Also ensure Firestore document is in sync
-    await db.collection('users').doc(uid).set({
-        isSuperAdmin: true,
-        isAuditor: true,
-        isCustomerSuccess: true,
-        lastBootstrapped: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    return { success: true, message: 'Your account has been elevated to SuperAdmin with secure Custom Claims.' };
+    return { success: true, message: 'Your security claims have been synchronized with your profile.' };
 });
 
 // 5. Institutional Impact Aggregator
@@ -1293,6 +1291,18 @@ exports.publishapplication = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('permission-denied', 'Only the assigned CS can publish.');
     }
 
+    // Duplicate Check: Registration Number
+    if (appData.registrationNumber) {
+        const dupSnap = await db.collection('businesses')
+            .where('registrationNumber', '==', appData.registrationNumber)
+            .limit(1)
+            .get();
+        
+        if (!dupSnap.empty) {
+            throw new functions.https.HttpsError('already-exists', 'A business with this Registration Number already exists.');
+        }
+    }
+
     const onboardingCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     const bizRef = db.collection('businesses').doc();
 
@@ -1300,6 +1310,8 @@ exports.publishapplication = functions.https.onCall(async (data, context) => {
         // 1. Sanitize Data Carryover (Housekeeping)
         const sanitizedBizData = {
             name: appData.name,
+            registrationNumber: appData.registrationNumber || "",
+            founder: appData.founder || "",
             address: appData.address,
             phone: appData.phone,
             email: appData.email,
@@ -1309,7 +1321,8 @@ exports.publishapplication = functions.https.onCall(async (data, context) => {
             impactJobs: appData.impactJobs,
             yearlyAssessments: appData.yearlyAssessments || {},
             story: appData.story || "",
-            purpose: appData.purpose || "",
+            purposeStatement: appData.purposeStatement || "",
+            googleMapsUrl: appData.googleMapsUrl || "",
             imageUrl: appData.imageUrl || null,
             videoUrl: appData.videoUrl || null,
             icon: appData.icon || "store"
@@ -1356,8 +1369,8 @@ exports.publishapplication = functions.https.onCall(async (data, context) => {
             badges: updatedBadges 
         }, { merge: true });
 
-        // Sync latest season tier to root for display
-        transaction.update(userRef, { currentTier: tier });
+        // Sync latest season tier to root for display and set owner status
+        transaction.update(userRef, { currentTier: tier, isOwner: true });
     });
 
     return { success: true, bizId: bizRef.id, code: onboardingCode };

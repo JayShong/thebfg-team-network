@@ -98,68 +98,50 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
 
-                // 1. BOOTSTRAP GATE (Deterministic Security resolution)
-                const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
-                let currentClaims = {};
-                
-                const activateMasterKey = async (targetUser, retryCount = 0) => {
+                const syncClaims = async (targetUser, retryCount = 0) => {
                     try {
                         const { functions } = await import('../services/firebase');
-                        const bootstrapFunc = functions.httpsCallable('bootstraprootadmin');
+                        const syncFunc = functions.httpsCallable('syncuserclaims');
                         
-                        // Use exponential backoff for retries
                         if (retryCount > 0) {
                             await new Promise(r => setTimeout(r, Math.pow(2, retryCount) * 1500));
                         } else {
-                            await new Promise(r => setTimeout(r, 1000)); // Increased base delay
+                            await new Promise(r => setTimeout(r, 1000));
                         }
                         
-                        // FORCE TOKEN REFRESH before calling
-                        // This ensures the Functions SDK has a fresh, valid token in its context
-                        console.log(`🔐 AUTH: Refreshing identity token (Attempt ${retryCount + 1})...`);
+                        console.log(`🔐 AUTH: Synchronizing security claims (Attempt ${retryCount + 1})...`);
                         await targetUser.getIdToken(true);
                         
-                        await bootstrapFunc();
+                        await syncFunc();
                         const refreshedToken = await targetUser.getIdTokenResult(true);
                         const claims = refreshedToken.claims;
                         
-                        if (claims.isSuperAdmin) {
-                            console.log("🔐 AUTH: Master Key successfully installed.");
-                            // Update the current user state with new claims
+                        if (claims.isSuperAdmin || claims.isAuditor || claims.isCustomerSuccess) {
+                            console.log("🔐 AUTH: Security claims successfully synchronized.");
                             setCurrentUser(prev => prev ? {
                                 ...prev,
-                                isSuperAdmin: true,
-                                isAuditor: true,
-                                isCustomerSuccess: true
+                                isSuperAdmin: !!claims.isSuperAdmin,
+                                isAuditor: !!claims.isAuditor || !!claims.isSuperAdmin,
+                                isCustomerSuccess: !!claims.isCustomerSuccess || !!claims.isSuperAdmin
                             } : null);
+                            
+                            // Trigger data refresh now that we have claims
+                            fetchRecentActivity(); 
+                            fetchPendingAudits();
                         }
                     } catch (err) {
-                        console.error(`❌ AUTH: Master Key activation attempt ${retryCount + 1} failed:`, err.message);
-                        // Final attempt failed - Force logout to clear stale session
-                        if (retryCount >= 2) {
-                            console.error("🚨 AUTH: Master Key activation critically failed. Purging stale session...");
-                            alert("Security Session Expired. Please log in again to activate the Master Key.");
-                            auth.signOut();
-                        } else {
-                            activateMasterKey(targetUser, retryCount + 1);
+                        console.error(`❌ AUTH: Claims synchronization attempt ${retryCount + 1} failed:`, err.message);
+                        if (retryCount < 2) {
+                            syncClaims(targetUser, retryCount + 1);
                         }
                     }
                 };
 
-                // 1. BOOTSTRAP GATE (Deterministic Security resolution)
+                // 1. IDENTITY GATE (Detect role intent vs secure claims)
                 try {
                     setIsClaimsResolving(true);
                     let tokenResult = await user.getIdTokenResult();
                     currentClaims = tokenResult.claims;
-
-                    const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/';
-                    
-                    if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin && !isLoginPage) {
-                        console.warn("🔐 AUTH: Root Admin detected. Initiating background Master Key activation...");
-                        activateMasterKey(user);
-                    } else if (currentClaims.isSuperAdmin) {
-                        console.log("🛡️ AUTH: Secure Master Key confirmed.");
-                    }
                 } catch (e) {
                     console.error("⚠️ AUTH: Claims check failed", e);
                 } finally {
@@ -194,27 +176,26 @@ export const AuthProvider = ({ children }) => {
                     }
                 }
 
-                // 3. SECURE ROLE RESOLUTION
-                let profile = {
-                    uid: user.uid,
-                    email: user.email,
-                    purchases: 0,
-                    checkins: 0,
-                    ...userDoc.data()
-                };
+                // 3. SECURE ROLE RESOLUTION (Merged Intent)
+                // We trust Firestore as the Source of Intent, but Auth Claims as the Source of Truth.
+                // Merging them in the UI ensures the portals appear immediately while claims sync.
+                const isSuperAdmin = !!currentClaims.isSuperAdmin || !!profile.isSuperAdmin;
+                const isAuditor = !!currentClaims.isAuditor || !!currentClaims.isSuperAdmin || !!profile.isAuditor;
+                const isCustomerSuccess = !!currentClaims.isCustomerSuccess || !!currentClaims.isSuperAdmin || !!profile.isCustomerSuccess;
 
-                // Use Claims as the Primary Source of Truth for roles
-                profile.isSuperAdmin = !!currentClaims.isSuperAdmin;
-                profile.isAuditor = !!currentClaims.isAuditor || !!currentClaims.isSuperAdmin;
-                profile.isCustomerSuccess = !!currentClaims.isCustomerSuccess || !!currentClaims.isSuperAdmin;
+                profile.isSuperAdmin = isSuperAdmin;
+                profile.isAuditor = isAuditor;
+                profile.isCustomerSuccess = isCustomerSuccess;
 
-                let finalProfile = {
-                    ...profile
-                };
+                // 4. SELF-HEALING: Detect if Auth Claims are lagging behind Firestore Intent
+                const needsSync = (!!profile.isSuperAdmin && !currentClaims.isSuperAdmin) ||
+                                  (!!profile.isAuditor && !currentClaims.isAuditor) ||
+                                  (!!profile.isCustomerSuccess && !currentClaims.isCustomerSuccess);
 
-                // Admin/Merchant Assistant UI Access
-                // Removed: isSuperAdmin leak for Merchant Assistants. 
-                // Each portal is now strictly partitioned by specific role flags.
+                if (needsSync) {
+                    console.warn("🔐 AUTH: Role mismatch detected. Initiating background claims synchronization...");
+                    syncClaims(user);
+                }
 
                 // 4. SYNC STATS: Populate localStorage from pre-calculated Firestore summary
                 try {
@@ -244,15 +225,51 @@ export const AuthProvider = ({ children }) => {
                     console.error("AUTH: Stats sync failed", e);
                 }
 
-                setCurrentUser(finalProfile);
+                // 4. STEWARDSHIP DETECTION (Quota-Friendly Cache)
+                // We cache the stewardship status directly in the user document to avoid 
+                // expensive multi-collection queries on every load.
+                const userData = userDoc.exists ? userDoc.data() : {};
                 
-                // Only trigger secondary data fetches if we aren't currently resolving claims
-                if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
-                    console.log("⏳ AUTH: Delaying activity sync until Master Key is ready...");
+                if (userData.stewardshipSyncedAt) {
+                    // Use cached intent from Firestore profile
+                    profile.isOwner = !!userData.isOwner;
+                    profile.isManager = !!userData.isManager;
+                    profile.isCrew = !!userData.isCrew;
+                    profile.isBusinessStaff = !!userData.isBusinessStaff;
                 } else {
-                    fetchRecentActivity(); 
-                    fetchPendingAudits(finalProfile);
+                    // Missing cache: Perform one-time discovery and save back to profile
+                    try {
+                        console.log("🛠️ AUTH: Discovering stewardship roles for first-time sync...");
+                        const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
+                            db.collection('businesses').where('ownerEmail', '==', user.email).limit(1).get(),
+                            db.collection('businesses').where('stewardship.managers', 'array-contains', user.email).limit(1).get(),
+                            db.collection('businesses').where('stewardship.crew', 'array-contains', user.email).limit(1).get()
+                        ]);
+                        
+                        profile.isOwner = !ownedSnap.empty;
+                        profile.isManager = !managedSnap.empty;
+                        profile.isCrew = !crewSnap.empty;
+                        profile.isBusinessStaff = profile.isOwner || profile.isManager || profile.isCrew;
+
+                        // Persist to user document for zero-read loads next time
+                        db.collection('users').doc(user.uid).set({
+                            isOwner: profile.isOwner,
+                            isManager: profile.isManager,
+                            isCrew: profile.isCrew,
+                            isBusinessStaff: profile.isBusinessStaff,
+                            stewardshipSyncedAt: new Date().toISOString()
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn("AUTH: Stewardship discovery deferred", e);
+                        profile.isBusinessStaff = false;
+                    }
                 }
+
+                setCurrentUser(profile);
+                
+                // Fetch secondary data
+                fetchRecentActivity(); 
+                fetchPendingAudits(profile);
             } else {
                 setCurrentUser(null);
             }

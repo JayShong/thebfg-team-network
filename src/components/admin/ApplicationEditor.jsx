@@ -1,16 +1,40 @@
 import React, { useState } from 'react';
 
+const INDUSTRIES = [
+    'Arts & Culture',
+    'Business Support Services',
+    'Cafe and Restaurants',
+    'Community',
+    'Ecological Stewardship',
+    'Education & Talent',
+    'Finance',
+    'Food Systems',
+    'Gifts & Crafts',
+    'Health & Wellness',
+    'Housing & Living',
+    'Manufacturing & Logistics',
+    'Personal Support Services',
+    'Pets',
+    'Repairs, Recycling & Sharing',
+    'Social Events',
+    'Sports',
+    'Tourism & Nature',
+    'Transportation & Mobility'
+];
+
 const ApplicationEditor = ({ application, onClose, onSave, isSaving, readOnly = false }) => {
     const [formData, setFormData] = useState({
         name: application.name || '',
+        registrationNumber: application.registrationNumber || '',
+        founder: application.founder || '',
         address: application.address || '',
         phone: application.phone || '',
         email: application.email || '',
         industry: application.industry || '',
         location: application.location || '',
         story: application.story || '',
-        purpose: application.purpose || '',
-        mission: application.mission || '',
+        purposeStatement: application.purposeStatement || '',
+        googleMapsUrl: application.googleMapsUrl || '',
         category: application.category || 'Standard'
     });
 
@@ -36,25 +60,44 @@ const ApplicationEditor = ({ application, onClose, onSave, isSaving, readOnly = 
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                    <div className="form-group">
-                        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Business Name</label>
-                        <input type="text" name="name" className="input-modern" value={formData.name} onChange={handleChange} required disabled={readOnly} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-group">
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Shop / Brand Name</label>
+                            <input type="text" name="name" className="input-modern" value={formData.name} onChange={handleChange} placeholder="Publicly visible name" required disabled={readOnly} />
+                        </div>
+                        <div className="form-group">
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Founder Name</label>
+                            <input type="text" name="founder" className="input-modern" value={formData.founder} onChange={handleChange} placeholder="Founder / Owner name" disabled={readOnly} />
+                        </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div className="form-group">
                             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Industry</label>
-                            <input type="text" name="industry" className="input-modern" value={formData.industry} onChange={handleChange} placeholder="e.g. Cafe" required disabled={readOnly} />
+                            <select name="industry" className="input-modern" value={formData.industry} onChange={handleChange} disabled={readOnly}>
+                                <option value="">Select an Industry</option>
+                                {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                            </select>
                         </div>
                         <div className="form-group">
-                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Location / Area</label>
-                            <input type="text" name="location" className="input-modern" value={formData.location} onChange={handleChange} placeholder="e.g. Bangsar" required disabled={readOnly} />
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Company Registration No.</label>
+                            <input type="text" name="registrationNumber" className="input-modern" value={formData.registrationNumber} onChange={handleChange} placeholder="SSM / Legal Registration" disabled={readOnly} />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Address</label>
-                        <textarea name="address" className="input-modern" value={formData.address} onChange={handleChange} rows="2" required disabled={readOnly} />
+                        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Location / Area</label>
+                        <input type="text" name="location" className="input-modern" value={formData.location} onChange={handleChange} placeholder="e.g. Bangsar" disabled={readOnly} />
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Google Maps Link</label>
+                        <input type="url" name="googleMapsUrl" className="input-modern" value={formData.googleMapsUrl} onChange={handleChange} placeholder="https://maps.google.com/..." disabled={readOnly} />
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Full Address</label>
+                        <textarea name="address" className="input-modern" value={formData.address} onChange={handleChange} rows="2" disabled={readOnly} />
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -71,7 +114,7 @@ const ApplicationEditor = ({ application, onClose, onSave, isSaving, readOnly = 
 
                     <div className="form-group">
                         <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>The Purpose Statement</label>
-                        <textarea name="purpose" className="input-modern" value={formData.purpose} onChange={handleChange} placeholder="What is the core purpose of this business?" rows="2" disabled={readOnly} />
+                        <textarea name="purposeStatement" className="input-modern" value={formData.purposeStatement} onChange={handleChange} placeholder="What is the core purpose of this business?" rows="2" disabled={readOnly} />
                     </div>
 
                     <div className="form-group">

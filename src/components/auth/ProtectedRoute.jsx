@@ -5,13 +5,10 @@ import RestrictedAccess from '../../pages/RestrictedAccess';
 /**
  * ProtectedRoute component handles role-based access control (RBAC).
  * It ensures that only users with the appropriate permissions can view specific routes.
- * 
- * @param {string} requiredRole - 'admin', 'auditor', or 'member'
- * @param {React.ReactElement} children - The component to render if authorized
  */
-const ProtectedRoute = ({ children, requiredRole }) => {
+const ProtectedRoute = ({ children, requiredRole, allowStaff = false }) => {
     const { currentUser, isGuest, isClaimsResolving } = useAuth();
- 
+
     if (isClaimsResolving && !isGuest) {
         return (
             <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -19,34 +16,41 @@ const ProtectedRoute = ({ children, requiredRole }) => {
             </div>
         );
     }
- 
+
     // 1. Check for Guest Access
     if (isGuest) {
-        if (requiredRole === 'merchant' || requiredRole === 'auditor') {
-            return <RestrictedAccess requiredRole={requiredRole === 'merchant' ? 'Merchant Assistant' : 'Auditor'} />;
+        if (requiredRole && requiredRole !== 'member') {
+            return <RestrictedAccess requiredRole={requiredRole} />;
         }
     }
- 
+
     // 2. Check for Authenticated User Roles
     if (currentUser) {
-        if (requiredRole === 'superadmin' && !currentUser.isSuperAdmin) {
-            return <RestrictedAccess requiredRole="Superadmin Governance" />;
+        // Superadmins bypass everything
+        if (currentUser.isSuperAdmin) return children;
+
+        const roleRequirements = {
+            superadmin: currentUser.isSuperAdmin,
+            customerSuccess: currentUser.isCustomerSuccess,
+            auditor: currentUser.isAuditor,
+            member: true
+        };
+
+        // Check if role is satisfied
+        let isAuthorized = !requiredRole || roleRequirements[requiredRole];
+
+        // 3. STAFF OVERRIDE: Allow Business Owners/Managers/Crews to access Business portals
+        if (!isAuthorized && allowStaff && requiredRole === 'customerSuccess') {
+            if (currentUser.isBusinessStaff || currentUser.isOwner) {
+                isAuthorized = true;
+            }
         }
 
-        if (requiredRole === 'merchant' && !currentUser.isSuperAdmin && !currentUser.isCustomerSuccess) {
-            return <RestrictedAccess requiredRole="Merchant Operations" />;
-        }
- 
-        if (requiredRole === 'auditor' && !currentUser.isSuperAdmin && !currentUser.isAuditor) {
-            return <RestrictedAccess requiredRole="Auditor" />;
-        }
-
-        if (requiredRole === 'customerSuccess' && !currentUser.isSuperAdmin && !currentUser.isCustomerSuccess) {
-            return <RestrictedAccess requiredRole="Customer Success" />;
+        if (!isAuthorized) {
+            return <RestrictedAccess requiredRole={requiredRole} />;
         }
     }
- 
-    // If no role is required or user meets the requirements, render the children
+
     return children;
 };
 

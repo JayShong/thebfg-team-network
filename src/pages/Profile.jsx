@@ -109,6 +109,26 @@ const Profile = () => {
         };
     }, [currentUser, isClaimsResolving]);
 
+    const handleCreateApplication = async () => {
+        setIsSavingApp(true);
+        try {
+            const newApp = {
+                email: currentUser.email,
+                ownerUid: currentUser.uid,
+                name: "New Business Application",
+                status: 'pending',
+                timestamp: new Date()
+            };
+            const docRef = await db.collection('applications').add(newApp);
+            setUserApplication({ id: docRef.id, ...newApp });
+            setShowAppEditor(true);
+        } catch (e) {
+            alert("Failed to start application: " + e.message);
+        } finally {
+            setIsSavingApp(false);
+        }
+    };
+
     const handleUpdateApplication = async (updates) => {
         setIsSavingApp(true);
         try {
@@ -334,7 +354,7 @@ const Profile = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {userApplication && (
+                                {userApplication ? (
                                     <button 
                                         onClick={() => setShowAppEditor(true)} 
                                         className="btn btn-secondary" 
@@ -342,6 +362,15 @@ const Profile = () => {
                                     >
                                         <i className={`fa-solid ${userApplication.status === 'approved' ? 'fa-box-archive' : 'fa-pen-nib'}`}></i>
                                         {userApplication.status === 'approved' ? ' View Application (Onboarded)' : ' Refine Application Form'}
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={handleCreateApplication}
+                                        className="btn btn-primary feature-gradient"
+                                        style={{ border: 'none' }}
+                                        disabled={isSavingApp}
+                                    >
+                                        <i className="fa-solid fa-plus-circle"></i> Register Your Business
                                     </button>
                                 )}
 
@@ -352,8 +381,8 @@ const Profile = () => {
                                 )}
 
                                 {displayUser.isCustomerSuccess && (
-                                    <button onClick={() => navigate('/onboarding-hub')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-user-tag"></i> Onboarding Hub
+                                    <button onClick={() => navigate('/merchant-portal')} className="btn btn-secondary">
+                                        <i className="fa-solid fa-store"></i> Merchant Portal
                                     </button>
                                 )}
 

@@ -172,7 +172,7 @@ const RoleManager = () => {
                 {emails.map(e => (
                     <div key={e} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span style={{ fontSize: '0.85rem' }}>{e}</span>
-                        {e !== 'jayshong@gmail.com' && (
+                        {e !== currentUser?.email && (
                             <button onClick={() => handleUpdate(e, roleType, true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
                                 <i className="fa-solid fa-trash-can"></i>
                             </button>

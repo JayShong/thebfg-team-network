@@ -12,7 +12,7 @@ export const PLATFORM_CONFIG = {
     IS_ALPHA: true,
     
     // Default Supervisors for Audits
-    DEFAULT_SUPERVISORS: ['jayshong@gmail.com'],
+    DEFAULT_SUPERVISORS: [],
 
     // Role Definitions
     ROLES: {

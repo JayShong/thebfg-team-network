@@ -73,15 +73,10 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Merchant, Auditor & Governance Routes */}
+        {/* Customer Success, Auditor & Governance Routes */}
         <Route path="/admin" element={
           <ProtectedRoute requiredRole="superadmin">
             <Admin />
-          </ProtectedRoute>
-        } />
-        <Route path="/merchant-portal" element={
-          <ProtectedRoute requiredRole="merchant">
-            <MerchantPortal />
           </ProtectedRoute>
         } />
         <Route path="/audit-hub" element={
@@ -89,18 +84,18 @@ function App() {
             <AuditHub />
           </ProtectedRoute>
         } />
-        <Route path="/onboarding-hub" element={
+        <Route path="/merchant-portal" element={
           <ProtectedRoute requiredRole="customerSuccess">
             <OnboardingHub />
           </ProtectedRoute>
         } />
         <Route path="/business-portal" element={
-          <ProtectedRoute requiredRole="merchant" allowStaff={true}>
+          <ProtectedRoute requiredRole="customerSuccess" allowStaff={true}>
             <BusinessPortal />
           </ProtectedRoute>
         } />
         <Route path="/portal" element={
-          <ProtectedRoute requiredRole="merchant" allowStaff={true}>
+          <ProtectedRoute requiredRole="customerSuccess" allowStaff={true}>
             <BusinessPortal />
           </ProtectedRoute>
         } />

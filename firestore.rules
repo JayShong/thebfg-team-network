@@ -11,10 +11,7 @@ service cloud.firestore {
 
     // Helper to check for Super Admin (Secure Claims first)
     function isSuperAdmin() {
-      return request.auth != null && (
-        request.auth.token.isSuperAdmin == true || 
-        request.auth.token.email == 'jayshong@gmail.com'
-      );
+      return request.auth != null && request.auth.token.isSuperAdmin == true;
     }
 
     // Role partitioning helpers
