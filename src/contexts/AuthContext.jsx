@@ -83,28 +83,46 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('bfg_guest_mode');
 
                 // 1. BOOTSTRAP GATE (Runs BEFORE any Firestore reads)
-                // If you are the root admin, we ensure claims are set first.
                 const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
                 let currentClaims = {};
+                
                 try {
                     const initialToken = await user.getIdTokenResult();
                     currentClaims = initialToken.claims;
 
                     if (user.email === BOOTSTRAP_TARGET && !currentClaims.isSuperAdmin) {
-                        console.warn("AUTH: Root Admin detected. Activating Secure Master Key...");
-                        const bootstrapFunc = firebase.functions().httpsCallable('bootstraprootadmin');
-                        await bootstrapFunc();
-                        // MUST force refresh token to put claims into the local session
-                        const refreshedToken = await user.getIdTokenResult(true);
-                        currentClaims = refreshedToken.claims;
-                        console.log("AUTH: Master Key Activated.");
+                        console.warn("🔐 AUTH: Root Admin detected. Requesting Master Key from server...");
+                        try {
+                            // Import functions directly from our service to ensure correct region/init
+                            const { functions } = await import('../services/firebase');
+                            const bootstrapFunc = functions.httpsCallable('bootstraprootadmin');
+                            const result = await bootstrapFunc();
+                            console.log("🔐 AUTH: Server response:", result.data);
+                            
+                            // FORCE refresh the token to pick up the new claims
+                            const refreshedToken = await user.getIdTokenResult(true);
+                            currentClaims = refreshedToken.claims;
+                            console.log("🔐 AUTH: Master Key successfully installed in local session.");
+                        } catch (err) {
+                            console.error("❌ AUTH: Master Key activation failed:", err.message);
+                        }
+                    } else if (currentClaims.isSuperAdmin) {
+                        console.log("🛡️ AUTH: Secure Master Key confirmed.");
                     }
                 } catch (e) {
-                    console.error("AUTH: Bootstrap/Claims check failed", e);
+                    console.error("⚠️ AUTH: Claims check failed", e);
                 }
 
                 // 2. Fetch profile from DB
-                let userDoc = await db.collection('users').doc(user.uid).get();
+                // Only proceed if we aren't in the middle of a bootstrap failure
+                let userDoc;
+                try {
+                    userDoc = await db.collection('users').doc(user.uid).get();
+                } catch (e) {
+                    console.error("❌ AUTH: Firestore profile read failed. This usually means permissions are missing.", e);
+                    // Fallback: create a skeleton profile so the app doesn't crash
+                    userDoc = { exists: false, data: () => ({}) };
+                }
                 
                 // AUTO-PROVISIONING: If user exists in Auth but not in Firestore
                 if (!userDoc.exists) {
