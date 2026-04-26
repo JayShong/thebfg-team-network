@@ -110,7 +110,9 @@ const OnboardingHub = () => {
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
                                                 <span className="tier-badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--color-growth)' }}>Drafting</span>
-                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Picked up {new Date(app.pickedUpAt?.seconds * 1000).toLocaleDateString()}</p>
+                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                    Picked up {app.pickedUpAt?.seconds ? new Date(app.pickedUpAt.seconds * 1000).toLocaleDateString() : 'recently'}
+                                                </p>
                                             </div>
                                         </div>
                                         <div style={{ marginTop: '1.2rem', display: 'flex', gap: '0.5rem' }}>
@@ -144,7 +146,7 @@ const OnboardingHub = () => {
                                             </button>
                                         </div>
                                         <div style={{ marginTop: '0.8rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                            Applied: {new Date(app.timestamp?.seconds * 1000).toLocaleDateString()}
+                                            Applied: {app.timestamp?.seconds ? new Date(app.timestamp.seconds * 1000).toLocaleDateString() : 'recently'}
                                         </div>
                                     </div>
                                 ))

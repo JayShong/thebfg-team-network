@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useBusinesses from '../hooks/useBusinesses';
 import BusinessCard from '../components/business/BusinessCard';
+import { db } from '../services/firebase';
 
 const Directory = () => {
     const [searchQuery, setSearchQuery] = useState('');

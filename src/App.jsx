@@ -28,10 +28,6 @@ import WelcomeOverlay from './components/WelcomeOverlay';
 function App() {
   const { currentUser, isGuest } = useAuth();
 
-  if (!currentUser && !isGuest) {
-    return <Login />;
-  }
-
   // First-time welcome overlay logic
   const [showWelcome, setShowWelcome] = useState(false);
   
@@ -40,6 +36,10 @@ function App() {
       setShowWelcome(true);
     }
   }, [currentUser]);
+
+  if (!currentUser && !isGuest) {
+    return <Login />;
+  }
 
   const dismissWelcome = () => {
     setShowWelcome(false);

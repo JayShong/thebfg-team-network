@@ -99,7 +99,10 @@ const BadgeGallery = () => {
             {categoryOrder.map(catKey => {
                 const catInfo = BADGE_CATEGORIES[catKey];
                 const catBadges = BADGES_CONFIG.filter(b => b.category === catKey);
-                const unlockedInCat = catBadges.filter(b => userBadges[b.id]?.unlocked).length;
+                const unlockedInCat = catBadges.filter(b => {
+                    const status = userBadges[b.id];
+                    return status === true || status?.unlocked === true;
+                }).length;
 
                 return (
                     <div key={catKey} className="badge-category-section glass-card" style={{ marginBottom: '1.5rem', borderLeft: `3px solid ${catInfo.color}` }}>
@@ -114,7 +117,8 @@ const BadgeGallery = () => {
                         
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem' }}>
                             {catBadges.map(b => {
-                                const isUnlocked = userBadges[b.id]?.unlocked;
+                                const badgeStatus = userBadges[b.id];
+                                const isUnlocked = badgeStatus === true || badgeStatus?.unlocked === true;
                                 const stateClass = isUnlocked ? 'unlocked' : 'locked';
                                 
                                 return (

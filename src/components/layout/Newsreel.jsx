@@ -8,8 +8,6 @@ const Newsreel = () => {
     const navigate = useNavigate();
     
     const [index, setIndex] = useState(0);
-    const [displayMessage, setDisplayMessage] = useState("");
-    const [clickAction, setClickAction] = useState(null);
     const [announcements, setAnnouncements] = useState([]);
 
     useEffect(() => {
@@ -90,32 +88,25 @@ const Newsreel = () => {
     const queue = getRotationQueue();
 
     useEffect(() => {
-        if (queue.length === 0) return;
-
-        // Ensure index is within bounds if queue size changes
-        const safeIndex = index % queue.length;
-        const current = queue[safeIndex];
-        
-        setDisplayMessage(current.text);
-        setClickAction(() => current.action);
-
+        if (queue.length <= 1) return;
         const interval = setInterval(() => {
             setIndex(prev => (prev + 1) % queue.length);
-        }, 8000); // 8 second rotation
-
+        }, 8000);
         return () => clearInterval(interval);
-    }, [index, recentActivity, pendingApprovalCount, isGuest, currentUser, announcements]);
+    }, [queue.length]);
 
     if (queue.length === 0) return <div className="newsreel hidden"></div>;
 
+    const current = queue[index % queue.length];
+
     return (
         <div 
-            className={`newsreel ${queue[index % queue.length]?.type === 'alert' ? 'alert-mode' : ''}`}
-            style={{ cursor: clickAction ? 'pointer' : 'default' }}
-            onClick={() => clickAction && clickAction()}
+            className={`newsreel ${current?.type === 'alert' ? 'alert-mode' : ''}`}
+            style={{ cursor: current?.action ? 'pointer' : 'default' }}
+            onClick={() => current?.action && current.action()}
         >
             <div className="newsreel-scroll">
-                {displayMessage}
+                {current?.text}
             </div>
         </div>
     );

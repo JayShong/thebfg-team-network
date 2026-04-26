@@ -145,11 +145,20 @@ const Scanner = () => {
     const updateLocalStats = (type, amount = 0) => {
         // 1. Update Personal Stats
         const personalSaved = localStorage.getItem('bfg_personal_stats');
-        let pStats = personalSaved ? JSON.parse(personalSaved) : {
+        let pStats = {
             totalCheckins: 0, totalPurchases: 0, totalWaste: 0, totalTrees: 0, totalFamilies: 0,
-            attendanceDays: 0, lastInitiativeAttendance: {},
-            uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {}
+            uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {},
+            lastCheckin: null, attendanceDays: 0
         };
+
+        try {
+            if (personalSaved) {
+                const parsed = JSON.parse(personalSaved);
+                pStats = { ...pStats, ...parsed };
+            }
+        } catch (e) {
+            console.warn("Scanner: Personal stats cache corrupt, resetting local buffer");
+        }
 
         // Ensure structure exists for legacy data
         if (!pStats.uniqueBizIds) pStats.uniqueBizIds = {};

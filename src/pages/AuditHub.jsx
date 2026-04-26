@@ -254,7 +254,7 @@ const AuditHub = () => {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div>
                                             <h4 style={{ margin: 0 }}>{log.bizName}</h4>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scores: {log.scores}</p>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scores: {JSON.stringify(log.scores)}</p>
                                         </div>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button onClick={() => approveAudit(log)} className="btn-icon" title="Approve"><i className="fa-solid fa-check" style={{color: 'var(--color-compliance)'}}></i></button>

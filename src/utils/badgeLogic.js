@@ -142,7 +142,8 @@ export const evaluateTier = (userBadges = {}) => {
     let progress = 0;
     let totalNext = 10;
     let isMax = false;
-    let missingCats = [];
+    const categories = ['Seen', 'Verified', 'Valued'];
+    const missingCats = categories.filter(cat => (categoryCounts[cat] || 0) === 0);
 
     if (totalUnlocked >= 100) {
         tierName = 'Legend';
