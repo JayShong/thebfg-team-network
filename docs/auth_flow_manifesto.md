@@ -156,8 +156,13 @@ This section maps human objectives to the underlying technical machinery.
     *   **The Security Protocol (Why Claims?):**
         *   **Custom Claims** are part of the user's encrypted Identity Token (JWT). They are signed by Google and are **immutable** from the client-side. This prevents a user from "spoofing" their role by editing their own Firestore document.
         *   **User Docs** are used for UI speed (showing/hiding buttons), but **Claims** are used for the actual Security Rules and Cloud Functions.
-        *   **Quota Optimization**: Security rules can check `request.auth.token.isSuperAdmin` without performing a Firestore Read on the `users` collection, significantly reducing quota usage.
-*   **Step 2: Portal Entry**
+*   **Step 2: Session Integrity Guard (The Hard Reset)**
+    *   **The Scenario**: A staff member refreshes a stale session where the browser cache remembers their role, but the Auth Token (Claims) has expired or is missing.
+    *   **Logic**: If `profile.isStaff` is true but `claims.isStaff` is false, the system detects a **Role Mismatch**.
+    *   **The Resolution**: Instead of background syncing (which often 401s), the system triggers a **Hard Reset**.
+    *   **Technical Action**: `auth.signOut()` + `alert()` + `Redirect to Login`.
+    *   **Rationale**: Ensures that Master Keys are always valid and prevents "Ghost Sessions" where a user has UI access but no backend permission.
+*   **Step 3: Portal Entry**
     *   **URL**: `/admin`
     *   **Action**: User (SuperAdmin) clicks "Governance Hub".
     *   **Technical Trigger**: `ProtectedRoute.jsx` checks `currentUser.isSuperAdmin`.
