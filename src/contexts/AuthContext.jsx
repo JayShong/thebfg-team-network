@@ -138,6 +138,7 @@ export const AuthProvider = ({ children }) => {
                 };
 
                 // 1. IDENTITY GATE (Detect role intent vs secure claims)
+                let currentClaims = {};
                 try {
                     setIsClaimsResolving(true);
                     let tokenResult = await user.getIdTokenResult();
@@ -175,6 +176,13 @@ export const AuthProvider = ({ children }) => {
                         console.warn("Provisioning failed - likely security rules catch-up");
                     }
                 }
+
+                const userData = userDoc.exists ? userDoc.data() : {};
+                const profile = { 
+                    uid: user.uid, 
+                    email: user.email, 
+                    ...userData 
+                };
 
                 // 3. SECURE ROLE RESOLUTION (Merged Intent)
                 // We trust Firestore as the Source of Intent, but Auth Claims as the Source of Truth.
@@ -228,7 +236,6 @@ export const AuthProvider = ({ children }) => {
                 // 4. STEWARDSHIP DETECTION (Quota-Friendly Cache)
                 // We cache the stewardship status directly in the user document to avoid 
                 // expensive multi-collection queries on every load.
-                const userData = userDoc.exists ? userDoc.data() : {};
                 
                 if (userData.stewardshipSyncedAt) {
                     // Use cached intent from Firestore profile
