@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { db, functions, auth } from '../services/firebase';
+import { db, functions } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import ApplicationEditor from '../components/admin/ApplicationEditor';
 import useBusinesses from '../hooks/useBusinesses';
 import { QRCodeCanvas } from 'qrcode.react';
 import { drawStandee } from '../utils/assetUtils';
 import firebase from 'firebase/compat/app';
+import { useNavigate } from 'react-router-dom';
 
 const OnboardingHub = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isActioning, setIsActioning] = useState(false);
@@ -33,7 +35,14 @@ const OnboardingHub = () => {
 
     // Role Guard
     if (!currentUser?.isCustomerSuccess && !currentUser?.isSuperAdmin) {
-        return <div style={{ padding: '2rem', textAlign: 'center' }}>Unauthorized: Customer Success Access Only</div>;
+        return (
+            <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                <i className="fa-solid fa-lock fa-3x" style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', opacity: 0.5 }}></i>
+                <h2 style={{ marginBottom: '0.5rem' }}>Access Restricted</h2>
+                <p style={{ color: 'var(--text-secondary)' }}>This portal is reserved for Network Staff and Governance.</p>
+                <button onClick={() => navigate('/profile')} className="btn btn-primary mt-2">Return to Profile</button>
+            </div>
+        );
     }
 
     const handlePickUp = async (id) => {
@@ -41,7 +50,6 @@ const OnboardingHub = () => {
         try {
             const assignFn = functions.httpsCallable('assignapplication');
             await assignFn({ applicationId: id });
-            alert("Application assigned to you.");
         } catch (err) {
             alert(err.message);
         } finally {
@@ -52,18 +60,12 @@ const OnboardingHub = () => {
     const handleUpdateApp = async (updates) => {
         setIsActioning(true);
         try {
-            // Check if this is an active business (has no 'status' field or status is 'active')
             const isActiveBusiness = editingApp.status === 'active' || !editingApp.status;
-            
             if (isActiveBusiness) {
-                // Direct Firestore update for active businesses
                 await db.collection('businesses').doc(editingApp.id).update(updates);
-                alert("Business profile updated successfully!");
             } else {
-                // Standard Cloud Function for applications
                 const updateFn = functions.httpsCallable('updateapplication');
                 await updateFn({ applicationId: editingApp.id, updates });
-                alert("Draft saved successfully.");
             }
             setEditingApp(null);
         } catch (err) {
@@ -79,7 +81,6 @@ const OnboardingHub = () => {
         try {
             const publishFn = functions.httpsCallable('publishapplication');
             await publishFn({ applicationId: id });
-            alert("Business published successfully! They are now live on the network.");
         } catch (err) {
             alert(err.message);
         } finally {
@@ -88,35 +89,52 @@ const OnboardingHub = () => {
     };
 
     return (
-        <div style={{ paddingBottom: '3rem' }}>
-            <div className="page-header" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <i className="fa-solid fa-store fa-2x" style={{ color: 'var(--color-growth)' }}></i>
+        <div style={{ paddingBottom: '3rem', maxWidth: '1000px', margin: '0 auto' }}>
+            {/* Header Section */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                    <div className="glass-card" style={{ width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                        <i className="fa-solid fa-store fa-2x" style={{ color: '#3B82F6' }}></i>
+                    </div>
                     <div>
-                        <h2 style={{ margin: 0 }}>Merchant Portal</h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Network Growth & Merchant Support</p>
+                        <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>Merchant Portal</h1>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '4px' }}>Network Growth & Strategic Support</p>
                     </div>
                 </div>
-                <button onClick={() => window.history.back()} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                <button onClick={() => navigate('/profile')} className="icon-btn glass-card" style={{ padding: '0.75rem 1.25rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
                     <i className="fa-solid fa-arrow-left"></i> Back
                 </button>
             </div>
 
-            {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+            {/* Premium Tab Navigation */}
+            <div className="glass-card" style={{ display: 'inline-flex', padding: '0.5rem', borderRadius: 'var(--radius-full)', marginBottom: '2.5rem', gap: '0.5rem', background: 'rgba(255,255,255,0.03)' }}>
                 <button 
                     onClick={() => setActiveTab('applications')}
                     className={`nav-btn ${activeTab === 'applications' ? 'active' : ''}`}
-                    style={{ background: activeTab === 'applications' ? 'var(--accent-primary)' : 'transparent', borderRadius: 'var(--radius-full)' }}
+                    style={{ 
+                        background: activeTab === 'applications' ? 'var(--accent-primary)' : 'transparent', 
+                        borderRadius: 'var(--radius-full)',
+                        padding: '0.6rem 1.5rem',
+                        border: 'none',
+                        color: activeTab === 'applications' ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: '600'
+                    }}
                 >
-                    <i className="fa-solid fa-clipboard-list"></i> Applications ({applications.length})
+                    <i className="fa-solid fa-clipboard-list" style={{ marginRight: '8px' }}></i> Intake Pool ({applications.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('directory')}
                     className={`nav-btn ${activeTab === 'directory' ? 'active' : ''}`}
-                    style={{ background: activeTab === 'directory' ? 'var(--accent-primary)' : 'transparent', borderRadius: 'var(--radius-full)' }}
+                    style={{ 
+                        background: activeTab === 'directory' ? 'var(--accent-primary)' : 'transparent', 
+                        borderRadius: 'var(--radius-full)',
+                        padding: '0.6rem 1.5rem',
+                        border: 'none',
+                        color: activeTab === 'directory' ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: '600'
+                    }}
                 >
-                    <i className="fa-solid fa-address-book"></i> Active Directory
+                    <i className="fa-solid fa-address-book" style={{ marginRight: '8px' }}></i> Network Inventory
                 </button>
             </div>
 
@@ -133,16 +151,11 @@ const OnboardingHub = () => {
                 <DirectoryManagementTab onEdit={setEditingApp} />
             )}
 
+            {/* Modal Overlay for Editor */}
             {editingApp && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(5px)' }}>
-                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h3 style={{ margin: 0 }}>Review Application</h3>
-                            <button onClick={() => setEditingApp(null)} className="btn-icon">
-                                <i className="fa-solid fa-xmark"></i>
-                            </button>
-                        </div>
-                        <ApplicationEditor application={editingApp} onSave={handleUpdateApp} readOnly={false} />
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(12px)' }}>
+                    <div className="slide-up" style={{ width: '100%', maxWidth: '700px' }}>
+                        <ApplicationEditor application={editingApp} onClose={() => setEditingApp(null)} onSave={handleUpdateApp} readOnly={false} />
                     </div>
                 </div>
             )}
@@ -154,9 +167,9 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
     const { currentUser } = useAuth();
     
     if (loading) return (
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <i className="fa-solid fa-spinner fa-spin fa-2x"></i>
-            <p style={{ marginTop: '1rem' }}>Synchronizing application pool...</p>
+        <div style={{ textAlign: 'center', padding: '5rem 0' }}>
+            <i className="fa-solid fa-spinner fa-spin fa-3x" style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem' }}></i>
+            <p style={{ color: 'var(--text-secondary)', letterSpacing: '1px' }}>SYNCHRONIZING INTAKE POOL...</p>
         </div>
     );
 
@@ -164,69 +177,84 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
     const unassigned = applications.filter(a => !a.assignedTo && a.status === 'pending');
 
     return (
-        <div className="slide-up">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {/* Section 1: Assigned to Me */}
-                <div>
-                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', letterSpacing: '1px' }}>My Active Assignments</h4>
-                    {myAssignments.length === 0 ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No pending tasks assigned to you.</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {myAssignments.map(app => (
-                                <div key={app.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem' }}>
-                                    <div>
-                                        <h4 style={{ margin: 0 }}>{app.name}</h4>
-                                        <p style={{ margin: '4px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{app.email} • {app.industry}</p>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '0.8rem' }}>
-                                        <button onClick={() => onEdit(app)} className="nav-btn" style={{ fontSize: '0.8rem' }}>
-                                            <i className="fa-solid fa-pen-to-square"></i> Review
-                                        </button>
-                                        <button 
-                                            onClick={() => onPublish(app.id)} 
-                                            disabled={isActioning}
-                                            className="nav-btn active" 
-                                            style={{ fontSize: '0.8rem', background: 'var(--color-growth)' }}
-                                        >
-                                            <i className="fa-solid fa-check-circle"></i> Publish
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+        <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+            {/* My Assignments */}
+            <section>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                    <div style={{ width: '8px', height: '24px', background: 'var(--accent-primary)', borderRadius: '4px' }}></div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Active Assignments</h3>
                 </div>
 
-                {/* Section 2: Intake Pool */}
-                <div>
-                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', letterSpacing: '1px' }}>New Intake Pool</h4>
-                    {unassigned.length === 0 ? (
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>Intake pool is currently empty.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {unassigned.map(app => (
-                                <div key={app.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', opacity: 0.8 }}>
-                                    <div>
-                                        <h4 style={{ margin: 0 }}>{app.name}</h4>
-                                        <p style={{ margin: '4px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{app.industry} • Submitted {new Date(app.createdAt).toLocaleDateString()}</p>
+                {myAssignments.length === 0 ? (
+                    <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', opacity: 0.6, border: '1px dashed rgba(255,255,255,0.1)' }}>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>You currently have no pending merchant reviews.</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                        {myAssignments.map(app => (
+                            <div key={app.id} className="glass-card item-card-hover" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                    <div style={{ width: '48px', height: '48px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: 'var(--accent-primary)' }}>
+                                        <i className="fa-solid fa-file-signature"></i>
                                     </div>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem' }}>{app.name}</h4>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>{app.industry}</span> • {app.email}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <button onClick={() => onEdit(app)} className="btn glass-card" style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem' }}>
+                                        <i className="fa-solid fa-pen-to-square"></i> Review
+                                    </button>
                                     <button 
-                                        onClick={() => onPickUp(app.id)} 
+                                        onClick={() => onPublish(app.id)} 
                                         disabled={isActioning}
-                                        className="nav-btn" 
-                                        style={{ fontSize: '0.8rem' }}
+                                        className="btn btn-primary" 
+                                        style={{ fontSize: '0.85rem', padding: '0.6rem 1.5rem', background: 'var(--color-growth)' }}
                                     >
-                                        <i className="fa-solid fa-hand-holding-hand"></i> Pick Up
+                                        <i className="fa-solid fa-check-circle"></i> Publish
                                     </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            {/* New Intake Pool */}
+            <section>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                    <div style={{ width: '8px', height: '24px', background: 'var(--text-secondary)', borderRadius: '4px', opacity: 0.3 }}></div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', margin: 0, color: 'var(--text-secondary)' }}>Intake Pool</h3>
                 </div>
-            </div>
+
+                {unassigned.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', textAlign: 'center', padding: '2rem' }}>The intake pool is currently empty.</p>
+                ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                        {unassigned.map(app => (
+                            <div key={app.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', opacity: 0.7 }}>
+                                <div>
+                                    <h4 style={{ margin: '0 0 2px 0' }}>{app.name}</h4>
+                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                        {app.industry} • Submitted {new Date(app.createdAt).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => onPickUp(app.id)} 
+                                    disabled={isActioning}
+                                    className="btn glass-card" 
+                                    style={{ fontSize: '0.85rem' }}
+                                >
+                                    <i className="fa-solid fa-hand-holding-hand"></i> Claim Application
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
         </div>
     );
 };
@@ -283,66 +311,89 @@ const DirectoryManagementTab = ({ onEdit }) => {
         }
     };
 
-    if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading directory...</div>;
+    if (loading) return <div style={{ padding: '5rem 0', textAlign: 'center' }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
     return (
         <div className="slide-up">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
-                {/* Column 1: Manual Onboarding */}
-                <div>
-                    <div className="glass-card" style={{ padding: '1.5rem', position: 'sticky', top: '1rem' }}>
-                        <h4 style={{ margin: '0 0 1rem 0' }}>Manual Onboard (Affiliate)</h4>
-                        <form onSubmit={onboardMerchant} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                            <input type="text" placeholder="Custom ID (e.g. cafe-lab)" className="input-modern" value={newBiz.id} onChange={e => setNewBiz({...newBiz, id: e.target.value.toLowerCase().replace(/\s+/g, '-')})} />
-                            <input type="text" placeholder="Business Name" className="input-modern" value={newBiz.name} onChange={e => setNewBiz({...newBiz, name: e.target.value})} />
-                            <input type="text" placeholder="Founder Name" className="input-modern" value={newBiz.founder} onChange={e => setNewBiz({...newBiz, founder: e.target.value})} />
-                            <input type="email" placeholder="Owner Email" className="input-modern" value={newBiz.ownerEmail} onChange={e => setNewBiz({...newBiz, ownerEmail: e.target.value})} />
-                            <button type="submit" className="nav-btn active" style={{ width: '100%', marginTop: '0.5rem' }}>Create Active Profile</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '2.5rem', alignItems: 'start' }}>
+                {/* Column 1: Manual Onboarding Form */}
+                <aside>
+                    <div className="glass-card" style={{ padding: '2rem', border: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: '1rem' }}>
+                        <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.1rem', fontWeight: '700' }}>
+                            <i className="fa-solid fa-plus-circle" style={{ color: 'var(--accent-primary)', marginRight: '8px' }}></i> Direct Onboard
+                        </h3>
+                        <form onSubmit={onboardMerchant} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                            <div className="form-group">
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Network ID</label>
+                                <input type="text" placeholder="e.g. cafe-lab" className="input-modern" value={newBiz.id} onChange={e => setNewBiz({...newBiz, id: e.target.value.toLowerCase().replace(/\s+/g, '-')})} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Brand Name</label>
+                                <input type="text" placeholder="Business Name" className="input-modern" value={newBiz.name} onChange={e => setNewBiz({...newBiz, name: e.target.value})} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Founder</label>
+                                <input type="text" placeholder="Founder Name" className="input-modern" value={newBiz.founder} onChange={e => setNewBiz({...newBiz, founder: e.target.value})} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Registered Email</label>
+                                <input type="email" placeholder="owner@email.com" className="input-modern" value={newBiz.ownerEmail} onChange={e => setNewBiz({...newBiz, ownerEmail: e.target.value})} />
+                            </div>
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', height: '48px', fontWeight: '700' }}>
+                                Initialize Profile
+                            </button>
                         </form>
                     </div>
-                </div>
+                </aside>
 
-                {/* Column 2: Directory & Assets */}
-                <div>
-                    <div className="glass-card" style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h4 style={{ margin: 0 }}>Business Inventory</h4>
-                            <input 
-                                type="text" 
-                                placeholder="Search inventory..." 
-                                className="input-modern" 
-                                style={{ width: '200px', fontSize: '0.8rem' }}
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                            />
+                {/* Column 2: Searchable Inventory */}
+                <main>
+                    <div className="glass-card" style={{ padding: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Network Inventory</h3>
+                            <div style={{ position: 'relative', width: '260px' }}>
+                                <i className="fa-solid fa-search" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}></i>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by name or ID..." 
+                                    className="input-modern" 
+                                    style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '0.85rem', height: '40px' }}
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                />
+                            </div>
                         </div>
 
-                        <div style={{ maxHeight: '600px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                        <div style={{ display: 'grid', gap: '0.75rem', maxHeight: '70vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
                             {filteredBusinesses.map(biz => (
-                                <div key={biz.id} style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div>
-                                        <h5 style={{ margin: 0 }}>{biz.name}</h5>
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '4px 0' }}>{biz.id} • {biz.location || 'No Location'}</p>
+                                <div key={biz.id} className="item-card-hover" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: 'var(--text-secondary)' }}>
+                                            <i className="fa-solid fa-building"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style={{ margin: '0 0 2px 0', fontSize: '1rem' }}>{biz.name}</h5>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                                                <code style={{ color: 'var(--accent-primary)', fontSize: '0.7rem' }}>{biz.id}</code> • {biz.location || 'Remote/TBD'}
+                                            </p>
+                                        </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <div style={{ display: 'none' }}>
                                             <QRCodeCanvas id={`qr-${biz.id}`} value={`${window.location.origin}/scanner?bizId=${biz.id}`} size={550} level="H" />
                                         </div>
                                         <button 
-                                            title="Manual Edit"
-                                            className="nav-btn" 
-                                            style={{ padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }}
-                                            onClick={() => {
-                                                // We pass the active business data into the editor
-                                                onEdit(biz);
-                                            }}
+                                            title="Manual Profile Edit"
+                                            className="icon-btn glass-card" 
+                                            style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
+                                            onClick={() => onEdit(biz)}
                                         >
-                                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                                            <i className="fa-solid fa-pen-to-square"></i>
                                         </button>
                                         <button 
-                                            title="Download Standee"
-                                            className="nav-btn" 
-                                            style={{ padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }}
+                                            title="Generate Network Standee"
+                                            className="btn glass-card" 
+                                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
                                             onClick={() => {
                                                 const main = document.createElement('canvas');
                                                 main.width = 1118; main.height = 1588;
@@ -354,14 +405,19 @@ const DirectoryManagementTab = ({ onEdit }) => {
                                                 link.click();
                                             }}
                                         >
-                                            <i className="fa-solid fa-qrcode"></i> Standee
+                                            <i className="fa-solid fa-qrcode"></i> Asset
                                         </button>
                                     </div>
                                 </div>
                             ))}
+                            {filteredBusinesses.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                                    <p>No matches found in network inventory.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
+                </main>
             </div>
         </div>
     );
