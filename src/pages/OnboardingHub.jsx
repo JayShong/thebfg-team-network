@@ -52,10 +52,20 @@ const OnboardingHub = () => {
     const handleUpdateApp = async (updates) => {
         setIsActioning(true);
         try {
-            const updateFn = functions.httpsCallable('updateapplication');
-            await updateFn({ applicationId: editingApp.id, updates });
+            // Check if this is an active business (has no 'status' field or status is 'active')
+            const isActiveBusiness = editingApp.status === 'active' || !editingApp.status;
+            
+            if (isActiveBusiness) {
+                // Direct Firestore update for active businesses
+                await db.collection('businesses').doc(editingApp.id).update(updates);
+                alert("Business profile updated successfully!");
+            } else {
+                // Standard Cloud Function for applications
+                const updateFn = functions.httpsCallable('updateapplication');
+                await updateFn({ applicationId: editingApp.id, updates });
+                alert("Draft saved successfully.");
+            }
             setEditingApp(null);
-            alert("Draft saved successfully.");
         } catch (err) {
             alert(err.message);
         } finally {
@@ -120,7 +130,7 @@ const OnboardingHub = () => {
                     onPublish={handlePublish}
                 />
             ) : (
-                <DirectoryManagementTab />
+                <DirectoryManagementTab onEdit={setEditingApp} />
             )}
 
             {editingApp && (
@@ -221,7 +231,7 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
     );
 };
 
-const DirectoryManagementTab = () => {
+const DirectoryManagementTab = ({ onEdit }) => {
     const { businesses, loading } = useBusinesses();
     const [searchQuery, setSearchQuery] = useState('');
     const [newBiz, setNewBiz] = useState({ 
@@ -318,6 +328,17 @@ const DirectoryManagementTab = () => {
                                         <div style={{ display: 'none' }}>
                                             <QRCodeCanvas id={`qr-${biz.id}`} value={`${window.location.origin}/scanner?bizId=${biz.id}`} size={550} level="H" />
                                         </div>
+                                        <button 
+                                            title="Manual Edit"
+                                            className="nav-btn" 
+                                            style={{ padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }}
+                                            onClick={() => {
+                                                // We pass the active business data into the editor
+                                                onEdit(biz);
+                                            }}
+                                        >
+                                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                                        </button>
                                         <button 
                                             title="Download Standee"
                                             className="nav-btn" 
