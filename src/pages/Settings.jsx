@@ -18,7 +18,7 @@ const CAUSES_LIST = [
 ];
 
 const Settings = () => {
-    const { currentUser, updateProfile, sendPasswordReset, logout } = useAuth();
+    const { currentUser, updateProfile, sendPasswordReset, logout, syncRoles } = useAuth();
     const navigate = useNavigate();
 
     const [nickname, setNickname] = useState('');
@@ -150,6 +150,23 @@ const Settings = () => {
         }
     };
 
+    const handleSyncRoles = async () => {
+        setLoading(true);
+        setMessage({ text: 'Re-verifying security badges with the network...', type: 'success' });
+        try {
+            const result = await syncRoles();
+            if (result.success) {
+                setMessage({ text: 'Security badges refreshed successfully!', type: 'success' });
+            } else {
+                setMessage({ text: 'Refresh failed: ' + result.error, type: 'error' });
+            }
+        } catch (err) {
+            setMessage({ text: 'Refresh failed: ' + err.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleDeleteAccount = async () => {
         const confirm1 = window.confirm("CRITICAL: Are you sure you want to delete your account? This action is IRREVERSIBLE and will purge all your badges and personal history.");
         if (!confirm1) return;
@@ -242,11 +259,26 @@ const Settings = () => {
                 </div>
 
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
-                    <h3 style={{ color: '#fff' }}><i className="fa-solid fa-key" style={{ color: 'var(--accent-secondary)' }}></i> Security</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Keep your account safe by verifying your identity or resetting your password.</p>
-                    <button type="button" onClick={handlePasswordReset} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }}>
-                        <i className="fa-solid fa-envelope"></i> Send Password Reset Email
-                    </button>
+                    <h3 style={{ color: '#fff' }}><i className="fa-solid fa-key" style={{ color: 'var(--accent-secondary)' }}></i> Security & Permissions</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                        Manage your account access and security permissions. If you were recently granted staff roles (Auditor, Customer Success, etc.) and don't see them yet, use the refresh tool below.
+                    </p>
+                    
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <button type="button" onClick={handlePasswordReset} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }}>
+                            <i className="fa-solid fa-envelope"></i> Send Password Reset
+                        </button>
+                        
+                        <button 
+                            type="button" 
+                            onClick={handleSyncRoles} 
+                            className="btn btn-secondary" 
+                            style={{ width: 'auto', padding: '0.75rem 1.5rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                            disabled={loading}
+                        >
+                            <i className={`fa-solid ${loading ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'}`}></i> Refresh Permissions
+                        </button>
+                    </div>
                 </div>
 
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.2s' }}>

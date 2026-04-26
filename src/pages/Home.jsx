@@ -5,7 +5,7 @@ import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { getSeasonId } from '../utils/badgeLogic';
 
 const Home = () => {
-    const { currentUser, isClaimsResolving } = useAuth();
+    const { currentUser } = useAuth();
 
 
     // Initialize states from localStorage with robust fallbacks
@@ -128,11 +128,6 @@ const Home = () => {
 
     useEffect(() => {
         // Trigger refresh if local storage is missing OR global stats are effectively zero
-        // AND we aren't currently resolving security claims
-        if (isClaimsResolving) {
-            console.log("⏳ HOME: Dashboard refresh paused for security warm-up...");
-            return;
-        }
 
         if (!localStorage.getItem('bfg_global_stats') || stats.consumers === 0) {
             refreshDashboard();
@@ -165,7 +160,7 @@ const Home = () => {
             }
         };
         fetchHolidays();
-    }, [currentUser, isClaimsResolving]);
+    }, [currentUser]);
 
     const gdpPenetration = stats.gdpPenetration || "0%";
 
@@ -236,7 +231,25 @@ const Home = () => {
                 </p>
             </div>
 
-            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', position: 'relative' }}>
+                {stats.consumers === 0 && stats.businesses === 0 && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(10, 10, 10, 0.7)',
+                        backdropFilter: 'blur(4px)',
+                        zIndex: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        <i className="fa-solid fa-satellite-dish fa-spin" style={{ color: 'var(--accent-primary)', fontSize: '1.5rem', marginBottom: '0.5rem' }}></i>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'white', letterSpacing: '0.5px' }}>Retrieving Network Stats...</span>
+                    </div>
+                )}
                 <div className="stat-card glass-card">
                     <i className="fa-solid fa-users stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>

@@ -30,18 +30,11 @@ The system relies on a dual-source identity model to separate "UI Intent" from "
 4.  **Merged Resolution**: The `AuthContext` merges roles from both sources. 
     *   *Result*: If a role exists in Firestore but not in the Claims yet, the UI still shows the portal (Resilience).
 
-### 3.2 The Self-Healing Mechanism (Background Sync)
-If the `AuthContext` detects that the Firestore Document has an elevated role flag that is missing from the Auth Claims, it triggers an automated **background synchronization**:
-1.  Calls `syncuserclaims()` (Cloud Function).
-2.  The function verifies the Firestore intent and updates the Auth Custom Claims.
-3.  The frontend forces an ID Token refresh (`getIdToken(true)`).
-4.  The security state is now synchronized without user intervention.
-
-### 3.3 Quota-Friendly Stewardship (Ownership)
-To avoid expensive `where` queries on every load:
-1.  Ownership and Manager/Crew status are consolidated within the `users/{uid}` document.
-2.  The frontend uses this consolidated record to grant access to the **Business Portal**.
-3.  Security is maintained because the Firestore rules verify ownership by comparing the `request.auth.token.email` against the `resource.data.ownerEmail`.
+### 3.2 Server-Side Provisioning
+Upon the creation of a new Auth account (via Login or Sign-up), a **Cloud Function** is triggered to:
+1.  Initialize the `users/{uid}` document with default stats (0 check-ins, 0 purchases).
+2.  Assign the default 'member' access rights.
+3.  The frontend waits for this document to appear before completing the login transition.
 
 ---
 
@@ -61,11 +54,6 @@ Responsible for the day-to-day operations of a specific onboarded business.
 *   **Business Manager**: Staff authorized by the owner to manage profile details and intelligence data.
 *   **Crew**: **(OPERATIONAL)** Responsible for handling customer scannings, recording check-ins, and performing purchase verifications at the point of sale.
 
-### 4.3 Identity Infrastructure
-Identity is split into two layers:
-1.  **UI Level (Speed)**: Firestore boolean flags (e.g., `isCustomerSuccess: true`) trigger portal visibility.
-2.  **Security Level (Truth)**: Firebase Auth Custom Claims (JWT) gate all write operations and Cloud Functions.
-
 ---
 
 ## 5. Security Gatekeepers
@@ -83,115 +71,42 @@ The final wall of defense.
 ---
 
 ## 6. User Intent Flows (Cognitive Mapping)
-This section maps human objectives to the underlying technical machinery.
 
-### 6.1 Intent: "I want to register my business on the BFG Network"
+### 6.1 Intent: "I want to join the movement (Universal Access)"
 > [!IMPORTANT]
-> **LOCK STATUS: VERIFIED & FROZEN**
-> **Last Approved**: 2026-04-26 (User Session)
+> **NEW PRIMARY FLOW: SERVER-SIDE AUTHORITY**
+> **Approved**: 2026-04-26
 
+1.  **User Action**: User enters email/password on the Login page and clicks **"Join the Movement"**.
+2.  **Creation Logic**: If the email is not in the database, a new Auth account is created.
+3.  **Server Provisioning**: A `functions.auth.user().onCreate()` trigger fires on the server.
+    *   **Action**: Creates the `users/{uid}` document.
+    *   **Data**: Populates personal stats (check-ins, verified purchases) and default user access rights.
+4.  **Frontend Receipt**: The `AuthContext` listens for this document. Once it arrives, a copy is sent to the frontend state.
+5.  **Completion**: The login process is finished, and the user is redirected to their Dashboard.
+
+### 6.2 Intent: "I want to register my business on the BFG Network"
 *   **Step 1: Onboarding (Becoming a Member)**
     *   **URL**: `/` (Auth Redirect to Login)
     *   **Action**: User signs up or logs in to the platform.
     *   **Technical Trigger**: `Login.jsx` -> `handleLogin()`
-    *   **Logic**: `onAuthStateChanged` in `AuthContext.jsx` detects the user and initializes the `users/{uid}` profile.
+    *   **Logic**: `onAuthStateChanged` in `AuthContext.jsx` detects the user and waits for the server-side `users/{uid}` profile.
 *   **Step 2: Navigation**
     *   **URL**: `/profile`
     *   **Action**: User navigates to the Merchant Portal (Staff) from their profile.
-    *   **Technical Trigger**: `Profile.jsx` -> `navigate('/merchant-portal')`
-    *   **Gate**: `ProtectedRoute.jsx` ensures the user is at least a 'member' (logged in).
 *   **Step 3: Intent to Apply**
     *   **URL**: `/merchant-portal` (Application Tab)
-    *   **Action**: User views the application form.
-    *   **Technical Trigger**: `OnboardingHub.jsx` renders the form fields.
-    *   **Data Schema (The Application Form)**:
-        *   **Shop / Brand Name** [REQUIRED]: Publicly visible consumer name.
-        *   **Founder Name** [OPTIONAL]: The individual driving the business.
-        *   **Contact Phone** [REQUIRED]: Primary business contact.
-        *   **Registered Email** [REQUIRED]: Read-only; synced with owner account.
-        *   **Company Registration No.** [OPTIONAL]: SSM / Legal identification for verification.
-        *   **Industry** [OPTIONAL]: Dropdown selection from 19 predefined categories.
-        *   **Location / Area** [OPTIONAL]: Local neighborhood (e.g. Bangsar).
-        *   **Google Maps Link** [OPTIONAL]: Direct link to physical location (`googleMapsUrl`).
-        *   **Full Address** [OPTIONAL]: Complete street address.
-        *   **Purpose Statement** [OPTIONAL]: The "Why" behind the business (`purposeStatement`).
-        *   **Founder's Story** [OPTIONAL]: Narrative of convictions and journey.
-*   **Step 4: Submission**
-    *   **URL**: `/onboarding-hub`
     *   **Action**: User fills in details and clicks "Submit Application".
-    *   **Technical Trigger**: `OnboardingHub.jsx` -> `handleSubmit()`
-    *   **Data Action**: Writes to `applications/{appId}` with status `pending`.
-    *   **Security**: `firestore.rules` validates that `request.auth.token.email == request.resource.data.email`.
-*   **Step 5: Review & Assignment (Customer Success)**
-    *   **URL**: `/merchant-portal`
-    *   **Action**: A Customer Success member reviews the new intake pool and "Picks Up" the application.
-    *   **Technical Trigger**: `OnboardingHub.jsx` -> `handlePickUp()`
-    *   **Data Action**: Calls `assignapplication` (Cloud Function) to set `assignedTo` field.
-*   **Step 6: Collaborative Refinement**
-    *   **The Window**: Even after an application is "Picked Up", the **Business Owner** retains full edit access to their draft. This allows Customer Success to support the owner in real-time (e.g., via phone/chat) to improve their Purpose Statement or Story before publication.
-    *   **Action**: Owner edits via `Profile.jsx` -> `ApplicationEditor.jsx`.
-*   **Step 7: Publishing (Customer Success)**
-    *   **URL**: `/merchant-portal`
-    *   **Action**: Once both parties are satisfied, Customer Success clicks "Publish Business."
-    *   **Technical Trigger**: `OnboardingHub.jsx` -> `handlePublish()`
-    *   **Data Action**: Calls `publishapplication` (Cloud Function).
-*   **Step 8: Provisioning (Backend)**
-    *   **URL**: N/A (Server-side Trigger)
-    *   **Technical Trigger**: `functions/index.js` -> `onApplicationApproved` (or equivalent Publish Trigger)
-    *   **Action A**: Automatically creates the `businesses/{bizId}` document.
-    *   **Action B**: Updates the owner's `users/{uid}` profile with `isOwner: true`.
-*   **Step 9: Activation (Portal Access)**
-    *   **URL**: `/profile`
-    *   **Action**: User returns to their profile.
-    *   **Technical Trigger**: `AuthContext.jsx` -> `onAuthStateChanged` / Re-fetch.
-    *   **Logic**: Stewardship detection identifies the `isOwner` flag.
-    *   **UI Result**: The "Business Portal" button appears in `Profile.jsx`.
-
-### 6.2 Intent: "I am Network Staff and I need to manage platform roles"
-*   **Step 1: Identity Handshake**
-    *   **URL**: `/` (Auth Redirect to Login)
-    *   **Action**: User logs in.
-    *   **Technical Trigger**: `AuthContext.jsx` -> `onAuthStateChanged`
-    *   **Logic**: `getIdTokenResult()` extracts secure **Custom Claims**.
-    *   **The Security Protocol (Why Claims?):**
-        *   **Custom Claims** are part of the user's encrypted Identity Token (JWT). They are signed by Google and are **immutable** from the client-side. This prevents a user from "spoofing" their role by editing their own Firestore document.
-        *   **User Docs** are used for UI speed (showing/hiding buttons), but **Claims** are used for the actual Security Rules and Cloud Functions.
-*   **Step 2: Session Integrity Guard (The Hard Reset)**
-    *   **The Scenario**: A staff member refreshes a stale session where the browser cache remembers their role, but the Auth Token (Claims) has expired or is missing.
-    *   **Logic**: If `profile.isStaff` is true but `claims.isStaff` is false, the system detects a **Role Mismatch**.
-    *   **The Resolution**: Instead of background syncing (which often 401s), the system triggers a **Hard Reset**.
-    *   **Technical Action**: `auth.signOut()` + `alert()` + `Redirect to Login`.
-    *   **Rationale**: Ensures that Master Keys are always valid and prevents "Ghost Sessions" where a user has UI access but no backend permission.
-*   **Step 3: Portal Entry**
-    *   **URL**: `/admin`
-    *   **Action**: User (SuperAdmin) clicks "Governance Hub".
-    *   **Technical Trigger**: `ProtectedRoute.jsx` checks `currentUser.isSuperAdmin`.
-*   **Step 3: Role Management**
-    *   **URL**: `/admin`
-    *   **Action**: SuperAdmin assigns the **Customer Success** or **Auditor** role to a member.
-    *   **Technical Trigger**: `Admin.jsx` -> `handleUpdate()`
-    *   **Data Action**: Calls `managerole()` (Cloud Function) which updates the `system/compliance_roles` list and promotes flags to the user's Auth Claims.
-
-### 6.3 Intent: "I am a Crew member and I need to verify a customer visit"
-*   **Step 1: Operational Access**
-    *   **URL**: `/business-portal`
-    *   **Action**: Crew member enters the portal of their assigned business.
-    *   **Gate**: `ProtectedRoute.jsx` checks `currentUser.isBusinessStaff`.
-*   **Step 2: Verification Action**
-    *   **URL**: `/business-portal` (Scanner Section)
-    *   **Action**: Crew scans a customer's card or reviews the "Purchase Verification Queue".
-    *   **Technical Trigger**: `BusinessPortal.jsx` -> `handleVerify()`
-    *   **Logic**: Updates `transactions/{id}` status to `verified`.
+*   **Step 4: Submission**
+    *   **Action**: Writes to `applications/{appId}` with status `pending`.
 
 ---
 
-## 6. Constraint Checklist for Agents
-Any modification to the Auth or RBAC systems **MUST** adhere to these constraints:
+## 7. Constraint Checklist for Agents
+*   [ ] **Server-Side Initialization**: All user profiles must be initialized by Cloud Functions, never by the client.
 *   [ ] **No Hardcoded Emails**: Never use static email addresses for permission gates.
-*   [ ] **Claim Dominance**: Administrative data access must always be gated by Auth Claims in security rules.
-*   [ ] **Self-Healing**: Always ensure a mechanism exists to sync Claims from Firestore intent.
-*   [ ] **Quota Efficiency**: Avoid multi-collection queries during the initial auth handshake.
-*   [ ] **UI Resilience**: Show portals based on Firestore flags while claims are in flight.
+*   [ ] **Claim Dominance**: Administrative data access must always be gated by Auth Claims.
+*   [ ] **Manual Reconciliation**: Provide a manual "Refresh Permissions" tool for staff members to reconcile claims on-demand.
 
 ---
 

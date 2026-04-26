@@ -93,9 +93,12 @@ const Newsreel = () => {
 
         // 3. Activity Feed (Sanitized Public Activities)
         // Merge server activities with local instant injections
-        const allActivity = [...localActivities, ...recentActivity];
+        const safeLocal = localActivities || [];
+        const safeRecent = recentActivity || [];
+        const allActivity = [...safeLocal, ...safeRecent];
         
         allActivity.forEach(act => {
+            if (!act) return;
             queue.push({
                 text: act.text || "Momentum in the network...",
                 type: act.type || 'activity',

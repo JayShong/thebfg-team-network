@@ -12,7 +12,7 @@ import { evaluateTier } from '../utils/badgeLogic';
 import ApplicationEditor from '../components/admin/ApplicationEditor';
 
 const Profile = () => {
-    const { currentUser, isGuest, isClaimsResolving, logout } = useAuth();
+    const { currentUser, isGuest, logout } = useAuth();
     const { businesses } = useBusinesses();
     const navigate = useNavigate();
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -45,7 +45,7 @@ const Profile = () => {
     const totalSupports = getUserSupports();
 
     useEffect(() => {
-        if (!currentUser?.uid || isClaimsResolving) return;
+        if (!currentUser?.uid) return;
         let unsubscribe = null;
 
         const subscribe = () => {
@@ -78,10 +78,10 @@ const Profile = () => {
             if (unsubscribe) unsubscribe();
             document.removeEventListener('visibilitychange', handleResumption);
         };
-    }, [currentUser, isClaimsResolving]);
+    }, [currentUser]);
 
     useEffect(() => {
-        if (!currentUser?.email || isClaimsResolving) return;
+        if (!currentUser?.email) return;
         let unsubscribe = null;
 
         const subscribe = () => {
@@ -107,7 +107,7 @@ const Profile = () => {
             if (unsubscribe) unsubscribe();
             document.removeEventListener('visibilitychange', handleResumption);
         };
-    }, [currentUser, isClaimsResolving]);
+    }, [currentUser]);
 
     const handleCreateApplication = async () => {
         setIsSavingApp(true);
@@ -213,6 +213,13 @@ const Profile = () => {
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>
                         {displayUser.nickname || displayUser.name || 'Explorer'}
                     </h3>
+                    
+                    {currentUser && !currentUser.isProvisioned && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center', color: 'var(--accent-primary)', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                            <i className="fa-solid fa-spinner fa-spin"></i>
+                            <span style={{ fontWeight: '600' }}>Provisioning Identity Handshake...</span>
+                        </div>
+                    )}
 
                     <div style={{ margin: '0.5rem 0', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {displayUser.isSuperAdmin && (

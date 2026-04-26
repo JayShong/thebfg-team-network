@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AuthModal = ({ onClose }) => {
@@ -10,6 +11,7 @@ const AuthModal = ({ onClose }) => {
     const [isSignUp, setIsSignUp] = useState(false);
     
     const { login, signup } = useAuth();
+    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -23,6 +25,7 @@ const AuthModal = ({ onClose }) => {
                 await login(email, password);
             }
             onClose();
+            navigate('/profile');
         } catch (err) {
             setError(err.message || 'Authentication failed. Please check credentials.');
         } finally {

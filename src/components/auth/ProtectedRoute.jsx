@@ -7,15 +7,7 @@ import RestrictedAccess from '../../pages/RestrictedAccess';
  * It ensures that only users with the appropriate permissions can view specific routes.
  */
 const ProtectedRoute = ({ children, requiredRole, allowStaff = false }) => {
-    const { currentUser, isGuest, isClaimsResolving } = useAuth();
-
-    if (isClaimsResolving && !isGuest) {
-        return (
-            <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <i className="fa-solid fa-shield-halved fa-spin fa-3x" style={{ color: 'var(--accent-primary)', opacity: 0.5 }}></i>
-            </div>
-        );
-    }
+    const { currentUser, isGuest } = useAuth();
 
     // 1. Check for Guest Access
     if (isGuest) {

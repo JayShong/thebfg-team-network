@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-    const { login, continueAsGuest, sendPasswordReset } = useAuth();
+    const { joinMovement, continueAsGuest, sendPasswordReset } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -32,7 +32,9 @@ const Login = () => {
             } else {
                 localStorage.removeItem('bfg_remembered_email');
             }
-            await login(email, password);
+            
+            // This now handles both existing login AND new registration automatically
+            await joinMovement(email, password);
             navigate('/');
         } catch (err) {
             setError(err.message || 'Authentication failed. Please check credentials.');
