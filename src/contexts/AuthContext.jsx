@@ -98,44 +98,6 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
 
-                const syncClaims = async (targetUser, retryCount = 0) => {
-                    try {
-                        const { functions } = await import('../services/firebase');
-                        const syncFunc = functions.httpsCallable('syncuserclaims');
-                        
-                        if (retryCount > 0) {
-                            await new Promise(r => setTimeout(r, Math.pow(2, retryCount) * 1500));
-                        } else {
-                            await new Promise(r => setTimeout(r, 1000));
-                        }
-                        
-                        console.log(`🔐 AUTH: Synchronizing security claims (Attempt ${retryCount + 1})...`);
-                        await targetUser.getIdToken(true);
-                        
-                        await syncFunc();
-                        const refreshedToken = await targetUser.getIdTokenResult(true);
-                        const claims = refreshedToken.claims;
-                        
-                        if (claims.isSuperAdmin || claims.isAuditor || claims.isCustomerSuccess) {
-                            console.log("🔐 AUTH: Security claims successfully synchronized.");
-                            setCurrentUser(prev => prev ? {
-                                ...prev,
-                                isSuperAdmin: !!claims.isSuperAdmin,
-                                isAuditor: !!claims.isAuditor || !!claims.isSuperAdmin,
-                                isCustomerSuccess: !!claims.isCustomerSuccess || !!claims.isSuperAdmin
-                            } : null);
-                            
-                            // Trigger data refresh now that we have claims
-                            fetchRecentActivity(); 
-                            fetchPendingAudits();
-                        }
-                    } catch (err) {
-                        console.error(`❌ AUTH: Claims synchronization attempt ${retryCount + 1} failed:`, err.message);
-                        if (retryCount < 2) {
-                            syncClaims(targetUser, retryCount + 1);
-                        }
-                    }
-                };
 
                 // 1. IDENTITY GATE (Detect role intent vs secure claims)
                 let currentClaims = {};
@@ -195,14 +157,18 @@ export const AuthProvider = ({ children }) => {
                 profile.isAuditor = isAuditor;
                 profile.isCustomerSuccess = isCustomerSuccess;
 
-                // 4. SELF-HEALING: Detect if Auth Claims are lagging behind Firestore Intent
+                // 4. SECURITY INTEGRITY CHECK: Detect if Auth Claims are lagging behind Firestore Intent
                 const needsSync = (!!profile.isSuperAdmin && !currentClaims.isSuperAdmin) ||
                                   (!!profile.isAuditor && !currentClaims.isAuditor) ||
                                   (!!profile.isCustomerSuccess && !currentClaims.isCustomerSuccess);
 
                 if (needsSync) {
-                    console.warn("🔐 AUTH: Role mismatch detected. Initiating background claims synchronization...");
-                    syncClaims(user);
+                    console.error("🔐 AUTH: Security Token Mismatch. Session invalidated for safety.");
+                    alert("Your security session has expired or requires re-validation. For your protection, please log in again.");
+                    auth.signOut();
+                    setCurrentUser(null);
+                    setLoading(false);
+                    return;
                 }
 
                 // 4. SYNC STATS: Populate localStorage from pre-calculated Firestore summary
