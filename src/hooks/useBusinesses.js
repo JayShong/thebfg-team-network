@@ -49,37 +49,42 @@ export const useBusinesses = (searchQuery = '', activeFilter = 'all') => {
                 query = query.where('industry', '==', industryMap[activeFilter]);
             }
 
-            // 2. Apply Server-Side Search (Starts With)
+            // 2. Apply Search (Smart Local Fallback for Case-Insensitivity)
             if (searchQuery.trim()) {
-                const term = searchQuery.trim();
-                // Firestore "Starts With" pattern
-                query = query.where('name', '>=', term)
-                             .where('name', '<=', term + '\uf8ff');
+                const term = searchQuery.trim().toLowerCase();
+                
+                // For staff/portal use or smaller directories, we fetch a larger batch 
+                // and filter locally to bypass Firestore's case-sensitivity limitations.
+                const snapshot = await query.limit(100).get(); 
+                const allLoaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                const filtered = allLoaded.filter(biz => 
+                    biz.name?.toLowerCase().includes(term) || 
+                    biz.id?.toLowerCase().includes(term) ||
+                    biz.founder?.toLowerCase().includes(term)
+                );
+
+                setBusinesses(filtered);
+                setHasMore(false); // Search results are usually contained in the batch
             } else {
-                // Default sorting by impact if no search
+                // Default logic for browsable directory (Ordered by impact)
                 query = query.orderBy('smiles', 'desc');
-            }
+                
+                if (isLoadMore && lastVisible.current) {
+                    query = query.startAfter(lastVisible.current);
+                }
 
-            // 3. Apply Pagination
-            if (isLoadMore && lastVisible.current) {
-                query = query.startAfter(lastVisible.current);
-            }
+                const snapshot = await query.limit(PAGE_SIZE).get();
+                const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                lastVisible.current = snapshot.docs[snapshot.docs.length - 1];
+                setHasMore(snapshot.docs.length === PAGE_SIZE);
 
-            const snapshot = await query.limit(PAGE_SIZE).get();
-
-            const loaded = [];
-            snapshot.forEach((doc) => {
-                loaded.push({ id: doc.id, ...doc.data() });
-            });
-
-            // Update pagination anchor
-            lastVisible.current = snapshot.docs[snapshot.docs.length - 1];
-            setHasMore(snapshot.docs.length === PAGE_SIZE);
-
-            if (isLoadMore) {
-                setBusinesses(prev => [...prev, ...loaded]);
-            } else {
-                setBusinesses(loaded);
+                if (isLoadMore) {
+                    setBusinesses(prev => [...prev, ...loaded]);
+                } else {
+                    setBusinesses(loaded);
+                }
             }
             
             setLoading(false);
