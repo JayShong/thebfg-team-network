@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }) => {
     const [localActivities, setLocalActivities] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+    const [currentClaims, setCurrentClaims] = useState({});
 
     // Safety: Force resolution/loading if it hangs (e.g. 3rd party cookie block, network issues)
     useEffect(() => {
@@ -99,12 +100,18 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('bfg_guest_mode');
 
 
-                // 1. IDENTITY GATE (Detect role intent vs secure claims)
-                let currentClaims = {};
+                // 1. IDENTITY GATE (Force fresh token and resolve claims)
+                let resolvedClaims = {};
                 try {
                     setIsClaimsResolving(true);
-                    let tokenResult = await user.getIdTokenResult();
-                    currentClaims = tokenResult.claims;
+                    
+                    // SOFT REFRESH: Forces browser to get a fresh token from the server
+                    // This prevents 401 errors from stale background sessions.
+                    await user.getIdToken(true); 
+                    
+                    const tokenResult = await user.getIdTokenResult();
+                    resolvedClaims = tokenResult.claims;
+                    setCurrentClaims(resolvedClaims);
                 } catch (e) {
                     console.error("⚠️ AUTH: Claims check failed", e);
                 } finally {
@@ -149,18 +156,18 @@ export const AuthProvider = ({ children }) => {
                 // 3. SECURE ROLE RESOLUTION (Merged Intent)
                 // We trust Firestore as the Source of Intent, but Auth Claims as the Source of Truth.
                 // Merging them in the UI ensures the portals appear immediately while claims sync.
-                const isSuperAdmin = !!currentClaims.isSuperAdmin || !!profile.isSuperAdmin;
-                const isAuditor = !!currentClaims.isAuditor || !!currentClaims.isSuperAdmin || !!profile.isAuditor;
-                const isCustomerSuccess = !!currentClaims.isCustomerSuccess || !!currentClaims.isSuperAdmin || !!profile.isCustomerSuccess;
+                const isSuperAdmin = !!resolvedClaims.isSuperAdmin || !!profile.isSuperAdmin;
+                const isAuditor = !!resolvedClaims.isAuditor || !!resolvedClaims.isSuperAdmin || !!profile.isAuditor;
+                const isCustomerSuccess = !!resolvedClaims.isCustomerSuccess || !!resolvedClaims.isSuperAdmin || !!profile.isCustomerSuccess;
 
                 profile.isSuperAdmin = isSuperAdmin;
                 profile.isAuditor = isAuditor;
                 profile.isCustomerSuccess = isCustomerSuccess;
 
                 // 4. SECURITY INTEGRITY CHECK: Detect if Auth Claims are lagging behind Firestore Intent
-                const needsSync = (!!profile.isSuperAdmin && !currentClaims.isSuperAdmin) ||
-                                  (!!profile.isAuditor && !currentClaims.isAuditor) ||
-                                  (!!profile.isCustomerSuccess && !currentClaims.isCustomerSuccess);
+                const needsSync = (!!profile.isSuperAdmin && !resolvedClaims.isSuperAdmin) ||
+                                  (!!profile.isAuditor && !resolvedClaims.isAuditor) ||
+                                  (!!profile.isCustomerSuccess && !resolvedClaims.isCustomerSuccess);
 
                 if (needsSync) {
                     console.error("🔐 AUTH: Security Token Mismatch. Session invalidated for safety.");
