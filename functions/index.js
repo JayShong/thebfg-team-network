@@ -576,7 +576,7 @@ exports.managerole = functions.https.onCall(async (data, context) => {
     // 1. Verify Requester
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
     const requesterEmail = context.auth.token.email;
-    const isRoot = requesterEmail === 'jayshong@gmail.com';
+    const isRoot = context.auth.token.isSuperAdmin === true || requesterEmail === 'jayshong@gmail.com';
 
     const { targetEmail, roleType, action } = data; // roleType: 'merchant' or 'compliance'
     const cleanEmail = targetEmail.trim().toLowerCase();
@@ -610,11 +610,23 @@ exports.managerole = functions.https.onCall(async (data, context) => {
 
     await roleRef.set({ emails: updatedList }, { merge: true });
     
-    // 4. Sync Role Flags to User Document (Optimizes client-side RBAC)
+    // 4. Sync Role Flags to User Document AND Set Custom Claims (Secure Access Layer)
     const userSnap = await db.collection('users').where('email', '==', cleanEmail).get();
     if (!userSnap.empty) {
+        const userDoc = userSnap.docs[0];
+        const uid = userDoc.id;
         const flagField = roleType === 'merchant' ? 'isCustomerSuccess' : 'isAuditor';
-        await userSnap.docs[0].ref.update({ [flagField]: action === 'assign' });
+        
+        // Update Firestore
+        await userDoc.ref.update({ [flagField]: action === 'assign' });
+
+        // Update Auth Custom Claims (The secure layer)
+        const currentClaims = (await admin.auth().getUser(uid)).customClaims || {};
+        const newClaims = { 
+            ...currentClaims,
+            [flagField]: action === 'assign'
+        };
+        await admin.auth().setCustomUserClaims(uid, newClaims);
     }
 
     // 5. Log Action
@@ -626,6 +638,39 @@ exports.managerole = functions.https.onCall(async (data, context) => {
     });
 
     return { success: true };
+});
+
+// 4.1 One-time Bootstrap for Root Admin (Self-Service)
+exports.bootstraprootadmin = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    
+    const email = context.auth.token.email;
+    const uid = context.auth.uid;
+
+    // Strict Hardcoded Gate (Server-side only)
+    if (email !== 'jayshong@gmail.com') {
+        throw new functions.https.HttpsError('permission-denied', 'Unauthorized bootstrap attempt.');
+    }
+
+    console.log(`BOOTSTRAP: Elevating ${email} to SuperAdmin Custom Claims.`);
+
+    const claims = {
+        isSuperAdmin: true,
+        isAuditor: true,
+        isCustomerSuccess: true
+    };
+
+    await admin.auth().setCustomUserClaims(uid, claims);
+    
+    // Also ensure Firestore document is in sync
+    await db.collection('users').doc(uid).set({
+        isSuperAdmin: true,
+        isAuditor: true,
+        isCustomerSuccess: true,
+        lastBootstrapped: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return { success: true, message: 'Your account has been elevated to SuperAdmin with secure Custom Claims.' };
 });
 
 // 5. Institutional Impact Aggregator

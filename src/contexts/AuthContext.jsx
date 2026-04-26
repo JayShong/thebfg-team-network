@@ -100,8 +100,18 @@ export const AuthProvider = ({ children }) => {
                     userDoc = await db.collection('users').doc(user.uid).get();
                 }
 
-                // Hardcoded Root Admin Fallback
-                const ROOT_ADMIN_EMAIL = 'jayshong@gmail.com';
+                // 3. SECURE ROLE RESOLUTION: Use Custom Claims (The secure layer)
+                let claims = {};
+                try {
+                    const idTokenResult = await user.getIdTokenResult(true); // Force refresh to get latest claims
+                    claims = idTokenResult.claims;
+                } catch (e) {
+                    console.error("AUTH: Failed to fetch custom claims", e);
+                }
+
+                // Hardcoded Root Admin Email is ONLY used here to trigger the initial bootstrap
+                // After the first run, the 'isSuperAdmin' claim will handle everything.
+                const BOOTSTRAP_TARGET = 'jayshong@gmail.com';
                 
                 let profile = {
                     uid: user.uid,
@@ -111,17 +121,33 @@ export const AuthProvider = ({ children }) => {
                     ...userDoc.data()
                 };
 
-                // Hardcoded Root Admin Fallback (Ensures access even if Firestore document is corrupted)
-                if (user.email === ROOT_ADMIN_EMAIL) {
-                    profile.isSuperAdmin = true;
-                    profile.isAuditor = true;
-                    profile.isCustomerSuccess = true;
-                } else {
-                    // Standard role mapping
-                    profile.isSuperAdmin = userDoc.data()?.isSuperAdmin || false;
-                    profile.isAuditor = userDoc.data()?.isAuditor || false;
-                    profile.isCustomerSuccess = userDoc.data()?.isCustomerSuccess || false;
+                // Use Claims as the Primary Source of Truth for roles
+                profile.isSuperAdmin = !!claims.isSuperAdmin;
+                profile.isAuditor = !!claims.isAuditor || !!claims.isSuperAdmin;
+                profile.isCustomerSuccess = !!claims.isCustomerSuccess || !!claims.isSuperAdmin;
+
+                // SELF-HEALING BOOTSTRAP:
+                // If you are the root admin but don't have the claims yet (first time after update)
+                // we trigger the server-side bootstrap automatically.
+                if (user.email === BOOTSTRAP_TARGET && !profile.isSuperAdmin) {
+                    console.warn("AUTH: Root Admin detected without secure claims. Triggering Bootstrap...");
+                    try {
+                        const bootstrapFunc = firebase.functions().httpsCallable('bootstraprootadmin');
+                        await bootstrapFunc();
+                        // Re-fetch claims after bootstrap
+                        const refreshedToken = await user.getIdTokenResult(true);
+                        profile.isSuperAdmin = true;
+                        profile.isAuditor = true;
+                        profile.isCustomerSuccess = true;
+                        console.log("AUTH: Root Admin successfully bootstrapped with Custom Claims.");
+                    } catch (err) {
+                        console.error("AUTH: Bootstrap failed", err);
+                    }
                 }
+
+                let finalProfile = {
+                    ...profile
+                };
 
                 // Admin/Merchant Assistant UI Access
                 // Removed: isSuperAdmin leak for Merchant Assistants. 
@@ -155,9 +181,9 @@ export const AuthProvider = ({ children }) => {
                     console.error("AUTH: Stats sync failed", e);
                 }
 
-                setCurrentUser(profile);
-                fetchRecentActivity(); // This now calls fetchPendingAudits as well
-                fetchPendingAudits(profile);
+                setCurrentUser(finalProfile);
+                fetchRecentActivity(); 
+                fetchPendingAudits(finalProfile);
             } else {
                 setCurrentUser(null);
             }
