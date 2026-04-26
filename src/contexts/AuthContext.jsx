@@ -106,13 +106,22 @@ export const AuthProvider = ({ children }) => {
                 let profile = {
                     uid: user.uid,
                     email: user.email,
-                    isSuperAdmin: user.email === ROOT_ADMIN_EMAIL,
-                    isAuditor: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isAuditor,
-                    isCustomerSuccess: user.email === ROOT_ADMIN_EMAIL || userDoc.data()?.isCustomerSuccess,
                     purchases: 0,
                     checkins: 0,
                     ...userDoc.data()
                 };
+
+                // Hardcoded Root Admin Fallback (Ensures access even if Firestore document is corrupted)
+                if (user.email === ROOT_ADMIN_EMAIL) {
+                    profile.isSuperAdmin = true;
+                    profile.isAuditor = true;
+                    profile.isCustomerSuccess = true;
+                } else {
+                    // Standard role mapping
+                    profile.isSuperAdmin = userDoc.data()?.isSuperAdmin || false;
+                    profile.isAuditor = userDoc.data()?.isAuditor || false;
+                    profile.isCustomerSuccess = userDoc.data()?.isCustomerSuccess || false;
+                }
 
                 // Admin/Merchant Assistant UI Access
                 // Removed: isSuperAdmin leak for Merchant Assistants. 
