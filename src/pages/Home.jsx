@@ -5,7 +5,7 @@ import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { getSeasonId } from '../utils/badgeLogic';
 
 const Home = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGuest } = useAuth();
 
 
     // Initialize states from localStorage with robust fallbacks
@@ -357,7 +357,7 @@ const Home = () => {
                 </div>
             </div>
 
-            {currentUser && (
+            { (currentUser || isGuest) && (
                 <>
                     <div className="page-header mt-4" style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Your Contribution</h2>

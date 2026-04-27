@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { BADGES_CONFIG, BADGE_CATEGORIES, getSeasonId } from '../../utils/badgeLogic';
+import AuthModal from '../auth/AuthModal';
+import { BADGES_CONFIG, BADGE_CATEGORIES, getSeasonId, getGuestBadges } from '../../utils/badgeLogic';
 import { db, functions } from '../../services/firebase';
 
 const BadgeGallery = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGuest } = useAuth();
+    const [showAuthModal, setShowAuthModal] = useState(false);
     const [selectedBadge, setSelectedBadge] = useState(null);
     const [seasonalBadges, setSeasonalBadges] = useState({});
+    const [localStats, setLocalStats] = useState({ totalCheckins: 0, totalPurchases: 0 });
     const [claimCode, setClaimCode] = useState('');
     const [isClaiming, setIsClaiming] = useState(false);
     const [claimSuccess, setClaimSuccess] = useState(null);
     const [claimError, setClaimError] = useState(null);
 
     useEffect(() => {
-        if (!currentUser) return;
+        const saved = localStorage.getItem('bfg_personal_stats');
+        if (saved) {
+            try {
+                setLocalStats(JSON.parse(saved));
+            } catch (e) { }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser || isGuest) return;
         
         const seasonId = getSeasonId();
         const unsub = db.collection('users').doc(currentUser.uid)
@@ -30,10 +42,11 @@ const BadgeGallery = () => {
             });
             
         return () => unsub();
-    }, [currentUser]);
+    }, [currentUser, isGuest]);
+
 
     const categoryOrder = ['Seen', 'Verified', 'Valued'];
-    const userBadges = seasonalBadges;
+    const userBadges = isGuest ? getGuestBadges(localStats) : seasonalBadges;
 
 
     const handleClaim = async (e) => {
@@ -55,10 +68,31 @@ const BadgeGallery = () => {
         }
     };
 
+    const [expandedCats, setExpandedCats] = useState(isGuest ? {} : { 'Seen': true, 'Verified': true, 'Valued': true });
+
+    const toggleCat = (cat) => {
+        setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+    };
+
     return (
         <div style={{ marginTop: '2rem' }}>
+            {/* The Invitation for Guests */}
+            {isGuest && (
+                <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'left' }}>
+                    <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-envelope-open-text"></i> Why Accept the Invitation?</h4>
+                    <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.5', listStyleType: 'none' }}>
+                        <li style={{ marginBottom: '0.4rem' }}><i className="fa-solid fa-check" style={{ fontSize: '0.7rem', marginRight: '8px', color: 'var(--accent-primary)' }}></i> Every check-in is a signal. Every purchase is a vote. Make yours count permanently.</li>
+                        <li style={{ marginBottom: '0.4rem' }}><i className="fa-solid fa-check" style={{ fontSize: '0.7rem', marginRight: '8px', color: 'var(--accent-primary)' }}></i> Collect Tokens of Empathy and rise through the Ambassador Journey.</li>
+                        <li style={{ marginBottom: '0.4rem' }}><i className="fa-solid fa-check" style={{ fontSize: '0.7rem', marginRight: '8px', color: 'var(--accent-primary)' }}></i> Prove that conviction-driven consumers are real — and growing.</li>
+                    </ul>
+                    <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none', width: '100%' }}>
+                        Create Free Account to Start Your Journey
+                    </button>
+                </div>
+            )}
+
             {/* Ambassador Redemption Section */}
-            {!currentUser?.isGuest && (
+            {!isGuest && currentUser && (
                 <div className="glass-card slide-up" style={{ marginBottom: '2rem', border: '1px solid var(--primary-light)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
                         <div style={{ background: 'var(--primary)', padding: '10px', borderRadius: '10px' }}>
@@ -103,44 +137,50 @@ const BadgeGallery = () => {
                     const status = userBadges[b.id];
                     return status === true || status?.unlocked === true;
                 }).length;
+                const isExpanded = expandedCats[catKey];
 
                 return (
-                    <div key={catKey} className="badge-category-section glass-card" style={{ marginBottom: '1.5rem', borderLeft: `3px solid ${catInfo.color}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', paddingBottom: '0.5rem', borderBottom: `2px solid ${catInfo.color}33` }}>
+                    <div key={catKey} className="badge-category-section glass-card" style={{ marginBottom: '1rem', borderLeft: `3px solid ${catInfo.color}`, padding: '0.75rem' }}>
+                        <div 
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+                            onClick={() => toggleCat(catKey)}
+                        >
                             <i className={`fa-solid ${catInfo.icon}`} style={{ color: catInfo.color, fontSize: '1.1rem' }}></i>
                             <div style={{ flex: 1 }}>
-                                <h4 style={{ margin: 0, fontSize: '1rem', color: catInfo.color }}>{catInfo.label}</h4>
-                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{catInfo.description}</p>
+                                <h4 style={{ margin: 0, fontSize: '0.9rem', color: catInfo.color }}>{catInfo.label}</h4>
+                                <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{isExpanded ? catInfo.description : `${unlockedInCat} / ${catBadges.length} Signals Captured`}</p>
                             </div>
-                            <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 600 }}>{unlockedInCat} / {catBadges.length}</span>
+                            <i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'}`} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.5 }}></i>
                         </div>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem' }}>
-                            {catBadges.map(b => {
-                                const badgeStatus = userBadges[b.id];
-                                const isUnlocked = badgeStatus === true || badgeStatus?.unlocked === true;
-                                const stateClass = isUnlocked ? 'unlocked' : 'locked';
-                                
-                                return (
-                                    <div 
-                                        key={b.id}
-                                        className={`badge-item ${stateClass}`} 
-                                        style={{ cursor: 'pointer', padding: '0.8rem 0.5rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}
-                                        onClick={() => setSelectedBadge(b)}
-                                    >
-                                        <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem', color: isUnlocked ? catInfo.color : 'var(--text-secondary)', opacity: isUnlocked ? 1 : 0.3 }}>
-                                            <i className={`fa-solid ${b.icon}`}></i>
+                        {isExpanded && (
+                            <div className="fade-in" style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem' }}>
+                                {catBadges.map(b => {
+                                    const badgeStatus = userBadges[b.id];
+                                    const isUnlocked = badgeStatus === true || badgeStatus?.unlocked === true;
+                                    const stateClass = isUnlocked ? 'unlocked' : 'locked';
+                                    
+                                    return (
+                                        <div 
+                                            key={b.id}
+                                            className={`badge-item ${stateClass}`} 
+                                            style={{ cursor: 'pointer', padding: '0.8rem 0.5rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedBadge(b); }}
+                                        >
+                                            <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem', color: isUnlocked ? catInfo.color : 'var(--text-secondary)', opacity: isUnlocked ? 1 : 0.3 }}>
+                                                <i className={`fa-solid ${b.icon}`}></i>
+                                            </div>
+                                            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffffff', opacity: isUnlocked ? 1 : 0.5 }}>{b.title}</div>
+                                            {b.tier && (
+                                                <span style={{ fontSize: '0.55rem', display: 'inline-block', marginTop: '0.2rem', padding: '0.1rem 0.4rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
+                                                    {b.tier}
+                                                </span>
+                                            )}
                                         </div>
-                                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffffff', opacity: isUnlocked ? 1 : 0.5 }}>{b.title}</div>
-                                        {b.tier && (
-                                            <span style={{ fontSize: '0.55rem', display: 'inline-block', marginTop: '0.2rem', padding: '0.1rem 0.4rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
-                                                {b.tier}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 );
             })}
@@ -174,6 +214,12 @@ const BadgeGallery = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {showAuthModal && (
+                <AuthModal 
+                    isOpen={showAuthModal} 
+                    onClose={() => setShowAuthModal(false)} 
+                />
             )}
         </div>
     );

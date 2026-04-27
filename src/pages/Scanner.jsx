@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TUTORIAL_STEPS } from '../utils/badgeLogic';
 import firebase from 'firebase/compat/app';
 import MilestoneCelebration, { SUPPORT_MILESTONES, PURCHASE_MILESTONES, DISCOVERY_MILESTONES } from '../components/MilestoneCelebration';
+import { updateLocalStatsBuffer } from '../utils/impactEngine';
 
 const Scanner = () => {
     const navigate = useNavigate();
@@ -143,9 +144,8 @@ const Scanner = () => {
 
 
     const updateLocalStats = (type, amount = 0) => {
-        // 1. Update Personal Stats
         const personalSaved = localStorage.getItem('bfg_personal_stats');
-        let pStats = {
+        let currentStats = {
             totalCheckins: 0, totalPurchases: 0, totalWaste: 0, totalTrees: 0, totalFamilies: 0,
             uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {},
             lastCheckin: null, attendanceDays: 0
@@ -153,23 +153,18 @@ const Scanner = () => {
 
         try {
             if (personalSaved) {
-                const parsed = JSON.parse(personalSaved);
-                pStats = { ...pStats, ...parsed };
+                currentStats = { ...currentStats, ...JSON.parse(personalSaved) };
             }
         } catch (e) {
             console.warn("Scanner: Personal stats cache corrupt, resetting local buffer");
         }
 
-        // Ensure structure exists for legacy data
-        if (!pStats.uniqueBizIds) pStats.uniqueBizIds = {};
+        const pStats = updateLocalStatsBuffer(currentStats, type, scannedBusiness, amount);
 
+        // Milestone Checks (Kept in UI component for state triggers)
         if (scannedBusiness) {
-            const isNewBiz = !pStats.uniqueBizIds[scannedBusiness.id];
+            const isNewBiz = !currentStats.uniqueBizIds[scannedBusiness.id];
             if (isNewBiz) {
-                pStats.uniqueBizIds[scannedBusiness.id] = true;
-                pStats.totalFamilies = (pStats.totalFamilies || 0) + (parseInt(scannedBusiness.impactJobs) || 0);
-
-                // Check for discovery milestone
                 const discoveryCount = Object.keys(pStats.uniqueBizIds).length;
                 if (DISCOVERY_MILESTONES.some(m => m.count === discoveryCount)) {
                     setActiveMilestone({ count: discoveryCount, type: 'discovery' });
@@ -177,51 +172,13 @@ const Scanner = () => {
             }
 
             if (type === 'checkin') {
-                pStats.totalCheckins = (pStats.totalCheckins || 0) + 1;
-                // Check for support milestone
-                const newCount = pStats.totalCheckins;
-                if (SUPPORT_MILESTONES.some(m => m.count === newCount)) {
-                    setActiveMilestone({ count: newCount, type: 'support' });
+                if (SUPPORT_MILESTONES.some(m => m.count === pStats.totalCheckins)) {
+                    setActiveMilestone({ count: pStats.totalCheckins, type: 'support' });
                 }
             } else if (type === 'purchase') {
-                pStats.totalPurchases = (pStats.totalPurchases || 0) + 1;
-
-                // Check for purchase milestone
-                const purchaseCount = pStats.totalPurchases;
-                if (PURCHASE_MILESTONES.some(m => m.count === purchaseCount)) {
-                    setActiveMilestone({ count: purchaseCount, type: 'purchase' });
+                if (PURCHASE_MILESTONES.some(m => m.count === pStats.totalPurchases)) {
+                    setActiveMilestone({ count: pStats.totalPurchases, type: 'purchase' });
                 }
-
-                // Calculate incremental impact if business data is available
-                if (scannedBusiness.yearlyAssessments) {
-                    let latestRev = 0; let latestWaste = 0; let latestTrees = 0;
-                    const assessments = Array.isArray(scannedBusiness.yearlyAssessments)
-                        ? scannedBusiness.yearlyAssessments : Object.values(scannedBusiness.yearlyAssessments);
-
-                    assessments.forEach(ya => {
-                        const rev = parseFloat(ya.revenue?.toString().replace(/,/g, '')) || 0;
-                        if (rev > latestRev) {
-                            latestRev = rev;
-                            latestWaste = parseFloat(ya.wasteKg?.toString().replace(/,/g, '')) || 0;
-                            latestTrees = parseFloat(ya.treesPlanted?.toString().replace(/,/g, '')) || 0;
-                        }
-                    });
-
-                    if (latestRev > 0) {
-                        const proportion = (parseFloat(amount) || 0) / latestRev;
-                        pStats.totalWaste = (pStats.totalWaste || 0) + (proportion * latestWaste);
-                        pStats.totalTrees = (pStats.totalTrees || 0) + (proportion * latestTrees);
-                    }
-                }
-            }
-
-            if (scannedBusiness.location) {
-                pStats.uniqueLocations = pStats.uniqueLocations || {};
-                pStats.uniqueLocations[scannedBusiness.location] = true;
-            }
-            if (scannedBusiness.industry) {
-                pStats.uniqueIndustries = pStats.uniqueIndustries || {};
-                pStats.uniqueIndustries[scannedBusiness.industry] = true;
             }
         }
         localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
@@ -229,10 +186,20 @@ const Scanner = () => {
         // 2. Update Global Stats (Estimated)
         const globalSaved = localStorage.getItem('bfg_global_stats');
         if (globalSaved) {
-            let gStats = JSON.parse(globalSaved);
-            if (type === 'checkin') gStats.checkins++;
-            if (type === 'purchase') gStats.purchases++;
-            localStorage.setItem('bfg_global_stats', JSON.stringify(gStats));
+            try {
+                let gStats = JSON.parse(globalSaved);
+                if (type === 'checkin') gStats.checkins++;
+                if (type === 'purchase') gStats.purchases++;
+                localStorage.setItem('bfg_global_stats', JSON.stringify(gStats));
+            } catch (e) {}
+        }
+
+        // 3. Update Last Checkins for Sentinel (Frontend Spam Prevention)
+        if (type === 'checkin' && scannedBusiness) {
+            const today = new Date().toISOString().split('T')[0];
+            if (!pStats.lastCheckins) pStats.lastCheckins = {};
+            pStats.lastCheckins[scannedBusiness.id] = today;
+            localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
         }
     };
 
@@ -282,14 +249,37 @@ const Scanner = () => {
 
         // 1. Handle Ghost Check-in (Anonymous)
         if (!currentUser) {
+            // Guest Sentinel Check (Frontend optimization)
+            const today = new Date().toISOString().split('T')[0];
+            const personalSaved = localStorage.getItem('bfg_personal_stats');
+            let pStats = {};
+            try { if (personalSaved) pStats = JSON.parse(personalSaved); } catch (e) {}
+            
+            if (pStats.lastCheckins?.[scannedBusiness.id] === today) {
+                alert("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
+                setScannedBusiness(null);
+                setScanning(true);
+                setIsSubmitting(false);
+                return;
+            }
+
             try {
                 const ghostCheckin = firebase.functions().httpsCallable('ghostcheckin');
                 const result = await ghostCheckin({ bizId: scannedBusiness.id, ghostId });
 
                 if (result.data.success) {
                     setIsSuccess(true);
-                    setSuccessMsg("Ghost Check-in successful! Your anonymous support has been recorded.");
+                    setSuccessMsg("Movement Signal Sent! Your anonymous support strengthens the network's momentum.");
+                    
+                    // Optimistic UI & Feed
                     updateLocalStats('checkin');
+                    addLocalActivity(`📍 Guest Supporter checked-in at ${scannedBusiness.name}`);
+
+                    const { evaluateBadges } = await import('../utils/badgeLogic');
+                    const newBadges = await evaluateBadges(null);
+                    if (newBadges && newBadges.length > 0) {
+                        setSuccessMsg(prev => `${prev}\n\n🏆 Discovery Noted: You would have unlocked: ${newBadges.join(', ')}! Accept the invitation to claim them.`);
+                    }
                 } else {
                     alert(result.data.message || "Could not record acknowledgment.");
                 }
@@ -302,6 +292,7 @@ const Scanner = () => {
             }
             return;
         }
+
 
         // 2. Handle Member Check-in
         const today = new Date().toISOString().split('T')[0];
@@ -356,16 +347,20 @@ const Scanner = () => {
             setIsSuccess(true);
             setSuccessMsg("You just chose conviction over convenience. That matters.");
             updateLocalStats('checkin');
+            const bizName = scannedBusiness.name;
             setScannedBusiness(null);
 
             // Inject local activity for instant newsreel feedback
             addLocalActivity(currentUser?.nickname || currentUser?.name
-                ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${scannedBusiness.name}`
-                : `📍 A guest checked-in at ${scannedBusiness.name}`
+                ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${bizName}`
+                : `📍 A guest checked-in at ${bizName}`
             );
 
-            const { evaluateBadges } = await import('../utils/badgeEngine');
-            await evaluateBadges(currentUser);
+            const { evaluateBadges } = await import('../utils/badgeLogic');
+            const newBadges = await evaluateBadges(currentUser);
+            if (newBadges && newBadges.length > 0) {
+                setSuccessMsg(prev => `${prev}\n\n🏆 New Token of Empathy Unlocked: ${newBadges.join(', ')}! Visit your profile to see it.`);
+            }
         } catch (e) {
             console.error(e);
             alert("Network Error: Could not log activity.");
@@ -399,44 +394,63 @@ const Scanner = () => {
         try {
             const isGhost = !currentUser;
 
-            await db.collection('transactions').add({
-                type: 'purchase',
-                bizId: scannedBusiness.id,
-                bizName: scannedBusiness.name,
-                bizIndustry: scannedBusiness.industry || 'Unknown',
-                bizLocation: scannedBusiness.location || 'Unknown',
-                userId: activeUserId,
-                userNickname: currentUser ? (currentUser.nickname || currentUser.name || 'Explorer') : 'Guest Supporter',
-                isGhost: isGhost,
-                amount: finalAmount,
-                receiptId: receiptId, // Mandatory
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending'
-            });
+            if (isGhost) {
+                const ghostPurchase = firebase.functions().httpsCallable('ghostpurchase');
+                const result = await ghostPurchase({ 
+                    bizId: scannedBusiness.id, 
+                    ghostId, 
+                    amount: finalAmount, 
+                    receiptId 
+                });
 
-            setIsSuccess(true);
-            setSuccessMsg(isGhost
-                ? "Your support has been recorded. Thank you for choosing conviction over convenience."
-                : "Your purchase has been recorded. This is proof that for-good businesses can win."
-            );
+                if (result.data.success) {
+                    const bizName = scannedBusiness.name;
+                    setIsSuccess(true);
+                    setSuccessMsg("Your support has been recorded. Thank you for choosing conviction over convenience.");
+                    updateLocalStats('purchase', finalAmount);
+                    addLocalActivity(`💳 Guest Supporter supported ${bizName}`);
 
-            updateLocalStats('purchase', finalAmount);
+                    const { evaluateBadges } = await import('../utils/badgeLogic');
+                    const newBadges = await evaluateBadges(null);
+                    if (newBadges && newBadges.length > 0) {
+                        setSuccessMsg(prev => `${prev}\n\n🏆 Discovery Noted: You would have unlocked: ${newBadges.join(', ')}! Accept the invitation to claim them.`);
+                    }
+                } else {
+                    alert(result.data.message || "Failed to log purchase.");
+                }
+            } else {
+                await db.collection('transactions').add({
+                    type: 'purchase',
+                    bizId: scannedBusiness.id,
+                    bizName: scannedBusiness.name,
+                    bizIndustry: scannedBusiness.industry || 'Unknown',
+                    bizLocation: scannedBusiness.location || 'Unknown',
+                    userId: activeUserId,
+                    userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                    isGhost: false,
+                    amount: finalAmount,
+                    receiptId: receiptId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'pending'
+                });
+
+                const bizName = scannedBusiness.name;
+                setIsSuccess(true);
+                setSuccessMsg("Your purchase has been recorded. This is proof that for-good businesses can win.");
+                updateLocalStats('purchase', finalAmount);
+                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Explorer'} supported ${bizName}`);
+                
+                const { evaluateBadges } = await import('../utils/badgeLogic');
+                const newBadges = await evaluateBadges(currentUser);
+                if (newBadges && newBadges.length > 0) {
+                    setSuccessMsg(prev => `${prev}\n\n🏆 New Token of Empathy Unlocked: ${newBadges.join(', ')}! Visit your profile to see it.`);
+                }
+            }
+
             setScannedBusiness(null);
-
-            // Inject local activity for instant newsreel feedback
-            addLocalActivity(currentUser?.nickname || currentUser?.name
-                ? `💳 ${currentUser.nickname || currentUser.name} supported ${scannedBusiness.name}`
-                : `💳 A guest supported ${scannedBusiness.name}`
-            );
             setPurchaseForm(false);
             setAmount('');
             setReceiptId('');
-
-            // Only evaluate badges for registered users
-            if (currentUser) {
-                const { evaluateBadges } = await import('../utils/badgeEngine');
-                await evaluateBadges(currentUser);
-            }
         } catch (e) {
             console.error(e);
             alert("Failed to log purchase.");
@@ -444,6 +458,7 @@ const Scanner = () => {
             setIsSubmitting(false);
         }
     };
+
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
@@ -454,7 +469,7 @@ const Scanner = () => {
                         <i className="fa-solid fa-circle-check success-icon-animated"></i>
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>Your Support Is In.</h2>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', whiteSpace: 'pre-wrap' }}>
                         {successMsg || "You just chose conviction over convenience. That matters."}
                     </p>
 
@@ -468,12 +483,12 @@ const Scanner = () => {
                             textAlign: 'left'
                         }}>
                             <h4 style={{ color: '#ffb84d', margin: '0 0 0.8rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}>
-                                <i className="fa-solid fa-ghost"></i> Ghost Check-in Successful
+                                <i className="fa-solid fa-ghost"></i> {successMsg.toLowerCase().includes('purchase') || successMsg.toLowerCase().includes('recorded') ? 'Ghost Purchase Successful' : 'Ghost Check-in Successful'}
                             </h4>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
                                 Your support was recorded anonymously. Create an identity to make every future support count permanently.
                             </p>
-                            <button onClick={() => navigate('/settings')} className="btn btn-primary mt-3 feature-gradient" style={{ width: '100%', border: 'none', padding: '0.8rem' }}>
+                            <button onClick={() => navigate('/login')} className="btn btn-primary mt-3 feature-gradient" style={{ width: '100%', border: 'none', padding: '0.8rem' }}>
                                 Secure My Impact Permanently
                             </button>
                         </div>

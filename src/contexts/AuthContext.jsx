@@ -9,8 +9,17 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [currentClaims, setCurrentClaims] = useState({});
     const [loading, setLoading] = useState(true);
-    const [isGuest, setIsGuest] = useState(false);
+    const [isGuest, setIsGuest] = useState(() => localStorage.getItem('bfg_guest_mode') === 'true');
+    const [ghostId, setGhostId] = useState(() => localStorage.getItem('bfg_ghost_id'));
     const [isSyncing, setIsSyncing] = useState(false);
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [localActivities, setLocalActivities] = useState([]);
+
+    const addLocalActivity = (text) => {
+        const newAct = { text, timestamp: new Date(), type: 'local' };
+        setLocalActivities(prev => [newAct, ...prev].slice(0, 5));
+    };
+
 
     const syncRoles = async () => {
         setIsSyncing(true);
@@ -66,6 +75,32 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 localStorage.removeItem('bfg_guest_mode');
 
+                // Identity Handshake: Reclaim anonymous history
+                const storedGhostId = localStorage.getItem('bfg_ghost_id');
+                if (storedGhostId && !window._bfg_claiming) {
+                    window._bfg_claiming = true;
+                    console.log("🤝 AUTH: Reclaiming anonymous history for:", storedGhostId);
+                    
+                    functions.httpsCallable('claimghostactivity')({ ghostId: storedGhostId })
+                        .then((result) => {
+                            if (result.data?.success) {
+                                setGhostId(null);
+                                localStorage.removeItem('bfg_personal_stats');
+                                localStorage.removeItem('bfg_ghost_id');
+                                console.log("🤝 AUTH: Handshake success. Guest cache purged.");
+                            } else {
+                                console.warn("Handshake backend error:", result.data?.message);
+                            }
+                        })
+                        .catch(err => {
+                            console.warn("Handshake failed:", err);
+                        })
+                        .finally(() => {
+                            window._bfg_claiming = false;
+                        });
+                }
+
+
                 try {
                     const tokenResult = await user.getIdTokenResult();
                     setCurrentClaims(tokenResult.claims);
@@ -99,6 +134,24 @@ export const AuthProvider = ({ children }) => {
                     unsubscribeDoc = docRef.onSnapshot(doc => {
                         if (doc.exists && doc.data().isProvisioned) {
                             const userData = doc.data();
+                            
+                            // SYNC: Update local storage scorecard with latest server data
+                            if (userData.checkins !== undefined || userData.purchases !== undefined) {
+                                const currentLocal = localStorage.getItem('bfg_personal_stats');
+                                let pStats = {};
+                                try { if (currentLocal) pStats = JSON.parse(currentLocal); } catch (e) {}
+
+                                const syncedStats = {
+                                    ...pStats,
+                                    totalCheckins: userData.checkins || 0,
+                                    totalPurchases: userData.purchases || 0,
+                                    // Note: Environmental impact fields (wasteKg, trees) aren't always in user doc, 
+                                    // but we preserve existing local ones if they aren't provided.
+                                    lastRefreshed: new Date().toISOString()
+                                };
+                                localStorage.setItem('bfg_personal_stats', JSON.stringify(syncedStats));
+                            }
+
                             setCurrentUser(prev => ({ 
                                 ...prev,
                                 ...userData,
@@ -118,21 +171,39 @@ export const AuthProvider = ({ children }) => {
             } else {
                 const guestMode = localStorage.getItem('bfg_guest_mode') === 'true';
                 setIsGuest(guestMode);
+                
+                if (guestMode && !localStorage.getItem('bfg_ghost_id')) {
+                    const newId = `GHOST_${window.crypto.randomUUID()}`;
+                    setGhostId(newId);
+                    localStorage.setItem('bfg_ghost_id', newId);
+                }
+
                 setCurrentUser(null);
                 setCurrentClaims({});
                 setLoading(false);
             }
         });
 
+        // Newsreel Pulse Subscription
+        const unsubscribePulse = db.collection('public_activity')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .onSnapshot(snap => {
+                setRecentActivity(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }, err => console.warn("Pulse stream failed:", err));
+
         return () => {
             unsubscribeAuth();
             if (unsubscribeDoc) unsubscribeDoc();
+            unsubscribePulse();
         };
+
     }, []);
 
     const logout = () => {
         setIsGuest(false);
         localStorage.removeItem('bfg_guest_mode');
+        // bfg_ghost_id and bfg_personal_stats are preserved for future claiming
         setCurrentUser(null);
         setCurrentClaims({});
         return auth.signOut();
@@ -141,7 +212,13 @@ export const AuthProvider = ({ children }) => {
     const continueAsGuest = () => {
         setIsGuest(true);
         localStorage.setItem('bfg_guest_mode', 'true');
+        if (!localStorage.getItem('bfg_ghost_id')) {
+            const newId = `GHOST_${window.crypto.randomUUID()}`;
+            setGhostId(newId);
+            localStorage.setItem('bfg_ghost_id', newId);
+        }
     };
+
 
     const sendPasswordReset = (email) => {
         return auth.sendPasswordResetEmail(email);
@@ -161,10 +238,13 @@ export const AuthProvider = ({ children }) => {
         continueAsGuest,
         sendPasswordReset,
         setLoading,
-        recentActivity: [],
-        localActivities: [],
+        ghostId,
+        recentActivity,
+        localActivities,
+        addLocalActivity,
         pendingApprovalCount: 0
     };
+
 
     return (
         <AuthContext.Provider value={value}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../services/firebase';
+import AuthModal from '../auth/AuthModal';
 
 const Newsreel = () => {
     const { currentUser, isGuest, logout, recentActivity, localActivities, pendingApprovalCount } = useAuth();
@@ -9,6 +10,7 @@ const Newsreel = () => {
     
     const [index, setIndex] = useState(0);
     const [announcements, setAnnouncements] = useState([]);
+    const [showAuthModal, setShowAuthModal] = useState(false);
 
     useEffect(() => {
         let unsubscribe = null;
@@ -75,7 +77,7 @@ const Newsreel = () => {
             queue.push({
                 text: "🔍 Exploring Mode: Join the Network to earn status & privileges.",
                 type: 'guest',
-                action: () => logout() // Legacy exit guest mode
+                action: () => setShowAuthModal(true)
             });
         } else if (currentUser?.name === 'Explorer') {
             queue.push({
@@ -124,15 +126,18 @@ const Newsreel = () => {
     const current = queue[index % queue.length];
 
     return (
-        <div 
-            className={`newsreel ${current?.type === 'alert' ? 'alert-mode' : ''}`}
-            style={{ cursor: current?.action ? 'pointer' : 'default' }}
-            onClick={() => current?.action && current.action()}
-        >
-            <div className="newsreel-scroll">
-                {current?.text}
+        <>
+            <div 
+                className={`newsreel ${current?.type === 'alert' ? 'alert-mode' : ''}`}
+                style={{ cursor: current?.action ? 'pointer' : 'default' }}
+                onClick={() => current?.action && current.action()}
+            >
+                <div className="newsreel-scroll">
+                    {current?.text}
+                </div>
             </div>
-        </div>
+            {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+        </>
     );
 };
 

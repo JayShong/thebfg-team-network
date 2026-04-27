@@ -1427,3 +1427,11 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
     border-radius: 2px;
     animation: confettiBurst 1.5s ease-out forwards;
 }
+
+/* Success Animations */
+@keyframes ripple { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 100% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); } }
+.success-ripple { border-radius: 50%; animation: ripple 2s infinite; }
+@keyframes scaleIn { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+.success-icon-animated { animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.slide-up { animation: slideUp 0.4s ease-out forwards; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

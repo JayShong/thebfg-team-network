@@ -39,12 +39,16 @@ const Initiatives = () => {
 
             if (!snapshot.empty) {
                 const newInitiatives = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setInitiatives(prev => [...prev, ...newInitiatives]);
-                setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+                
+                setInitiatives(prev => {
+                    // Filter out duplicates to prevent key warnings
+                    const existingIds = new Set(prev.map(i => i.id));
+                    const uniqueNew = newInitiatives.filter(i => !existingIds.has(i.id));
+                    return [...prev, ...uniqueNew];
+                });
 
-                if (snapshot.docs.length < PAGE_SIZE) {
-                    setHasMore(false);
-                }
+                setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+                if (snapshot.docs.length < PAGE_SIZE) setHasMore(false);
             } else {
                 setHasMore(false);
             }

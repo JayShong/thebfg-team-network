@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { evaluateTier, CURRENT_SEASON, BADGE_CATEGORIES } from '../../utils/badgeLogic';
+import { evaluateTier, CURRENT_SEASON, BADGE_CATEGORIES, getGuestBadges } from '../../utils/badgeLogic';
+import { useAuth } from '../../contexts/AuthContext';
 
 const JOURNEY_STEPS = [
     { name: 'Scout', icon: 'fa-binoculars', color: 'var(--accent-primary)' },
@@ -9,7 +10,25 @@ const JOURNEY_STEPS = [
 ];
 
 const TierShowcase = ({ currentUser }) => {
-    const userBadges = currentUser?.badges || {};
+    const { isGuest } = useAuth();
+    
+    // For Guests, we simulate badges based on localStorage impact to show a "Teaser Tier"
+    const getBadgesToEvaluate = () => {
+        if (!isGuest) return currentUser?.badges || {};
+        
+        try {
+            const saved = localStorage.getItem('bfg_personal_stats');
+            if (saved) {
+                const stats = JSON.parse(saved);
+                return getGuestBadges(stats);
+            }
+        } catch (e) {
+            console.warn("Failed to parse guest stats for tier evaluation", e);
+        }
+        return {};
+    };
+
+    const userBadges = getBadgesToEvaluate();
     const tierInfo = evaluateTier(userBadges);
 
     const currentStepIdx = Math.max(0, JOURNEY_STEPS.findIndex(s => s.name === tierInfo.name));

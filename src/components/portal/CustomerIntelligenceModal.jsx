@@ -90,8 +90,14 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                                         <div style={{ background: 'linear-gradient(135deg, #ffb84d, #ef6c00)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', boxShadow: '0 8px 20px rgba(239,108,0,0.4)', border: '4px solid rgba(255,255,255,0.1)' }}>
                                             <i className="fa-solid fa-user-check" style={{ color: '#fff', fontSize: '2.2rem' }}></i>
                                         </div>
-                                        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>{d.nickname}</h2>
-                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Loyal Supporter recognized by your business</p>
+                                        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>
+                                            {d.nickname}
+                                        </h2>
+                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                            {d.nickname === 'Guest Supporter' ? 'Temporary session until they Accept the Invitation' : 'Loyal Supporter recognized by your business'}
+                                        </p>
+
+
                                     </div>
 
                                     <div className="loyalty-stats-grid">

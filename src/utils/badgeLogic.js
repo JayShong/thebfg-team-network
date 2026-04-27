@@ -44,6 +44,7 @@ const SECTOR_MAP = {
 const PRESENCE_TITLES = ['Curiosity', 'Patron', 'Visionary', 'Cultural Custodian'];
 const FINANCIAL_TITLES = ['Ally', 'Benefactor', 'Creative Catalyst', 'Economic Pillar'];
 
+const JOURNEY_LEVELS = [1, 3, 7, 15];
 const GENERATED_BADGES = [];
 
 // 1. Generate Presence Journeys (Seen)
@@ -53,7 +54,8 @@ Object.entries(SECTOR_MAP).forEach(([sector, icon]) => {
             id: `journey_seen_${sector.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${index}`,
             title, sector, category: 'Seen', icon,
             why: `Stage ${index + 1} of your ${sector} presence journey. Your consistent visits make these founders visible.`,
-            how: `Visit a variable percentage of ${sector} businesses to unlock.`
+            how: `Visit ${JOURNEY_LEVELS[index]}+ businesses in this sector to unlock.`,
+            condition: (u, stats) => Object.keys(stats.sectorMetrics?.[sector]?.seen || {}).length >= JOURNEY_LEVELS[index]
         });
     });
 });
@@ -65,7 +67,8 @@ Object.entries(SECTOR_MAP).forEach(([sector, icon]) => {
             id: `journey_valued_${sector.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${index}`,
             title, sector, category: 'Valued', icon,
             why: `Stage ${index + 1} of your ${sector} financial journey. Your verified purchases directly sustain this industry.`,
-            how: `Complete verified purchases at a variable percentage of ${sector} businesses.`
+            how: `Complete verified purchases at ${JOURNEY_LEVELS[index]}+ businesses in this sector.`,
+            condition: (u, stats) => Object.keys(stats.sectorMetrics?.[sector]?.valued || {}).length >= JOURNEY_LEVELS[index]
         });
     });
 });
@@ -78,7 +81,8 @@ const UNIVERSAL = [
         category: 'Verified',
         icon: 'fa-shield-heart',
         why: 'Recognition of your commitment to officially verified impact businesses across the entire network.',
-        how: 'Support verified businesses across the platform.'
+        how: 'Support verified businesses across the platform.',
+        condition: (u, stats, index) => (stats.totalCheckins || 0) >= JOURNEY_LEVELS[index]
     },
     {
         id: 'journey_ambassador',
@@ -86,7 +90,8 @@ const UNIVERSAL = [
         category: 'Seen',
         icon: 'fa-handshake-angle',
         why: 'Rewarding your advocacy. You are not just a participant; you are an architect of the network.',
-        how: 'Onboard new businesses by persuading owners and claiming the secret code.'
+        how: 'Onboard new businesses by persuading owners and claiming the secret code.',
+        condition: (u, stats, index) => (u?.onboardedCount || 0) >= JOURNEY_LEVELS[index]
     }
 ];
 
@@ -95,7 +100,8 @@ UNIVERSAL.forEach(j => {
         GENERATED_BADGES.push({
             id: `${j.id}_${index}`,
             title, category: j.category, icon: j.icon,
-            why: j.why, how: j.how
+            why: j.why, how: j.how,
+            condition: (u, stats) => j.condition(u, stats, index)
         });
     });
 });
@@ -105,14 +111,98 @@ export const BADGES_CONFIG = [
     {
         id: 'impact_carbon_crusader', title: 'Carbon Crusader', category: 'Verified', icon: 'fa-cloud-arrow-down',
         why: 'The network has verified your contribution to carbon removal.',
-        how: 'Offset 10+ trees through verified purchases.'
+        how: 'Offset 1+ trees through verified purchases.',
+        condition: (u, stats) => (stats.totalTrees || 0) >= 1
     },
     {
         id: 'impact_waste_warrior', title: 'Waste Warrior', category: 'Verified', icon: 'fa-trash-arrow-up',
         why: 'The network has verified your contribution to waste diversion.',
-        how: 'Divert 50kg+ of waste through verified purchases.'
+        how: 'Divert 1kg+ of waste through verified purchases.',
+        condition: (u, stats) => (stats.totalWaste || 0) >= 1
+    },
+    // Legacy / Status Badges
+    { 
+        id: 'seen_night_owl', title: 'Night Owl', category: 'Seen', icon: 'fa-moon',
+        why: 'Supporting businesses during the late hours.', how: 'Visit a business after 8 PM.',
+        condition: () => new Date().getHours() >= 20 
+    },
+    { 
+        id: 'seen_early_bird', title: 'Early Bird', category: 'Seen', icon: 'fa-sun',
+        why: 'Supporting businesses during the early hours.', how: 'Visit a business before 9 AM.',
+        condition: () => new Date().getHours() < 9 
+    },
+    { 
+        id: 'valued_monday_motivator', title: 'Monday Motivator', category: 'Valued', icon: 'fa-coffee',
+        why: 'Kickstarting the week with conviction.', how: 'Log a purchase on a Monday.',
+        condition: () => new Date().getDay() === 1 
+    },
+    { 
+        id: 'valued_weekend', title: 'Weekend Philanthropist', category: 'Valued', icon: 'fa-glass-cheers',
+        why: 'Making your leisure count.', how: 'Log a purchase on a Saturday or Sunday.',
+        condition: () => [0, 6].includes(new Date().getDay()) 
     }
 ];
+
+/**
+ * Client-side badge evaluation for INSTANT UX feedback.
+ * Uses localStorage to avoid expensive Firestore reads.
+ */
+export const evaluateBadges = async (user) => {
+    // If no user, we are in Guest Mode. We still evaluate for 0ms feedback/teasers.
+    try {
+        const saved = localStorage.getItem('bfg_personal_stats');
+        if (!saved) return [];
+
+        const stats = JSON.parse(saved);
+        const currentBadges = user?.badges || {};
+        const newlyUnlocked = [];
+
+        BADGES_CONFIG.forEach(badge => {
+            if (badge.condition) {
+                // If the user doesn't have it yet and they meet the criteria based on local stats
+                if (!currentBadges[badge.id] && badge.condition(user, stats)) {
+                    newlyUnlocked.push(badge.title);
+                }
+            }
+        });
+
+        return newlyUnlocked;
+
+    } catch (e) {
+        console.error("Local badge evaluation failed:", e);
+    }
+    return [];
+};
+
+/**
+ * Helper to simulate badges for guests based on their session impact (localStorage)
+ * This allows the Ghost Teaser Tier architecture to function correctly.
+ */
+export const getGuestBadges = (stats = {}) => {
+    const badges = {};
+    const supports = stats.totalCheckins || 0;
+    const purchases = stats.totalPurchases || 0;
+    const uniqueIndustries = stats.uniqueIndustries || {};
+
+    // 1. Universal Journeys (Teaser)
+    if (supports >= 1) badges['journey_verified_universal_0'] = true;
+    if (supports >= 5) badges['journey_verified_universal_1'] = true;
+    if (supports >= 10) badges['journey_verified_universal_2'] = true;
+    
+    // 2. Impact Badges (Teaser)
+    if (purchases >= 1) badges['impact_carbon_crusader'] = true; 
+    if (purchases >= 3) badges['impact_waste_warrior'] = true;
+
+    // 3. Sector-Specific Journeys (Dynamic Teaser)
+    Object.keys(uniqueIndustries).forEach(sector => {
+        const sectorBadge = BADGES_CONFIG.find(b => b.sector === sector && b.category === 'Seen' && b.title === 'Curiosity');
+        if (sectorBadge) {
+            badges[sectorBadge.id] = true;
+        }
+    });
+
+    return badges;
+};
 
 /**
  * Privilege Tiers — Ambassador Journey Naming Convention

@@ -2,19 +2,33 @@ import React, { useState } from 'react';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import firebase from 'firebase/compat/app';
+import { updateLocalStatsBuffer } from '../../utils/impactEngine';
 
 const ReceiptLogger = ({ businesses }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGuest, ghostId, addLocalActivity } = useAuth();
     const [bizId, setBizId] = useState('');
     const [receipt, setReceipt] = useState('');
     const [amount, setAmount] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
 
+    const updateLocalStats = (type, amt = 0) => {
+        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        let currentStats = { totalCheckins: 0, totalPurchases: 0 };
+        try {
+            if (personalSaved) currentStats = JSON.parse(personalSaved);
+        } catch (e) {}
+
+        const business = (businesses || []).find(b => b.id === bizId);
+        const pStats = updateLocalStatsBuffer(currentStats, type, business, amt);
+        
+        localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!currentUser) return;
+        if (!currentUser && !isGuest) return;
         if (!bizId || !receipt || !amount) {
             setMessage({ text: 'Please fill out all fields.', type: 'error' });
             return;
@@ -24,18 +38,43 @@ const ReceiptLogger = ({ businesses }) => {
         setMessage({ text: '', type: '' });
 
         try {
-            await db.collection('transactions').add({
-                type: 'purchase',
-                bizId: bizId,
-                userId: currentUser.uid,
-                userNickname: currentUser.name || 'Anonymous',
-                receipt: receipt,
-                amount: parseFloat(amount),
-                status: 'pending',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            const bizName = (businesses || []).find(b => b.id === bizId)?.name || 'Unknown Business';
 
-            setMessage({ text: 'Purchase logged successfully! Awaiting verification.', type: 'success' });
+            if (isGuest) {
+                const ghostPurchase = firebase.functions().httpsCallable('ghostpurchase');
+                const result = await ghostPurchase({ 
+                    bizId, 
+                    ghostId, 
+                    amount: parseFloat(amount), 
+                    receiptId: receipt 
+                });
+
+                if (result.data.success) {
+                    setMessage({ text: 'Ghost Purchase logged! Accept the Invitation to claim your status.', type: 'success' });
+                    updateLocalStats('purchase', parseFloat(amount));
+                    addLocalActivity(`💳 Guest Supporter supported ${bizName}`);
+                } else {
+                    setMessage({ text: result.data.message || 'Failed to log purchase.', type: 'error' });
+                }
+            } else {
+                await db.collection('transactions').add({
+                    type: 'purchase',
+                    bizId: bizId,
+                    bizName: bizName,
+                    userId: currentUser.uid,
+                    userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                    isGhost: false,
+                    receiptId: receipt,
+                    amount: parseFloat(amount),
+                    status: 'pending',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                setMessage({ text: 'Purchase logged successfully! Awaiting verification.', type: 'success' });
+                updateLocalStats('purchase', parseFloat(amount));
+                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Explorer'} supported ${bizName}`);
+            }
+
             setBizId('');
             setReceipt('');
             setAmount('');

@@ -17,7 +17,8 @@ const BusinessCard = ({ business }) => {
                     .get();
                 setRecommendCount(snap.size);
             } catch (e) {
-                console.warn("Card recommendation fetch failed", e);
+                // Graceful fallback for public cards
+                setRecommendCount(0);
             }
         };
         fetchRecommendations();

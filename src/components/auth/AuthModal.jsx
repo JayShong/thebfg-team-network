@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -33,14 +34,33 @@ const AuthModal = ({ onClose }) => {
         }
     };
 
-    return (
-        <div className="modal" style={{ display: 'flex', zIndex: 2000 }}>
-            <div className="modal-content glass-card slide-up" style={{ padding: '2rem', border: '1px solid var(--glass-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+    const modalRoot = document.getElementById('root') || document.body;
+
+    return ReactDOM.createPortal(
+        <div className="modal" style={{ 
+            display: 'flex', 
+            zIndex: 4000, 
+            position: 'fixed', 
+            top: 0, left: 0, right: 0, bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(15, 23, 42, 0.9)',
+            backdropFilter: 'blur(8px)',
+            padding: '1.5rem'
+        }}>
+            <div className="modal-content glass-card" style={{ 
+                padding: '2rem', 
+                border: '1px solid var(--glass-border)', 
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                width: '90%',
+                maxWidth: '400px',
+                position: 'relative'
+            }}>
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
                     <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', margin: 0 }}>
                         <i className="fa-solid fa-leaf text-gradient"></i> Conviction Gateway
                     </h2>
-                    <button onClick={onClose} className="icon-btn" style={{ background: 'none', border: 'none', fontSize: '1.25rem' }}>
+                    <button onClick={() => { onClose(); navigate('/'); }} className="icon-btn" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '0.5rem' }}>
                         <i className="fa-solid fa-times"></i>
                     </button>
                 </div>
@@ -104,15 +124,50 @@ const AuthModal = ({ onClose }) => {
                             type="button" 
                             onClick={() => setIsSignUp(!isSignUp)} 
                             style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer', textDecoration: 'none' }}
-                            onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                            onMouseOut={(e) => e.target.style.textDecoration = 'none'}
                         >
                             {isSignUp ? 'Log in here' : 'Register your profile'}
                         </button>
+
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed var(--glass-border)' }}>
+                            <button 
+                                type="button"
+                                onClick={() => { onClose(); navigate('/'); }}
+                                className="guest-cta"
+                                style={{ 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    border: '1px solid rgba(255,255,255,0.1)', 
+                                    color: 'var(--text-secondary)', 
+                                    padding: '0.85rem 1rem', 
+                                    borderRadius: '12px', 
+                                    fontSize: '0.85rem', 
+                                    width: '100%',
+                                    cursor: 'pointer',
+                                    fontWeight: '700',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                }}
+                            >
+                                <i className="fa-solid fa-ghost"></i> Continue exploring as Guest
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        modalRoot
     );
 };
 

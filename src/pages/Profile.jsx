@@ -18,7 +18,7 @@ const Profile = () => {
     const [showAuthModal, setShowAuthModal] = useState(false);
 
     // Detect if current user is an owner of any business
-    const ownedBusinesses = businesses.filter(b => b.ownerEmail === currentUser?.email);
+    const ownedBusinesses = (businesses || []).filter(b => b.ownerEmail === currentUser?.email);
     const isOwner = ownedBusinesses.length > 0;
 
     const userTier = evaluateTier(currentUser?.badges || {});
@@ -31,18 +31,18 @@ const Profile = () => {
     const [showAppEditor, setShowAppEditor] = useState(false);
     const [isSavingApp, setIsSavingApp] = useState(false);
 
-    // Read total supports from localStorage for milestone gallery
-    const getUserSupports = () => {
+    // Read stats from localStorage for guest view
+    const getLocalStats = () => {
         try {
             const saved = localStorage.getItem('bfg_personal_stats');
             if (saved) {
-                const parsed = JSON.parse(saved);
-                return parsed.totalCheckins || 0;
+                return JSON.parse(saved);
             }
         } catch (e) { }
-        return 0;
+        return { totalCheckins: 0, totalPurchases: 0 };
     };
-    const totalSupports = getUserSupports();
+    const localStats = getLocalStats();
+    const totalSupports = currentUser ? (currentUser.checkins || 0) : (localStats.totalCheckins || 0);
 
     useEffect(() => {
         if (!currentUser?.uid) return;
@@ -163,11 +163,13 @@ const Profile = () => {
     }
 
     const displayUser = currentUser || {
-        name: 'Guest Explorer',
+        name: 'Guest Supporter',
+        nickname: 'Guest Supporter',
         email: 'Limited Access Mode',
-        id: 'GUEST-MODE',
-        checkins: 0,
-        purchases: 0,
+        id: 'Guest Supporter',
+        checkins: localStats.totalCheckins || 0,
+        purchases: localStats.totalPurchases || 0,
+        badges: {},
         isGuest: true
     };
 
@@ -213,7 +215,7 @@ const Profile = () => {
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>
                         {displayUser.nickname || displayUser.name || 'Explorer'}
                     </h3>
-                    
+
                     {currentUser && !currentUser.isProvisioned && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center', color: 'var(--accent-primary)', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
                             <i className="fa-solid fa-spinner fa-spin"></i>
@@ -259,13 +261,13 @@ const Profile = () => {
                         )}
                         {displayUser.isGuest && (
                             <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
-                                <i className="fa-solid fa-ghost"></i> Guest Explorer
+                                <i className="fa-solid fa-ghost"></i> Guest Supporter
                             </span>
                         )}
                     </div>
 
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{displayUser.email}</p>
-                    <p className="user-id">ID: <span>{displayUser.uid ? displayUser.uid.substring(0, 10).toUpperCase() : displayUser.id}</span></p>
+                    <p className="user-id">ID: <span>{displayUser.isGuest ? 'Guest Supporter' : (displayUser.uid ? displayUser.uid.substring(0, 10).toUpperCase() : displayUser.id)}</span></p>
 
                     {/* Empathy Profile Tags */}
                     {!displayUser.isGuest && (
@@ -317,17 +319,17 @@ const Profile = () => {
 
                 <div className="badge-footer">
                     {displayUser.isGuest ? (
-                        <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'left' }}>
-                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-envelope-open-text"></i> Why Accept the Invitation?</h4>
+                        <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'left' }}>
+                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}><i className="fa-solid fa-envelope-open-text"></i> Accept The Invitation</h4>
                             <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.5' }}>
                                 <li style={{ marginBottom: '0.4rem' }}>Every check-in is a signal. Every purchase is a vote. Make yours count permanently.</li>
                                 <li style={{ marginBottom: '0.4rem' }}>Collect Tokens of Empathy and rise through the Ambassador Journey.</li>
                                 <li style={{ marginBottom: '0.4rem' }}>Prove that conviction-driven consumers are real — and growing.</li>
-
                             </ul>
-                            <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none' }}>
-                                Create Free Account
+                            <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none', width: '100%' }}>
+                                Accept The Invitation
                             </button>
+                            {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
                         </div>
                     ) : (
                         <>
@@ -362,16 +364,16 @@ const Profile = () => {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {userApplication ? (
-                                    <button 
-                                        onClick={() => setShowAppEditor(true)} 
-                                        className="btn btn-secondary" 
+                                    <button
+                                        onClick={() => setShowAppEditor(true)}
+                                        className="btn btn-secondary"
                                         style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}
                                     >
                                         <i className={`fa-solid ${userApplication.status === 'approved' ? 'fa-box-archive' : 'fa-pen-nib'}`}></i>
                                         {userApplication.status === 'approved' ? ' View Application (Onboarded)' : ' Refine Application Form'}
                                     </button>
                                 ) : (
-                                    <button 
+                                    <button
                                         onClick={handleCreateApplication}
                                         className="btn btn-primary feature-gradient"
                                         style={{ border: 'none' }}
@@ -414,80 +416,83 @@ const Profile = () => {
                 </div>
             </div>
 
-            {/* Milestone Gallery */}
-            {!displayUser.isGuest && (
-                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.05s' }}>
-                    <h3 style={{ marginBottom: '0.5rem' }}>
-                        <i className="fa-solid fa-star" style={{ color: '#F59E0B' }}></i> Your Milestones
-                    </h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                        {totalSupports > 0
+            {/* Milestone Gallery (Teaser for Guests) */}
+            <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.05s' }}>
+                <h3 style={{ marginBottom: '0.5rem' }}>
+                    <i className="fa-solid fa-star" style={{ color: '#F59E0B' }}></i> Your Milestones
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                    {displayUser.isGuest 
+                        ? 'Join the network to officially claim these milestones.'
+                        : (totalSupports > 0
                             ? `${totalSupports} supports and counting. Tap an unlocked milestone to relive the moment.`
-                            : 'Support a for-good business to unlock your first milestone.'
-                        }
-                    </p>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '0.75rem'
-                    }}>
-                        {SUPPORT_MILESTONES.map(m => {
-                            const isUnlocked = totalSupports >= m.count;
-                            return (
-                                <div
-                                    key={m.count}
-                                    onClick={() => isUnlocked && setReplayMilestone(m.count)}
-                                    style={{
-                                        background: isUnlocked
-                                            ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.12))'
-                                            : 'rgba(255,255,255,0.02)',
-                                        border: isUnlocked
-                                            ? '1px solid rgba(139, 92, 246, 0.3)'
-                                            : '1px dashed rgba(255,255,255,0.08)',
-                                        borderRadius: '14px',
-                                        padding: '1rem 0.5rem',
-                                        textAlign: 'center',
-                                        cursor: isUnlocked ? 'pointer' : 'default',
-                                        transition: 'all 0.2s ease',
-                                        opacity: isUnlocked ? 1 : 0.4,
-                                        position: 'relative',
-                                        overflow: 'hidden'
-                                    }}
-                                >
-                                    {isUnlocked && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '6px',
-                                            right: '6px',
-                                            fontSize: '0.55rem',
-                                            color: 'var(--accent-primary)',
-                                            opacity: 0.7
-                                        }}>
-                                            <i className="fa-solid fa-play"></i>
-                                        </div>
-                                    )}
+                            : 'Support a for-good business to unlock your first milestone.')
+                    }
+                </p>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '0.75rem'
+                }}>
+                    {SUPPORT_MILESTONES.map(m => {
+                        // Milestones are locked for guests as a teaser
+                        const isUnlocked = !displayUser.isGuest && totalSupports >= m.count;
+                        const isTeaserUnlocked = displayUser.isGuest && totalSupports >= m.count;
+                        
+                        return (
+                            <div
+                                key={m.count}
+                                onClick={() => isUnlocked && setReplayMilestone(m.count)}
+                                style={{
+                                    background: (isUnlocked || isTeaserUnlocked)
+                                        ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.12))'
+                                        : 'rgba(255,255,255,0.02)',
+                                    border: (isUnlocked || isTeaserUnlocked)
+                                        ? '1px solid rgba(139, 92, 246, 0.3)'
+                                        : '1px dashed rgba(255,255,255,0.08)',
+                                    borderRadius: '14px',
+                                    padding: '1rem 0.5rem',
+                                    textAlign: 'center',
+                                    cursor: isUnlocked ? 'pointer' : 'default',
+                                    transition: 'all 0.2s ease',
+                                    opacity: (isUnlocked || isTeaserUnlocked) ? 1 : 0.4,
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                {isUnlocked && (
                                     <div style={{
-                                        fontSize: isUnlocked ? '1.5rem' : '1.2rem',
-                                        fontWeight: '800',
-                                        color: isUnlocked ? '#fff' : 'rgba(255,255,255,0.3)',
-                                        marginBottom: '0.3rem'
+                                        position: 'absolute',
+                                        top: '6px',
+                                        right: '6px',
+                                        fontSize: '0.55rem',
+                                        color: 'var(--accent-primary)',
+                                        opacity: 0.7
                                     }}>
-                                        {isUnlocked ? m.count : '???'}
+                                        <i className="fa-solid fa-play"></i>
                                     </div>
-                                    <div style={{
-                                        fontSize: '0.6rem',
-                                        color: isUnlocked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '1px'
-                                    }}>
-                                        {isUnlocked ? 'Supports' : 'Locked'}
-                                    </div>
+                                )}
+                                <div style={{
+                                    fontSize: (isUnlocked || isTeaserUnlocked) ? '1.5rem' : '1.2rem',
+                                    fontWeight: '800',
+                                    color: (isUnlocked || isTeaserUnlocked) ? '#fff' : 'rgba(255,255,255,0.3)',
+                                    marginBottom: '0.3rem'
+                                }}>
+                                    {(isUnlocked || isTeaserUnlocked) ? m.count : '???'}
                                 </div>
-                            );
-                        })}
-                    </div>
+                                <div style={{
+                                    fontSize: '0.6rem',
+                                    color: (isUnlocked || isTeaserUnlocked) ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px'
+                                }}>
+                                    {(isUnlocked || isTeaserUnlocked) ? (displayUser.isGuest ? 'Earned' : 'Supports') : 'Locked'}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
 
             {/* Milestone Replay Overlay */}
             {replayMilestone && (
@@ -503,81 +508,80 @@ const Profile = () => {
                 />
             )}
 
-            {/* Purchase Logging Component */}
-            {!displayUser.isGuest && (
-                <>
-                    <div className="mt-4"><ReceiptLogger businesses={businesses} /></div>
+            {/* Purchase Logging Component (Visible to Guests) */}
+            <div className="mt-4"><ReceiptLogger businesses={businesses} /></div>
+            
+            {/* Activity History (Hidden for Guests) */}
+            {currentUser && (
+                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
+                    <h3 style={{ marginBottom: '1.2rem' }}><i className="fa-solid fa-history" style={{ color: 'var(--accent-secondary)' }}></i> Activity History</h3>
 
-                    <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
-                        <h3 style={{ marginBottom: '1.2rem' }}><i className="fa-solid fa-history" style={{ color: 'var(--accent-secondary)' }}></i> Activity History</h3>
+                    {historyLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1.5rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
+                    ) : history.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '1rem 0' }}>No activity recorded yet. Visit a business to start your journey!</p>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                            {history.map(item => {
+                                const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
+                                const bizName = item.bizName || 'Unknown Business';
+                                const isPurchase = item.type === 'purchase';
+                                const isPending = item.status === 'pending';
 
-                        {historyLoading ? (
-                            <div style={{ textAlign: 'center', padding: '1.5rem' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
-                        ) : history.length === 0 ? (
-                            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '1rem 0' }}>No activity recorded yet. Visit a business to start your journey!</p>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                                {history.map(item => {
-                                    const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
-                                    const bizName = item.bizName || 'Unknown Business';
-                                    const isPurchase = item.type === 'purchase';
-                                    const isPending = item.status === 'pending';
-
-                                    return (
-                                        <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-                                                    <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: isPurchase ? 'rgba(255,184,77,0.1)' : 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <i className={`fa-solid ${isPurchase ? 'fa-receipt' : 'fa-location-dot'}`} style={{ color: isPurchase ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{bizName}</div>
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{date.toLocaleDateString()} • {isPurchase ? 'Purchase' : 'Check-in'}</div>
-                                                    </div>
+                                return (
+                                    <div key={item.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                                                <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: isPurchase ? 'rgba(255,184,77,0.1)' : 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <i className={`fa-solid ${isPurchase ? 'fa-receipt' : 'fa-location-dot'}`} style={{ color: isPurchase ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
                                                 </div>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
-                                                    <div style={{
-                                                        fontSize: '0.6rem',
-                                                        color: item.status === 'verified' ? '#4caf50' : (isPending ? '#ffb84d' : 'var(--text-secondary)'),
-                                                        textTransform: 'uppercase',
-                                                        fontWeight: 'bold',
-                                                        marginTop: '2px'
-                                                    }}>
-                                                        {item.status || 'verified'}
-                                                    </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{bizName}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{date.toLocaleDateString()} • {isPurchase ? 'Purchase' : 'Check-in'}</div>
                                                 </div>
                                             </div>
-
-                                            {isPurchase && isPending && (
-                                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                                    <button
-                                                        onClick={() => {
-                                                            const newAmount = prompt("Enter corrected amount (RM):", item.amount);
-                                                            if (newAmount && !isNaN(newAmount)) {
-                                                                db.collection('transactions').doc(item.id).update({ amount: parseFloat(newAmount) })
-                                                                    .catch(e => alert("Update failed: " + e.message));
-                                                            }
-                                                        }}
-                                                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                    >
-                                                        <i className="fa-solid fa-pen"></i> Edit Amount
-                                                    </button>
+                                            <div style={{ textAlign: 'right' }}>
+                                                {isPurchase && <div style={{ fontSize: '0.85rem', fontWeight: '800' }}>RM {item.amount?.toFixed(2)}</div>}
+                                                <div style={{
+                                                    fontSize: '0.6rem',
+                                                    color: item.status === 'verified' ? '#4caf50' : (isPending ? '#ffb84d' : 'var(--text-secondary)'),
+                                                    textTransform: 'uppercase',
+                                                    fontWeight: 'bold',
+                                                    marginTop: '2px'
+                                                }}>
+                                                    {item.status || 'verified'}
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </>
+
+                                        {isPurchase && isPending && (
+                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        const newAmount = prompt("Enter corrected amount (RM):", item.amount);
+                                                        if (newAmount && !isNaN(newAmount)) {
+                                                            db.collection('transactions').doc(item.id).update({ amount: parseFloat(newAmount) })
+                                                                .catch(e => alert("Update failed: " + e.message));
+                                                        }
+                                                    }}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                >
+                                                    <i className="fa-solid fa-pen"></i> Edit Amount
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             )}
 
             {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
-            
+
             {showAppEditor && userApplication && (
-                <ApplicationEditor 
+                <ApplicationEditor
                     application={userApplication}
                     onClose={() => setShowAppEditor(false)}
                     onSave={handleUpdateApplication}

@@ -112,9 +112,9 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
     
-    // Alias for legacy audit_logs collection
+    // System Audit Trail (Public Transparency)
     match /audit_logs/{logId} {
-      allow read: if request.auth != null && (isAuditor() || isSuperAdmin());
+      allow read: if true; 
       allow write: if isSuperAdmin() || isAuditor();
     }
 
@@ -145,8 +145,8 @@ service cloud.firestore {
 
     // Consumer Feedback
     match /feedback/{feedbackId} {
-      allow create: if true; // Allow guests and users to submit observations
-      allow read, update, delete: if isAuditor() || isSuperAdmin();
+      allow create, read: if true; // Allow guests and users to read counts/recommendations
+      allow update, delete: if isAuditor() || isSuperAdmin();
     }
 
     // User Applications

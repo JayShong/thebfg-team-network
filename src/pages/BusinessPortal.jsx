@@ -83,7 +83,16 @@ const BusinessPortal = () => {
                 volume += (s.purchaseVolume || 0);
             });
 
-            setShardedStats({ checkins, ghostCheckins, purchases, volume });
+            // Calculate Member-only checkins (Total - Ghost)
+            const memberCheckins = checkins - ghostCheckins;
+
+            setShardedStats({ 
+                checkins: memberCheckins, 
+                ghostCheckins, 
+                purchases, 
+                volume 
+            });
+
         } catch (e) {
             console.warn("Failed to fetch shards:", e);
         }
