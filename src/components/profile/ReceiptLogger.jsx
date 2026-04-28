@@ -41,7 +41,7 @@ const ReceiptLogger = ({ businesses }) => {
             const bizName = (businesses || []).find(b => b.id === bizId)?.name || 'Unknown Business';
 
             if (isGuest) {
-                const ghostPurchase = firebase.functions().httpsCallable('ghostpurchase');
+                const ghostPurchase = firebase.functions().httpsCallable('recordghostpurchase');
                 const result = await ghostPurchase({ 
                     bizId, 
                     ghostId, 
@@ -62,7 +62,7 @@ const ReceiptLogger = ({ businesses }) => {
                     bizId: bizId,
                     bizName: bizName,
                     userId: currentUser.uid,
-                    userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                    userNickname: currentUser.nickname || currentUser.name || 'Ambassador',
                     isGhost: false,
                     receiptId: receipt,
                     amount: parseFloat(amount),
@@ -72,7 +72,7 @@ const ReceiptLogger = ({ businesses }) => {
 
                 setMessage({ text: 'Purchase logged successfully! Awaiting verification.', type: 'success' });
                 updateLocalStats('purchase', parseFloat(amount));
-                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Explorer'} supported ${bizName}`);
+                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Ambassador'} supported ${bizName}`);
             }
 
             setBizId('');

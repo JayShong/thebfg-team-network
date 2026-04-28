@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     // Role partitioning helpers
-    function isMerchantAssistant() {
+    function isCustomerSuccess() {
       return request.auth != null && (
         isSuperAdmin() || 
         request.auth.token.isCustomerSuccess == true ||
@@ -30,12 +30,30 @@ service cloud.firestore {
         request.auth.token.email in get(/databases/$(database)/documents/system/compliance_roles).data.emails
       );
     }
+    function isSteward(bizId) {
+      let bizData = get(/databases/$(database)/documents/businesses/$(bizId)).data;
+      return request.auth != null && (
+        request.auth.token.email == bizData.ownerEmail ||
+        request.auth.token.email in bizData.stewardship.managers ||
+        request.auth.token.email in bizData.stewardship.crew ||
+        isCustomerSuccess() ||
+        isAuditor()
+      );
+    }
 
     // Users Collection - Protect PII & Role Fields
     match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isMerchantAssistant() || isAuditor());
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || 
+        isCustomerSuccess() || 
+        isAuditor() ||
+        (
+          exists(/databases/$(database)/documents/gratitude_bond_transfer/$(request.auth.uid + "_" + userId)) &&
+          get(/databases/$(database)/documents/gratitude_bond_transfer/$(request.auth.uid + "_" + userId)).data.expiresAt > request.time
+        )
+      );
       allow update: if request.auth != null && request.auth.uid == userId && 
-                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isAuditor', 'isMerchantAssistant', 'isSuperAdmin', 'isFlagged']);
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isAuditor', 'isCustomerSuccess', 'isSuperAdmin', 'isFlagged']);
       allow create: if request.auth != null && request.auth.uid == userId;
 
       // Allow access to sub-collections (counters, seasons, etc.)
@@ -59,7 +77,7 @@ service cloud.firestore {
     
     // Role Documents - Partitioned Visibility
     match /system/merchant_roles {
-      allow read: if isMerchantAssistant() || isSuperAdmin();
+      allow read: if isCustomerSuccess() || isSuperAdmin();
       allow write: if isSuperAdmin();
     }
     match /system/compliance_roles {
@@ -74,32 +92,46 @@ service cloud.firestore {
     // Business Directory
     match /businesses/{bizId} {
       allow read: if true;
-      allow write: if isMerchantAssistant() || isAuditor();
+      allow write: if isCustomerSuccess() || isAuditor();
       allow update: if request.auth != null && 
-                    request.auth.token.email == resource.data.ownerEmail &&
+                    (request.auth.token.email == resource.data.ownerEmail || isCustomerSuccess() || isAuditor()) &&
                     !request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'status', 'isVerified', 'ownerEmail', 'id']);
+      
+      // Partitioned Transaction Ledger (Merchant Queue)
+      match /transactions/{txnId} {
+        allow read: if isSteward(bizId);
+        allow write: if false; // System only via Cloud Functions
+      }
+
+      // Intelligence Center (Business Aggregates)
+      match /intelligence/latest {
+        allow read: if isSteward(bizId);
+        allow write: if false; // System only via Cloud Functions
+      }
     }
     
     // Transactions - Private Data
     match /transactions/{txnId} {
-      // Only owners, merchant assistants (for support), or auditors can see raw transaction data
+      // Only owners, customer success assistants (for support), or auditors can see raw transaction data
       allow read: if request.auth != null && (
         request.auth.uid == resource.data.userId || 
-        isMerchantAssistant() || 
-        isAuditor()
+        isCustomerSuccess() || 
+        isAuditor() ||
+        isSteward(resource.data.bizId)
       );
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       // Users can edit their own pending logs. Admins can manage any.
       allow update: if request.auth != null && (
         (request.auth.uid == resource.data.userId && resource.data.status == 'pending') ||
-        isMerchantAssistant() || 
-        isAuditor()
+        isCustomerSuccess() || 
+        isAuditor() ||
+        isSteward(resource.data.bizId)
       );
-      allow delete: if isMerchantAssistant() || isAuditor();
+      allow delete: if isCustomerSuccess() || isAuditor() || isSteward(resource.data.bizId);
     }
 
-    // Newsreel / Public Activity Feed
-    match /public_activity/{actId} {
+    // Newsreel / Network Pulse Feed
+    match /network_pulse/{actId} {
       allow read: if true;
       allow write: if false; // System only via Cloud Functions
     }
@@ -121,12 +153,12 @@ service cloud.firestore {
     // Announcements
     match /announcements/{announcementId} {
       allow read: if true;
-      allow write: if isMerchantAssistant() || isAuditor();
+      allow write: if isCustomerSuccess() || isAuditor();
     }
 
     // Initiatives, Privileges, Supervisions
-    match /initiatives/{initId} { allow read: if true; allow write: if isMerchantAssistant() || isAuditor(); }
-    match /privileges/{privId} { allow read: if true; allow write: if isMerchantAssistant() || isAuditor(); }
+    match /initiatives/{initId} { allow read: if true; allow write: if isCustomerSuccess() || isAuditor(); }
+    match /privileges/{privId} { allow read: if true; allow write: if isCustomerSuccess() || isAuditor(); }
     match /supervisions/{supId} { allow read: if true; allow write: if isSuperAdmin(); }
 
     // Institutional Audit Workflow
@@ -153,24 +185,30 @@ service cloud.firestore {
     match /applications/{appId} {
       allow read: if request.auth != null && (
         request.auth.token.email == resource.data.email || 
-        isMerchantAssistant() || 
+        isCustomerSuccess() || 
         isAuditor()
       );
       allow create: if request.auth != null && request.auth.token.email == request.resource.data.email;
       allow update: if request.auth != null && (
         (request.auth.token.email == resource.data.email && resource.data.status != 'approved') ||
-        isMerchantAssistant() || 
+        isCustomerSuccess() || 
         isAuditor()
       );
     }
 
-    // Gratitude Bonds (Business Intelligence)
-    match /gratitude_bond_records/{bondId} {
+    // Gratitude Bonds (Business Intelligence & User Relationship)
+    match /users/{userId}/gratitude_bonds/{bizId} {
       allow read: if request.auth != null && (
-        request.auth.uid == resource.data.userId || 
-        isMerchantAssistant() || 
-        isAuditor() ||
-        request.auth.token.email == get(/databases/$(database)/documents/businesses/$(resource.data.bizId)).data.ownerEmail
+        request.auth.uid == userId || 
+        isSteward(bizId)
+      );
+      allow write: if false; // System only via Cloud Functions
+    }
+
+    match /gratitude_bond_transfer/{bondId} {
+      allow read: if request.auth != null && (
+        (request.auth.uid == resource.data.userId || isSteward(resource.data.bizId)) &&
+        resource.data.expiresAt > request.time
       );
       allow write: if false; // System only via Cloud Functions
     }

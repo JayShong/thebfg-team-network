@@ -5,7 +5,7 @@ import { db } from '../../services/firebase';
 import AuthModal from '../auth/AuthModal';
 
 const Newsreel = () => {
-    const { currentUser, isGuest, logout, recentActivity, localActivities, pendingApprovalCount } = useAuth();
+    const { currentUser, isGuest, logout, pulseFeed, localActivities, pendingApprovalCount } = useAuth();
     const navigate = useNavigate();
     
     const [index, setIndex] = useState(0);
@@ -79,7 +79,15 @@ const Newsreel = () => {
                 type: 'guest',
                 action: () => setShowAuthModal(true)
             });
-        } else if (currentUser?.name === 'Explorer') {
+
+            if (localStorage.getItem('bfg_personal_stats')) {
+                queue.push({
+                    text: "⚠️ Warning: Your anonymous impact data will be permanently lost if a different user logs into this device. Please Register to claim it.",
+                    type: 'alert',
+                    action: () => setShowAuthModal(true)
+                });
+            }
+        } else if (currentUser?.name === 'Ambassador') {
             queue.push({
                 text: "Introduce yourself to the network with a nickname.",
                 type: 'onboarding',
@@ -87,7 +95,7 @@ const Newsreel = () => {
             });
         } else if (currentUser) {
             queue.push({
-                text: `✨ Welcome back, ${currentUser.nickname || currentUser.name || 'Explorer'}! Your support strengthens the Conviction Network.`,
+                text: `✨ Welcome back, ${currentUser.nickname || currentUser.name || 'Ambassador'}! Your support strengthens the Conviction Network.`,
                 type: 'welcome',
                 action: null
             });
@@ -96,13 +104,18 @@ const Newsreel = () => {
         // 3. Activity Feed (Sanitized Public Activities)
         // Merge server activities with local instant injections
         const safeLocal = localActivities || [];
-        const safeRecent = recentActivity || [];
-        const allActivity = [...safeLocal, ...safeRecent];
+        const safeRecent = pulseFeed || [];
         
-        allActivity.forEach(act => {
-            if (!act) return;
+        // Deduplicate local vs server injections to prevent double counting
+        const seenTexts = new Set();
+        
+        [...safeLocal, ...safeRecent].forEach(act => {
+            if (!act || !act.text) return;
+            if (seenTexts.has(act.text)) return;
+            
+            seenTexts.add(act.text);
             queue.push({
-                text: act.text || "Momentum in the network...",
+                text: act.text,
                 type: act.type || 'activity',
                 action: () => navigate(`/directory`)
             });

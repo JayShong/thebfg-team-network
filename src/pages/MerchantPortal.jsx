@@ -1,226 +1,422 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useBusinesses from '../hooks/useBusinesses';
-import { db, auth, functions } from '../services/firebase';
-import { QRCodeCanvas } from 'qrcode.react';
-import { drawStandee } from '../utils/assetUtils';
 import { useAuth } from '../contexts/AuthContext';
-import firebase from 'firebase/compat/app';
+import { db, functions } from '../services/firebase';
+import ApplicationEditor from '../components/admin/ApplicationEditor';
+import OnboardingHub from './OnboardingHub'; 
+import CrewManager from '../components/portal/CrewManager';
+import useBusinesses from '../hooks/useBusinesses';
 
 /**
- * Merchant Portal (Operational)
- * Focused on Business Onboarding, Database Management, and Standee Generation.
- * Accessible to Merchant Assistants and Superadmins.
+ * Unified Merchant Portal
+ * A central hub for Ambassadors (Applications), Owners (Management), and CS (Operations).
  */
 const MerchantPortal = () => {
     const navigate = useNavigate();
-    const { currentUser } = useAuth();
-    const { businesses, loading } = useBusinesses();
-    const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [newBiz, setNewBiz] = useState({ 
-        id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '',
-        founderImg: '', shopfrontImg: ''
-    });
-    const [editingBiz, setEditingBiz] = useState(null);
+    const { currentUser, syncRoles, isSyncing: authSyncing } = useAuth();
+    const [activeTab, setActiveTab] = useState('application');
+    const [userApplication, setUserApplication] = useState(null);
+    const [myBusinesses, setMyBusinesses] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [isActioning, setIsActioning] = useState(false);
+    const [showEditor, setShowEditor] = useState(false);
 
+    // 1. Data Fetching
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchQuery);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
+        if (!currentUser?.email) return;
 
-    const filteredBusinesses = React.useMemo(() => {
-        if (!debouncedSearch) return businesses;
-        const q = debouncedSearch.toLowerCase();
-        return businesses.filter(b => 
-            b.name?.toLowerCase().includes(q) || 
-            b.founder?.toLowerCase().includes(q) ||
-            b.id?.toLowerCase().includes(q)
-        );
-    }, [businesses, debouncedSearch]);
+        // Fetch User's Application
+        const unsubApp = db.collection('applications')
+            .where('email', '==', currentUser.email)
+            .limit(1)
+            .onSnapshot(snap => {
+                if (!snap.empty) {
+                    setUserApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                }
+                setLoading(false);
+            });
 
-    const onboardMerchant = async (e) => {
-        e.preventDefault();
-        if (!newBiz.id || !newBiz.name) return alert("ID and Name are mandatory.");
+        // Fetch User's Businesses (Owner or Steward)
+        const fetchMyBusinesses = async () => {
+            try {
+                const email = currentUser.email;
+                const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
+                    db.collection('businesses').where('ownerEmail', '==', email).get(),
+                    db.collection('businesses').where('stewardship.managers', 'array-contains', email).get(),
+                    db.collection('businesses').where('stewardship.crew', 'array-contains', email).get()
+                ]);
+
+                const all = [
+                    ...ownedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    ...managedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    ...crewSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+                ];
+                // Deduplicate
+                const unique = Array.from(new Map(all.map(b => [b.id, b])).values());
+                setMyBusinesses(unique);
+            } catch (err) {
+                console.warn("Failed to fetch my businesses:", err);
+            }
+        };
+
+        fetchMyBusinesses();
+
+        return () => unsubApp();
+    }, [currentUser]);
+
+    // Role-based defaults
+    useEffect(() => {
+        if (currentUser?.isCustomerSuccess || currentUser?.isSuperAdmin) {
+            setActiveTab('cs');
+        } else if (myBusinesses.length > 0) {
+            setActiveTab('my-business');
+        } else {
+            setActiveTab('application');
+        }
+    }, [currentUser, myBusinesses.length]);
+
+    const handleStartApplication = async () => {
+        setIsActioning(true);
         try {
-            const batch = db.batch();
-            const bizRef = db.collection('businesses').doc(newBiz.id);
-            
-            batch.set(bizRef, {
-                ...newBiz,
-                status: 'active',
-                isVerified: false,
-                membershipType: 'affiliate',
-                checkinsCount: 0,
-                purchasesCount: 0,
-                purchaseVolume: 0,
-                createdAt: new Date().toISOString()
+            const onboardFn = functions.httpsCallable('onboardbusinessapplication');
+            const result = await onboardFn({
+                name: "New Strategic Application",
+                email: currentUser.email,
+                phone: ""
             });
-
-            const statsRef = db.collection('system').doc('stats');
-            batch.update(statsRef, {
-                businesses: firebase.firestore.FieldValue.increment(1)
-            });
-
-            await batch.commit();
-            setNewBiz({ 
-                id: '', name: '', industry: 'F&B', location: '', founder: '', ownerEmail: '',
-                founderImg: '', shopfrontImg: ''
-            });
-            alert("Merchant successfully onboarded!");
+            alert("Application draft created! Please fill in your business details.");
+            setShowEditor(true);
         } catch (err) {
-            alert("Onboarding failed: " + err.message);
+            alert(err.message);
+        } finally {
+            setIsActioning(false);
         }
     };
 
-    const BusinessRow = ({ biz }) => (
-        <div style={{ padding: '1.2rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div>
-                <h4 style={{ margin: 0, color: '#fff' }}>{biz.name}</h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '4px 0' }}>ID: {biz.id} | Founder: {biz.founder || 'N/A'}</p>
-                {biz.membershipType === 'affiliate' && <span style={{ fontSize: '0.65rem', background: 'rgba(255,184,77,0.1)', color: '#ffb84d', padding: '2px 6px', borderRadius: '4px' }}>Affiliate</span>}
-            </div>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                <div style={{ display: 'none' }}>
-                    <QRCodeCanvas id={`qr-${biz.id}`} value={biz.id} size={550} level="H" />
-                </div>
-                <button 
-                    title="Download Standee"
-                    className="filter-btn" 
-                    style={{ padding: '0.5rem', background: 'rgba(59,130,246,0.1)', color: 'var(--accent-primary)' }}
-                    onClick={() => {
-                        const main = document.createElement('canvas');
-                        main.width = 1118; main.height = 1588;
-                        const qr = document.getElementById(`qr-${biz.id}`);
-                        const dataUrl = drawStandee(main, qr, biz.name);
-                        const link = document.createElement('a');
-                        link.download = `BFG_Standee_${biz.id}.png`;
-                        link.href = dataUrl;
-                        link.click();
-                    }}
-                >
-                    <i className="fa-solid fa-download"></i>
-                </button>
-                <button 
-                    title="Edit Governance"
-                    className="filter-btn" 
-                    style={{ padding: '0.5rem', background: 'rgba(255,184,77,0.1)', color: '#ffb84d' }}
-                    onClick={() => navigate(`/business-portal?edit=${biz.id}`)}
-                >
-                    <i className="fa-solid fa-gear"></i>
-                </button>
-                <button 
-                    title="View Profile"
-                    className="filter-btn" 
-                    style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                    onClick={() => navigate(`/business/${biz.id}`)}
-                >
-                    <i className="fa-solid fa-eye"></i>
-                </button>
-            </div>
-        </div>
+    const handleSubmitApplication = async () => {
+        if (!userApplication) return;
+        setIsActioning(true);
+        try {
+            const submitFn = functions.httpsCallable('submitapplication');
+            await submitFn({ applicationId: userApplication.id });
+            alert("Application submitted! Our Customer Success team will review it shortly.");
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setIsActioning(false);
+        }
+    };
+
+    const handleUpdateApplication = async (updates) => {
+        setIsActioning(true);
+        try {
+            const updateFn = functions.httpsCallable('updateapplication');
+            await updateFn({ applicationId: userApplication.id, updates });
+            alert("Application draft saved.");
+            setShowEditor(false);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setIsActioning(false);
+        }
+    };
+
+    const TabButton = ({ id, icon, label, count }) => (
+        <button 
+            onClick={() => setActiveTab(id)}
+            className={`nav-btn ${activeTab === id ? 'active' : ''}`}
+            style={{ 
+                background: activeTab === id ? 'var(--accent-primary)' : 'transparent', 
+                borderRadius: 'var(--radius-full)',
+                padding: '0.6rem 1.5rem',
+                fontSize: '0.85rem',
+                border: activeTab === id ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease'
+            }}
+        >
+            <i className={`fa-solid ${icon}`}></i>
+            <span>{label}</span>
+            {count > 0 && <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>{count}</span>}
+        </button>
     );
 
     return (
-        <div style={{ paddingBottom: '3rem' }}>
-            <button className="back-btn" onClick={() => navigate('/profile')} style={{ marginBottom: '1rem' }}>
-                <i className="fa-solid fa-arrow-left"></i> Back to Profile
-            </button>
-            
-            <div className="page-header" style={{ marginBottom: '2rem' }}>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0 }}>Merchant Portal</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Network Operations & Business Management</p>
+        <div style={{ paddingBottom: '4rem', maxWidth: '1000px', margin: '0 auto' }}>
+            <div className="page-header slide-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', marginTop: '1rem' }}>
+                <div>
+                    <h1 style={{ fontSize: '2.4rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>Merchant Portal</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '4px' }}>Strategic Growth & Operations</p>
+                </div>
+                <button onClick={() => navigate('/profile')} className="icon-btn glass-card" style={{ padding: '0.8rem 1.2rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-arrow-left"></i>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase' }}>Back</span>
+                </button>
             </div>
 
-            {/* Merchant Database */}
-            <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 0.5rem', color: '#fff' }}><i className="fa-solid fa-database" style={{ color: 'var(--accent-primary)' }}></i> Merchant Database</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Search and manage business profiles within the network.</p>
+            {/* Tab Navigation */}
+            <div className="glass-card slide-up" style={{ 
+                display: 'flex', 
+                padding: '0.5rem', 
+                borderRadius: 'var(--radius-full)', 
+                marginBottom: '2.5rem', 
+                gap: '0.5rem', 
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                overflowX: 'auto'
+            }}>
+                <TabButton id="application" icon="fa-file-signature" label="Register My Business" />
                 
-                <div style={{ marginBottom: '1rem' }}>
-                    <input 
-                        type="text" 
-                        className="input-modern" 
-                        placeholder="Search by name, founder, or ID..." 
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
+                {myBusinesses.length > 0 && (
+                    <TabButton id="my-business" icon="fa-store" label="My Business" count={myBusinesses.length} />
+                )}
+
+                {(currentUser?.isCustomerSuccess || currentUser?.isSuperAdmin) && (
+                    <TabButton id="cs" icon="fa-shield-halved" label="Network Ops (CS)" />
+                )}
+            </div>
+
+            {/* Content Area */}
+            <div className="content-area">
+                {activeTab === 'application' && (
+                    <div className="slide-up">
+                        {!userApplication ? (
+                            <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                                <i className="fa-solid fa-seedling fa-4x" style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', opacity: 0.8 }}></i>
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '1rem' }}>Register Your Business</h2>
+                                <p style={{ color: 'var(--text-secondary)', maxWidth: '450px', margin: '0 auto 2.5rem auto', lineHeight: '1.6' }}>
+                                    Join the BFG Network to turn your customer transactions into social impact. Start your application to become a verified for-good business.
+                                </p>
+                                <button 
+                                    onClick={handleStartApplication} 
+                                    disabled={isActioning}
+                                    className="btn btn-primary feature-gradient" 
+                                    style={{ padding: '1.2rem 3rem', fontSize: '1.1rem', fontWeight: '800', border: 'none' }}
+                                >
+                                    {isActioning ? <i className="fa-solid fa-spinner fa-spin"></i> : "Begin My Application"}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="glass-card" style={{ padding: '2rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                            <span style={{ 
+                                                fontSize: '0.65rem', 
+                                                background: userApplication.status === 'onboarding' ? 'rgba(59, 130, 246, 0.2)' : 
+                                                            userApplication.status === 'approved' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                color: userApplication.status === 'onboarding' ? '#3B82F6' : 
+                                                       userApplication.status === 'approved' ? '#22c55e' : 'var(--text-secondary)',
+                                                padding: '2px 8px',
+                                                borderRadius: '10px',
+                                                textTransform: 'uppercase',
+                                                fontWeight: '800'
+                                            }}>
+                                                {userApplication.status}
+                                            </span>
+                                            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{userApplication.name}</h3>
+                                        </div>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                            {userApplication.status === 'approved' ? 'This business is live on the BFG Network.' : 'Refine your business story and strategic profile.'}
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        {userApplication.status === 'draft' && (
+                                            <button 
+                                                onClick={handleSubmitApplication} 
+                                                disabled={isActioning}
+                                                className="btn btn-primary feature-gradient"
+                                                style={{ border: 'none' }}
+                                            >
+                                                {isActioning ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-paper-plane"></i> Submit for Review</>}
+                                            </button>
+                                        )}
+                                        {userApplication.status === 'approved' && !currentUser.isOwner && (
+                                            <button 
+                                                onClick={async () => {
+                                                    const res = await syncRoles();
+                                                    if (res.success) alert("Identity synced! Business Portal access activated.");
+                                                    else alert("Sync failed: " + res.error);
+                                                }}
+                                                className="btn glass-card"
+                                                style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
+                                            >
+                                                <i className={`fa-solid ${authSyncing ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'}`}></i> Sync
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={() => userApplication.status === 'approved' ? navigate(`/business-portal?bizId=${userApplication.bizId}`) : setShowEditor(true)} 
+                                            className="btn btn-primary"
+                                            style={{ background: userApplication.status === 'approved' ? 'rgba(34, 197, 94, 0.1)' : 'var(--accent-primary)', color: userApplication.status === 'approved' ? '#22c55e' : '#fff', border: userApplication.status === 'approved' ? '1px solid rgba(34, 197, 94, 0.2)' : 'none' }}
+                                        >
+                                            <i className={`fa-solid ${userApplication.status === 'approved' ? 'fa-gauge-high' : 'fa-pen-nib'}`}></i>
+                                            {userApplication.status === 'approved' ? ' Open Portal' : ' Edit Draft'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--accent-primary)' }}>Application Guidelines</h4>
+                                    <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.6' }}>
+                                        <li>Ensure your <strong>Purpose Statement</strong> reflects your social or environmental impact.</li>
+                                        <li>Your <strong>Founder Story</strong> is what connects consumers to your convictions.</li>
+                                        <li>Once submitted, a Customer Success member will claim your application to start the onboarding handshake.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'my-business' && (
+                    <div className="slide-up">
+                        <div style={{ display: 'grid', gap: '1.5rem' }}>
+                            {myBusinesses.map(biz => (
+                                <BusinessManagementSuite 
+                                    key={biz.id} 
+                                    business={biz} 
+                                    onRefresh={fetchMyBusinesses}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'cs' && (
+                    <OnboardingHub />
+                )}
+            </div>
+
+            {/* Modal Editor Overlay */}
+            {showEditor && userApplication && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(12px)' }}>
+                    <div className="slide-up" style={{ width: '100%', maxWidth: '750px' }}>
+                        <ApplicationEditor 
+                            application={userApplication} 
+                            onClose={() => setShowEditor(false)} 
+                            onSave={handleUpdateApplication} 
+                            isSaving={isActioning}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const BusinessManagementSuite = ({ business, onRefresh }) => {
+    const navigate = useNavigate();
+    const { currentUser, getStewardshipLevel } = useAuth();
+    const [showEditor, setShowEditor] = useState(false);
+    const [showCrewManager, setShowCrewManager] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const stewardship = getStewardshipLevel(business);
+    const canManage = stewardship === 'founder' || stewardship === 'manager' || currentUser?.isSuperAdmin;
+    const canEdit = stewardship === 'founder' || currentUser?.isSuperAdmin;
+
+    const handleUpdate = async (updatedData) => {
+        setIsSaving(true);
+        try {
+            await db.collection('businesses').doc(business.id).update({
+                ...updatedData,
+                updatedAt: new Date().toISOString()
+            });
+            setShowEditor(false);
+            onRefresh();
+            alert("Business identity updated successfully.");
+        } catch (err) {
+            alert("Update failed: " + err.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="glass-card" style={{ padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+                <div>
+                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{business.name}</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{business.industry} • {business.location || 'Remote'}</p>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px', color: 'var(--text-secondary)' }}>
+                            Role: {stewardship?.toUpperCase()}
+                        </span>
+                        {business.isVerified && (
+                            <span style={{ fontSize: '0.7rem', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 8px', borderRadius: '10px', color: '#22c55e' }}>
+                                <i className="fa-solid fa-certificate"></i> VERIFIED
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    {canEdit && (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button onClick={() => setShowCrewManager(true)} className="btn btn-secondary">
+                                <i className="fa-solid fa-users-gear"></i> Manage Crew
+                            </button>
+                            <button onClick={() => setShowEditor(true)} className="btn btn-secondary">
+                                <i className="fa-solid fa-pen-to-square"></i> Edit Identity
+                            </button>
+                        </div>
+                    )}
+                    <button 
+                        onClick={() => navigate(`/business-portal?bizId=${business.id}`)} 
+                        className="btn btn-primary feature-gradient"
+                    >
+                        <i className="fa-solid fa-gauge-high"></i> Operations Hub
+                    </button>
+                </div>
+            </div>
+
+            {canManage && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800' }}>{business.checkinsCount || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Visitors</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#ffb84d' }}>{business.purchasesCount || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Supporters</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(business.purchaseVolume || 0).toLocaleString()}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Impact Volume</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--accent-primary)' }}>{business.stewardship?.crew?.length || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Crew Members</div>
+                    </div>
+                </div>
+            )}
+
+            {showEditor && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(15px)' }}>
+                    <div className="slide-up" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <ApplicationEditor 
+                            application={business} 
+                            onClose={() => setShowEditor(false)} 
+                            onSave={handleUpdate} 
+                            isSaving={isSaving}
+                            isLiveBusiness={true}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {showCrewManager && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(15px)' }}>
+                    <CrewManager 
+                        business={business} 
+                        onClose={() => setShowCrewManager(false)} 
+                        onUpdate={() => {
+                            onRefresh();
+                        }}
                     />
                 </div>
-
-                <div style={{ maxHeight: '400px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '2rem' }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>
-                    ) : filteredBusinesses.length === 0 ? (
-                        <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No businesses found.</p>
-                    ) : (
-                        filteredBusinesses.map(biz => <BusinessRow key={biz.id} biz={biz} />)
-                    )}
-                </div>
-            </div>
-
-            {/* Onboarding Section */}
-            <div className="glass-card">
-                <h3 style={{ margin: '0 0 1.5rem', color: '#fff' }}><i className="fa-solid fa-plus-circle" style={{ color: 'var(--accent-success)' }}></i> Add New Business</h3>
-                
-                <form onSubmit={onboardMerchant} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label>Business Name</label>
-                        <input type="text" className="input-modern" value={newBiz.name} onChange={e => setNewBiz({...newBiz, name: e.target.value})} required placeholder="e.g. Earthly Goods" />
-                    </div>
-                    <div className="form-group">
-                        <label>Founder Name</label>
-                        <input type="text" className="input-modern" value={newBiz.founder} onChange={e => setNewBiz({...newBiz, founder: e.target.value})} placeholder="e.g. Jane Doe" />
-                    </div>
-                    <div className="form-group">
-                        <label>Unique ID (Slug)</label>
-                        <input type="text" className="input-modern" value={newBiz.id} onChange={e => setNewBiz({...newBiz, id: e.target.value})} required placeholder="e.g. earthly-goods" />
-                    </div>
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label>Owner Email (For Portal Access)</label>
-                        <input type="email" className="input-modern" value={newBiz.ownerEmail} onChange={e => setNewBiz({...newBiz, ownerEmail: e.target.value})} placeholder="owner@business.com" />
-                    </div>
-                    <div className="form-group">
-                        <label>Industry</label>
-                        <select className="input-modern" value={newBiz.industry} onChange={e => setNewBiz({...newBiz, industry: e.target.value})}>
-                            <option value="F&B">Food & Beverage</option>
-                            <option value="Retail">Retail</option>
-                            <option value="Services">Services</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>Location (City/State)</label>
-                        <input type="text" className="input-modern" value={newBiz.location} onChange={e => setNewBiz({...newBiz, location: e.target.value})} placeholder="e.g. Kuala Lumpur" />
-                    </div>
-                    <div className="form-group">
-                        <label>Founder Photo (URL)</label>
-                        <input type="url" className="input-modern" value={newBiz.founderImg} onChange={e => setNewBiz({...newBiz, founderImg: e.target.value})} placeholder="https://..." />
-                    </div>
-                    <div className="form-group">
-                        <label>Shopfront Photo (URL)</label>
-                        <input type="url" className="input-modern" value={newBiz.shopfrontImg} onChange={e => setNewBiz({...newBiz, shopfrontImg: e.target.value})} placeholder="https://..." />
-                    </div>
-                    <button 
-                        type="submit" 
-                        className="nav-btn" 
-                        style={{ 
-                            gridColumn: '1 / -1', 
-                            marginTop: '2rem',
-                            background: 'rgba(0,0,0,0.2)',
-                            borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--accent-success)',
-                            color: 'var(--accent-success)',
-                            height: '60px',
-                            justifyContent: 'center',
-                            fontSize: '1.1rem',
-                            fontWeight: '700'
-                        }}
-                    >
-                        <i className="fa-solid fa-plus-circle"></i> Finalize Onboarding
-                    </button>
-                </form>
-            </div>
+            )}
         </div>
     );
 };

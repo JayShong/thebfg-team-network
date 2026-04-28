@@ -69,18 +69,27 @@ const BusinessProfile = () => {
         }
     }, [id, businesses, loading]);
 
-    // Reconciled stats from the business document (Updated every 5 mins by the network cron)
+    const [intelligence, setIntelligence] = useState(null);
+    useEffect(() => {
+        if (!id) return;
+        const unsubscribe = db.collection('businesses').doc(id).collection('intelligence').doc('latest')
+            .onSnapshot(doc => {
+                if (doc.exists) setIntelligence(doc.data());
+            });
+        return () => unsubscribe();
+    }, [id]);
+
     const stats = {
-        checkins: (business?.checkinsCount || 0) + (business?.ghostCheckinsCount || 0),
-        purchases: business?.purchasesCount || 0,
-        volume: business?.purchaseVolume || 0
+        checkins: intelligence?.totalCheckins || (business?.checkinsCount || 0) + (business?.ghostCheckinsCount || 0),
+        purchases: intelligence?.totalPurchases || business?.purchasesCount || 0,
+        volume: intelligence?.communityImpact || business?.purchaseVolume || 0
     };
 
     useEffect(() => {
         if (!id) return;
         
-        const unsubscribe = db.collection('audit_logs')
-            .where('bizId', '==', id)
+        const unsubscribe = db.collection('businesses').doc(id).collection('transactions')
+            .where('status', '==', 'verified')
             .orderBy('timestamp', 'desc')
             .limit(20) // Scale safeguard
             .onSnapshot(snapshot => {
@@ -509,33 +518,17 @@ const UserLoyaltyConnection = ({ bizId, userId }) => {
     useEffect(() => {
         if (!bizId || !userId) return;
         
-        const unsubscribe = db.collection('transactions')
-            .where('bizId', '==', bizId)
-            .where('userId', '==', userId)
-            .orderBy('timestamp', 'desc')
-            .onSnapshot(snap => {
-                let checkins = 0;
-                let purchases = 0;
-                let totalSpend = 0;
-                const pLog = [];
-                const rLog = [];
-
-                snap.forEach(doc => {
-                    const t = doc.data();
-                    if (t.type === 'checkin') checkins++;
-                    if (t.type === 'purchase' && t.status === 'verified') {
-                        purchases++;
-                        totalSpend += (parseFloat(t.amount) || 0);
-                        pLog.push({ id: doc.id, ...t });
-                    }
-                    if (t.type === 'reward') {
-                        rLog.push({ id: doc.id, ...t });
-                    }
-                });
-
-                setStats({ checkins, purchases, totalSpend });
-                setPurchaseLog(pLog);
-                setRewardsLog(rLog);
+        // PIVOT: 0ms Connection via Partitioned Bond Projection
+        const unsubscribe = db.collection('users').doc(userId).collection('gratitude_bonds').doc(bizId)
+            .onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    setStats({
+                        checkins: data.totalCheckins || 0,
+                        purchases: data.totalPurchases || 0,
+                        totalSpend: data.totalSpend || 0
+                    });
+                }
                 setLoading(false);
             });
             

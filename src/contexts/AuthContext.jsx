@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db, functions } from '../services/firebase';
+import { auth, db, functions, IS_MOCKED_MODE } from '../services/firebase';
 
 const AuthContext = createContext();
 
@@ -12,8 +12,17 @@ export const AuthProvider = ({ children }) => {
     const [isGuest, setIsGuest] = useState(() => localStorage.getItem('bfg_guest_mode') === 'true');
     const [ghostId, setGhostId] = useState(() => localStorage.getItem('bfg_ghost_id'));
     const [isSyncing, setIsSyncing] = useState(false);
-    const [recentActivity, setRecentActivity] = useState([]);
+    const [pulseFeed, setPulseFeed] = useState([]);
     const [localActivities, setLocalActivities] = useState([]);
+
+    const getStewardshipLevel = (biz) => {
+        if (!currentUser?.email || !biz) return null;
+        if (biz.ownerEmail === currentUser.email) return 'founder';
+        if (biz.stewardship?.managers?.includes(currentUser.email)) return 'manager';
+        if (biz.stewardship?.crew?.includes(currentUser.email)) return 'crew';
+        if (currentUser.isCustomerSuccess || currentUser.isSuperAdmin) return 'support';
+        return null;
+    };
 
     const addLocalActivity = (text) => {
         const newAct = { text, timestamp: new Date(), type: 'local' };
@@ -32,7 +41,8 @@ export const AuthProvider = ({ children }) => {
                 ...(prev || {}),
                 isSuperAdmin: !!tokenResult.claims.isSuperAdmin,
                 isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin,
-                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin
+                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin,
+                isOwner: !!tokenResult.claims.isOwner
             }));
             return { success: true };
         } catch (err) {
@@ -81,7 +91,7 @@ export const AuthProvider = ({ children }) => {
                     window._bfg_claiming = true;
                     console.log("🤝 AUTH: Reclaiming anonymous history for:", storedGhostId);
                     
-                    functions.httpsCallable('claimghostactivity')({ ghostId: storedGhostId })
+                    functions.httpsCallable('acceptinvitationtojoinnetwork')({ ghostId: storedGhostId })
                         .then((result) => {
                             if (result.data?.success) {
                                 setGhostId(null);
@@ -110,23 +120,38 @@ export const AuthProvider = ({ children }) => {
                         uid: user.uid, 
                         email: user.email, 
                         isProvisioned: false,
+                        nickname: "Ambassador",
                         isSuperAdmin: !!tokenResult.claims.isSuperAdmin,
                         isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin,
-                        isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin
+                        isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin,
+                        isOwner: !!tokenResult.claims.isOwner
                     });
                     setLoading(false);
                     
                     const docRef = db.collection('users').doc(user.uid);
                     
-                    // HANDSHAKE: Ensure a document exists to trigger server-side provisioning
+                    // HANDSHAKE: Ensure a document exists and is marked for provisioning
                     const docSnap = await docRef.get();
-                    if (!docSnap.exists) {
-                        console.log("🤝 AUTH: Initiating server-side provisioning handshake...");
-                        await docRef.set({
+                    if (!docSnap.exists || !docSnap.data()?.isProvisioned) {
+                        console.log("🤝 AUTH: Initiating or repairing server-side provisioning handshake...");
+                        const provisionPayload = {
                             email: user.email,
-                            isProvisioned: false,
-                            created_at: new Date().toISOString()
-                        });
+                            isProvisioned: !!IS_MOCKED_MODE, // Self-provision in mock mode
+                            nickname: "Ambassador",
+                            last_handshake_at: new Date().toISOString()
+                        };
+
+                        if (IS_MOCKED_MODE) {
+                            console.log("🛠️ AUTH: [MOCK MODE] Performing frontend self-provisioning...");
+                            Object.assign(provisionPayload, {
+                                checkins: 0,
+                                purchases: 0,
+                                badges: {},
+                                currentTier: { name: 'Seed', badgeCount: 0 }
+                            });
+                        }
+
+                        await docRef.set(provisionPayload, { merge: true });
                     }
 
                     // RECEIPT: Listen for the provisioned profile from the server
@@ -158,7 +183,8 @@ export const AuthProvider = ({ children }) => {
                                 isProvisioned: true,
                                 isSuperAdmin: !!tokenResult.claims.isSuperAdmin,
                                 isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin,
-                                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin
+                                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin,
+                                isOwner: !!tokenResult.claims.isOwner
                             }));
                         } else {
                             console.log("⏳ AUTH: Waiting for server-side provisioning...");
@@ -185,11 +211,11 @@ export const AuthProvider = ({ children }) => {
         });
 
         // Newsreel Pulse Subscription
-        const unsubscribePulse = db.collection('public_activity')
+        const unsubscribePulse = db.collection('network_pulse')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .onSnapshot(snap => {
-                setRecentActivity(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setPulseFeed(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             }, err => console.warn("Pulse stream failed:", err));
 
         return () => {
@@ -239,12 +265,13 @@ export const AuthProvider = ({ children }) => {
         sendPasswordReset,
         setLoading,
         ghostId,
-        recentActivity,
+        pulseFeed,
         localActivities,
         addLocalActivity,
+        getStewardshipLevel,
+        userNickname: 'Ambassador',
         pendingApprovalCount: 0
     };
-
 
     return (
         <AuthContext.Provider value={value}>

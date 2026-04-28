@@ -85,8 +85,8 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/merchant-portal" element={
-          <ProtectedRoute requiredRole="customerSuccess">
-            <OnboardingHub />
+          <ProtectedRoute requiredRole="member">
+            <MerchantPortal />
           </ProtectedRoute>
         } />
         <Route path="/business-portal" element={

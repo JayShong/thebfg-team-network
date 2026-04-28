@@ -31,8 +31,14 @@ The platform allows exploration without friction, but ensures every action can b
 1.  **Onboarding**: User becomes a Member.
 2.  **Application**: Merchant Portal -> "Submit Application".
 3.  **Review**: Customer Success "Picks Up" application.
-4.  **Publish**: Cloud Function `publishapplication` creates `businesses/{bizId}`.
-5.  **Provisioning**: Owner user updated with `isOwner: true`.
+4.  **Step 4: Submission**
+    *   **URL**: `/merchant-portal`
+    *   **Action**: User fills in all required details and clicks "Submit for Review".
+    *   **Technical Trigger**: `MerchantPortal.jsx` -> `handleSubmitApplication()`
+    *   **Data Action**: Calls `submitapplication` (Cloud Function) to update `applications/{appId}` with `status: 'submitted'`.
+    *   **Security**: `firestore.rules` validates that `request.auth.token.email == request.resource.data.email`.
+5.  **Publish**: Cloud Function `publishapplication` creates `businesses/{bizId}`.
+6.  **Provisioning**: Owner user updated with `isOwner: true`.
 
 ---
 

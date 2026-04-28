@@ -260,23 +260,9 @@ const Settings = () => {
 
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
                     <h3 style={{ color: '#fff' }}><i className="fa-solid fa-key" style={{ color: 'var(--accent-secondary)' }}></i> Security & Permissions</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                        Manage your account access and security permissions. If you were recently granted staff roles (Auditor, Customer Success, etc.) and don't see them yet, use the refresh tool below.
-                    </p>
-                    
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         <button type="button" onClick={handlePasswordReset} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }}>
                             <i className="fa-solid fa-envelope"></i> Send Password Reset
-                        </button>
-                        
-                        <button 
-                            type="button" 
-                            onClick={handleSyncRoles} 
-                            className="btn btn-secondary" 
-                            style={{ width: 'auto', padding: '0.75rem 1.5rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
-                            disabled={loading}
-                        >
-                            <i className={`fa-solid ${loading ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'}`}></i> Refresh Permissions
                         </button>
                     </div>
                 </div>
@@ -300,76 +286,14 @@ const Settings = () => {
                     </div>
                 </div>
 
-                <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.25s', border: '1px solid var(--primary-light)' }}>
-                    <h3 style={{ color: '#fff', marginBottom: '0.5rem' }}><i className="fa-solid fa-briefcase" style={{ color: 'var(--primary)' }}></i> Onboard Your Business</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                        Apply to list your business in the BFG Network. Once submitted, our team will review your application.
-                    </p>
-
-                    {myApplication ? (
-                        <div style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary-light)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                <div>
-                                    <h4 style={{ margin: 0 }}>Application for {myApplication.name}</h4>
-                                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                        Status: <strong style={{ color: 'var(--primary-light)', textTransform: 'uppercase' }}>{myApplication.status}</strong>
-                                    </p>
-                                </div>
-                                <span className="tier-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
-                                    {['pending', 'draft'].includes(myApplication.status) ? (myApplication.assignedTo ? 'Partner Assigned' : 'Awaiting CS Partner') : 'Historical Record'}
-                                </span>
-                            </div>
-
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '1.2rem' }}>
-                                {['pending', 'draft'].includes(myApplication.status)
-                                    ? (myApplication.assignedTo
-                                        ? `Great news! A Customer Success partner (${myApplication.assignedEmail}) is currently handling your application. You can both co-edit the details together.`
-                                        : "Your application is in the pool. Once a Customer Success member picks it up, you'll be able to co-edit the full business profile details here.")
-                                    : "This application has been processed and is now part of the BFG Network historical records. It is preserved here for your reference."}
-                            </p>
-
-                            <button type="button" onClick={() => setEditingApp(myApplication)} className="nav-btn active" style={{ width: '100%', justifyContent: 'center' }}>
-                                <i className={`fa-solid ${['pending', 'draft'].includes(myApplication.status) ? 'fa-pen-to-square' : 'fa-eye'}`}></i>
-                                {['pending', 'draft'].includes(myApplication.status) ? ' Edit My Application Details' : ' View Historical Record'}
-                            </button>
-                        </div>
-                    ) : onboardingSuccess ? (
-                        <div className="success-gradient" style={{ padding: '1.5rem', borderRadius: '12px', textAlign: 'center' }}>
-                            <i className="fa-solid fa-circle-check fa-2x" style={{ marginBottom: '0.5rem' }}></i>
-                            <p style={{ fontWeight: '600' }}>Application Submitted!</p>
-                            <p style={{ fontSize: '0.85rem' }}>A customer success representative will pick up your application shortly.</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-                            <div className="form-group">
-                                <label>Business Name</label>
-                                <input type="text" className="input-modern" value={bizName} onChange={(e) => setBizName(e.target.value)} placeholder="Official Business Name" />
-                            </div>
-                            <div className="form-group">
-                                <label>Business Address</label>
-                                <textarea className="input-modern" style={{ minHeight: '80px' }} value={bizAddress} onChange={(e) => setBizAddress(e.target.value)} placeholder="Full physical address" />
-                            </div>
-                            <div className="form-group">
-                                <label>Contact Number</label>
-                                <input type="tel" className="input-modern" value={bizPhone} onChange={(e) => setBizPhone(e.target.value)} placeholder="+60..." />
-                            </div>
-                            <div className="form-group">
-                                <label>Business Email</label>
-                                <input type="email" className="input-modern" value={bizEmail} onChange={(e) => handleBizEmailChange(e.target.value)} />
-                                {showEmailWarning && (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.75rem', borderRadius: '8px', backgroundColor: 'rgba(255, 165, 0, 0.1)', border: '1px solid orange' }}>
-                                        <p style={{ color: 'orange', fontSize: '0.75rem', margin: 0 }}>
-                                            <i className="fa-solid fa-triangle-exclamation"></i> <strong>Warning:</strong> If you use a different email, a new account will be created. You will need to manage two separate accounts.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            <button type="button" onClick={handleOnboardSubmit} className="btn btn-primary" style={{ marginTop: '0.5rem' }} disabled={loading || !bizName || !bizAddress}>
-                                {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : "Submit Application"}
-                            </button>
-                        </div>
-                    )}
-                </div>
+                <button
+                    type="submit"
+                    className="btn btn-primary mt-4 feature-gradient"
+                    style={{ padding: '1.25rem', fontSize: '1.1rem', border: 'none' }}
+                    disabled={loading}
+                >
+                    {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-floppy-disk"></i> Save Changes</>}
+                </button>
 
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.3s', border: '1px solid rgba(255, 68, 68, 0.3)' }}>
                     <h3 style={{ color: '#ff4444' }}><i className="fa-solid fa-triangle-exclamation"></i> Danger Zone</h3>
@@ -387,14 +311,7 @@ const Settings = () => {
                     </button>
                 </div>
 
-                <button
-                    type="submit"
-                    className="btn btn-primary mt-4 feature-gradient"
-                    style={{ padding: '1.25rem', fontSize: '1.1rem', border: 'none' }}
-                    disabled={loading}
-                >
-                    {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-floppy-disk"></i> Save Changes</>}
-                </button>
+
             </form>
 
             <div style={{ marginTop: '3rem', textAlign: 'center', opacity: 0.4, fontSize: '0.65rem', letterSpacing: '1px' }}>

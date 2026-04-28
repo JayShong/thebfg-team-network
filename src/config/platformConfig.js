@@ -20,6 +20,8 @@ export const PLATFORM_CONFIG = {
         ADMIN: 'isAdmin',
         AUDITOR: 'isAuditor',
         OWNER: 'isOwner',
+        MANAGER: 'isManager',
+        CREW: 'isCrew',
         CUSTOMER_SUCCESS: 'isCustomerSuccess'
     }
 };

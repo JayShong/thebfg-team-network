@@ -70,6 +70,12 @@ const AuthModal = ({ onClose }) => {
                 </p>
  
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    {localStorage.getItem('bfg_personal_stats') && (
+                        <div className="glass-card" style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '12px', color: '#fcd34d', fontSize: '0.85rem', textAlign: 'center' }}>
+                            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '6px' }}></i> 
+                            <strong>Warning:</strong> Logging in as a different user will permanently overwrite your current anonymous impact data. If this is your first time, please Register to claim it.
+                        </div>
+                    )}
                     <div className="form-group">
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>

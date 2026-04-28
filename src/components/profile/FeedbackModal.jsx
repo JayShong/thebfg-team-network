@@ -21,7 +21,7 @@ const FeedbackModal = ({ business, currentUser, onClose }) => {
                 bizId: business.id,
                 bizName: business.name,
                 userId: currentUser?.uid || 'guest',
-                userNickname: currentUser?.nickname || currentUser?.name || 'Explorer',
+                userNickname: currentUser?.nickname || currentUser?.name || 'Ambassador',
                 type,
                 text: feedback,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),

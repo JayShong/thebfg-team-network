@@ -17,9 +17,9 @@ const Profile = () => {
     const navigate = useNavigate();
     const [showAuthModal, setShowAuthModal] = useState(false);
 
-    // Detect if current user is an owner of any business
-    const ownedBusinesses = (businesses || []).filter(b => b.ownerEmail === currentUser?.email);
-    const isOwner = ownedBusinesses.length > 0;
+    const [myBusinesses, setMyBusinesses] = useState([]);
+    const isOwner = myBusinesses.some(b => b.ownerEmail === currentUser?.email);
+    const isSteward = myBusinesses.length > 0;
 
     const userTier = evaluateTier(currentUser?.badges || {});
 
@@ -98,6 +98,29 @@ const Profile = () => {
 
         subscribe();
 
+        const fetchMyBiz = async () => {
+            if (!currentUser?.email) return;
+            try {
+                const email = currentUser.email;
+                const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
+                    db.collection('businesses').where('ownerEmail', '==', email).get(),
+                    db.collection('businesses').where('stewardship.managers', 'array-contains', email).get(),
+                    db.collection('businesses').where('stewardship.crew', 'array-contains', email).get()
+                ]);
+
+                const all = [
+                    ...ownedSnap.docs.map(d => d.data()),
+                    ...managedSnap.docs.map(d => d.data()),
+                    ...crewSnap.docs.map(d => d.data())
+                ];
+                const unique = Array.from(new Map(all.map(b => [b.id, b])).values());
+                setMyBusinesses(unique);
+            } catch (err) {
+                console.warn("Failed to fetch authorized businesses:", err);
+            }
+        };
+        fetchMyBiz();
+
         const handleResumption = () => {
             if (document.visibilityState === 'visible') subscribe();
         };
@@ -109,41 +132,7 @@ const Profile = () => {
         };
     }, [currentUser]);
 
-    const handleCreateApplication = async () => {
-        setIsSavingApp(true);
-        try {
-            const newApp = {
-                email: currentUser.email,
-                ownerUid: currentUser.uid,
-                name: "New Business Application",
-                status: 'pending',
-                timestamp: new Date()
-            };
-            const docRef = await db.collection('applications').add(newApp);
-            setUserApplication({ id: docRef.id, ...newApp });
-            setShowAppEditor(true);
-        } catch (e) {
-            alert("Failed to start application: " + e.message);
-        } finally {
-            setIsSavingApp(false);
-        }
-    };
-
-    const handleUpdateApplication = async (updates) => {
-        setIsSavingApp(true);
-        try {
-            await db.collection('applications').doc(userApplication.id).update({
-                ...updates,
-                lastEditedAt: new Date().toISOString()
-            });
-            setShowAppEditor(false);
-            alert("Application updated successfully.");
-        } catch (e) {
-            alert(e.message);
-        } finally {
-            setIsSavingApp(false);
-        }
-    };
+    // Handled by Merchant Portal
 
     if (!currentUser && !isGuest) {
         return (
@@ -213,7 +202,7 @@ const Profile = () => {
                         <i className="fa-solid fa-user"></i>
                     </div>
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '0.2rem', color: '#fff' }}>
-                        {displayUser.nickname || displayUser.name || 'Explorer'}
+                        {displayUser.nickname || displayUser.name || 'Ambassador'}
                     </h3>
 
                     {currentUser && !currentUser.isProvisioned && (
@@ -363,49 +352,9 @@ const Profile = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {userApplication ? (
-                                    <button
-                                        onClick={() => setShowAppEditor(true)}
-                                        className="btn btn-secondary"
-                                        style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}
-                                    >
-                                        <i className={`fa-solid ${userApplication.status === 'approved' ? 'fa-box-archive' : 'fa-pen-nib'}`}></i>
-                                        {userApplication.status === 'approved' ? ' View Application (Onboarded)' : ' Refine Application Form'}
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleCreateApplication}
-                                        className="btn btn-primary feature-gradient"
-                                        style={{ border: 'none' }}
-                                        disabled={isSavingApp}
-                                    >
-                                        <i className="fa-solid fa-plus-circle"></i> Register Your Business
-                                    </button>
-                                )}
-
-                                {displayUser.isSuperAdmin && (
-                                    <button onClick={() => navigate('/admin')} className="btn btn-secondary" style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}>
-                                        <i className="fa-solid fa-crown"></i> Governance Portal
-                                    </button>
-                                )}
-
-                                {displayUser.isCustomerSuccess && (
-                                    <button onClick={() => navigate('/merchant-portal')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-store"></i> Merchant Portal
-                                    </button>
-                                )}
-
-                                {(displayUser.isSuperAdmin || displayUser.isAuditor) && (
-                                    <button onClick={() => navigate('/audit-hub')} className="btn btn-secondary">
-                                        <i className="fa-solid fa-clipboard-check"></i> Verification Hub
-                                    </button>
-                                )}
-
-                                {(isOwner || displayUser.isCustomerSuccess || displayUser.isSuperAdmin || businesses.some(b => [...(b.stewardship?.managers || []), ...(b.stewardship?.crew || [])].includes(displayUser.email))) && (
-                                    <button onClick={() => navigate('/business-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
-                                        <i className="fa-solid fa-store"></i> My Business Portal
-                                    </button>
-                                )}
+                                <button onClick={() => navigate('/merchant-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
+                                    <i className="fa-solid fa-store"></i> Merchant Portal
+                                </button>
 
                                 <button onClick={logout} className="btn btn-secondary" style={{ border: '1px solid rgba(255,87,87,0.3)', color: '#ff5757' }}>
                                     <i className="fa-solid fa-right-from-bracket"></i> Sign Out

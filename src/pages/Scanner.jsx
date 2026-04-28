@@ -264,7 +264,7 @@ const Scanner = () => {
             }
 
             try {
-                const ghostCheckin = firebase.functions().httpsCallable('ghostcheckin');
+                const ghostCheckin = firebase.functions().httpsCallable('recordghostcheckin');
                 const result = await ghostCheckin({ bizId: scannedBusiness.id, ghostId });
 
                 if (result.data.success) {
@@ -333,8 +333,9 @@ const Scanner = () => {
                 bizIndustry: scannedBusiness.industry || 'Unknown',
                 bizLocation: scannedBusiness.location || 'Unknown',
                 userId: currentUser.uid,
-                userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                userNickname: currentUser.nickname || currentUser.name || 'Ambassador',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 status: 'verified'
             });
 
@@ -353,7 +354,7 @@ const Scanner = () => {
             // Inject local activity for instant newsreel feedback
             addLocalActivity(currentUser?.nickname || currentUser?.name
                 ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${bizName}`
-                : `📍 A guest checked-in at ${bizName}`
+                : `📍 Guest Supporter checked-in at ${bizName}`
             );
 
             const { evaluateBadges } = await import('../utils/badgeLogic');
@@ -392,15 +393,16 @@ const Scanner = () => {
         }
 
         try {
-            const isGhost = !currentUser;
+            const isGuest = !currentUser;
 
-            if (isGhost) {
-                const ghostPurchase = firebase.functions().httpsCallable('ghostpurchase');
-                const result = await ghostPurchase({ 
+            if (isGuest) {
+                const recordGhostPurchase = firebase.functions().httpsCallable('recordghostpurchase');
+                const result = await recordGhostPurchase({ 
                     bizId: scannedBusiness.id, 
                     ghostId, 
                     amount: finalAmount, 
-                    receiptId 
+                    receiptId,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
                 if (result.data.success) {
@@ -426,11 +428,12 @@ const Scanner = () => {
                     bizIndustry: scannedBusiness.industry || 'Unknown',
                     bizLocation: scannedBusiness.location || 'Unknown',
                     userId: activeUserId,
-                    userNickname: currentUser.nickname || currentUser.name || 'Explorer',
+                    userNickname: currentUser.nickname || currentUser.name || 'Ambassador',
                     isGhost: false,
                     amount: finalAmount,
                     receiptId: receiptId,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'pending'
                 });
 
@@ -438,7 +441,7 @@ const Scanner = () => {
                 setIsSuccess(true);
                 setSuccessMsg("Your purchase has been recorded. This is proof that for-good businesses can win.");
                 updateLocalStats('purchase', finalAmount);
-                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Explorer'} supported ${bizName}`);
+                addLocalActivity(`💳 ${currentUser.nickname || currentUser.name || 'Ambassador'} supported ${bizName}`);
                 
                 const { evaluateBadges } = await import('../utils/badgeLogic');
                 const newBadges = await evaluateBadges(currentUser);

@@ -17,7 +17,7 @@ const BusinessPortal = () => {
     const { businesses, loading: bizLoading } = useBusinesses();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const adminEditId = searchParams.get('edit');
+    const adminEditId = searchParams.get('edit') || searchParams.get('bizId');
     
     const [myBusinesses, setMyBusinesses] = useState([]);
     const [selectedBiz, setSelectedBiz] = useState(null);
@@ -36,26 +36,50 @@ const BusinessPortal = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [scannedUserId, setScannedUserId] = useState(null);
     const [showIntelligence, setShowIntelligence] = useState(false);
+    const [isSyncingLedger, setIsSyncingLedger] = useState(false);
 
     const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isCustomerSuccess) && adminEditId;
 
     useEffect(() => {
-        if (businesses.length > 0) {
-            if (isSupportMode) {
-                const target = businesses.find(b => b.id === adminEditId);
-                if (target) {
-                    setMyBusinesses([target]);
-                    handleSelectBiz(target);
-                }
-            } else if (currentUser) {
-                const owned = businesses.filter(b => b.ownerEmail === currentUser.email);
-                setMyBusinesses(owned);
-                if (owned.length === 1) {
-                    handleSelectBiz(owned[0]);
-                }
+        if (isSupportMode && businesses.length > 0) {
+            const target = businesses.find(b => b.id === adminEditId);
+            if (target) {
+                setMyBusinesses([target]);
+                handleSelectBiz(target);
             }
         }
-    }, [businesses, currentUser, adminEditId]);
+    }, [businesses, isSupportMode, adminEditId]);
+
+    useEffect(() => {
+        if (!currentUser?.email || isSupportMode) return;
+
+        const fetchMyBiz = async () => {
+            try {
+                const email = currentUser.email;
+                const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
+                    db.collection('businesses').where('ownerEmail', '==', email).get(),
+                    db.collection('businesses').where('stewardship.managers', 'array-contains', email).get(),
+                    db.collection('businesses').where('stewardship.crew', 'array-contains', email).get()
+                ]);
+
+                const owned = ownedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const managed = managedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const crew = crewSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const all = [...owned, ...managed, ...crew];
+                const unique = Array.from(new Map(all.map(b => [b.id, b])).values());
+                
+                setMyBusinesses(unique);
+                if (unique.length === 1 && !selectedBiz) {
+                    handleSelectBiz(unique[0]);
+                }
+            } catch (err) {
+                console.warn("Failed to fetch stewardship businesses:", err);
+            }
+        };
+
+        fetchMyBiz();
+    }, [currentUser, isSupportMode]);
 
     const stewardshipLevel = selectedBiz ? getStewardshipLevel(selectedBiz) : null;
     const canEditProfile = stewardshipLevel === 'founder' || stewardshipLevel === 'support';
@@ -64,37 +88,57 @@ const BusinessPortal = () => {
 
     const [shardedStats, setShardedStats] = useState({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
 
+    const handleSyncLedger = async () => {
+        if (!selectedBiz || isSyncingLedger) return;
+        setIsSyncingLedger(true);
+        try {
+            const syncFn = firebase.functions().httpsCallable('syncmerchantledger');
+            const result = await syncFn({ bizId: selectedBiz.id });
+            console.log(`SYNC: Pulled ${result.data?.count || 0} transactions into projection.`);
+        } catch (e) {
+            console.error("Manual sync failed:", e);
+            alert("Sync failed: " + e.message);
+        } finally {
+            setIsSyncingLedger(false);
+        }
+    };
+
     const handleSelectBiz = async (biz) => {
         setSelectedBiz(biz);
         setShardedStats({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
         
+        // INTELLIGENCE CENTER PIVOT: Pull from the specialized aggregation doc
         try {
-            const shardSnap = await db.collection('businesses').doc(biz.id).collection('shards').get();
-            let checkins = biz.checkinsCount || 0;
-            let ghostCheckins = biz.ghostCheckinsCount || 0;
-            let purchases = biz.purchasesCount || 0;
-            let volume = biz.purchaseVolume || 0;
+            const intelSnap = await db.collection('businesses').doc(biz.id).collection('intelligence').doc('latest').get();
+            if (intelSnap.exists) {
+                const data = intelSnap.data();
+                setShardedStats({
+                    checkins: data.totalCheckins || 0,
+                    ghostCheckins: data.ghostCheckins || 0,
+                    purchases: data.totalPurchases || 0,
+                    volume: data.communityImpact || 0,
+                    loyalSupporters: data.loyalSupporters || 0,
+                    uniqueVisitors: data.uniqueVisitors || 0
+                });
+            } else {
+                // Fallback to legacy shard summing if doc doesn't exist yet
+                const shardSnap = await db.collection('businesses').doc(biz.id).collection('shards').get();
+                let checkins = biz.checkinsCount || 0;
+                let ghostCheckins = biz.ghostCheckinsCount || 0;
+                let purchases = biz.purchasesCount || 0;
+                let volume = biz.purchaseVolume || 0;
 
-            shardSnap.forEach(doc => {
-                const s = doc.data();
-                checkins += (s.checkinsCount || 0);
-                ghostCheckins += (s.ghostCheckinsCount || 0);
-                purchases += (s.purchasesCount || 0);
-                volume += (s.purchaseVolume || 0);
-            });
-
-            // Calculate Member-only checkins (Total - Ghost)
-            const memberCheckins = checkins - ghostCheckins;
-
-            setShardedStats({ 
-                checkins: memberCheckins, 
-                ghostCheckins, 
-                purchases, 
-                volume 
-            });
-
+                shardSnap.forEach(doc => {
+                    const s = doc.data();
+                    checkins += (s.checkinsCount || 0);
+                    ghostCheckins += (s.ghostCheckinsCount || 0);
+                    purchases += (s.purchasesCount || 0);
+                    volume += (s.purchaseVolume || 0);
+                });
+                setShardedStats({ checkins: checkins - ghostCheckins, ghostCheckins, purchases, volume });
+            }
         } catch (e) {
-            console.warn("Failed to fetch shards:", e);
+            console.warn("Intelligence fetch failed:", e);
         }
 
         setFormData({
@@ -133,6 +177,20 @@ const BusinessPortal = () => {
             </div>
         );
     }
+
+    const handleDownloadStandee = () => {
+        if (!selectedBiz) return;
+        const main = document.createElement('canvas');
+        main.width = 1118; main.height = 1588;
+        const qr = document.getElementById('hidden-qr');
+        if (!qr) return alert("QR Generator not ready. Please try again.");
+        
+        const dataUrl = drawStandee(main, qr, selectedBiz.name);
+        const link = document.createElement('a');
+        link.download = `BFG_Standee_${selectedBiz.id}.png`;
+        link.href = dataUrl;
+        link.click();
+    };
 
     const getIndustryIcon = (industry) => {
         const map = {
@@ -260,9 +318,31 @@ const BusinessPortal = () => {
                     </div>
                 </div>
             )}
-
             {selectedBiz && (
                 <div className="slide-up" style={{ marginTop: '1.5rem' }}>
+                    <div className="portal-header" style={{ marginBottom: '2.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>Operations Hub</h1>
+                                <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                    {selectedBiz.name} • Daily Engagements
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button 
+                                    onClick={() => navigate('/merchant-portal')} 
+                                    className="btn btn-secondary"
+                                    style={{ background: 'rgba(255,255,255,0.05)' }}
+                                >
+                                    <i className="fa-solid fa-arrow-left"></i> Strategy Hub
+                                </button>
+                                <button onClick={handleDownloadStandee} className="btn btn-secondary" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                    <i className="fa-solid fa-download"></i> Get Standee
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <div>
@@ -276,60 +356,7 @@ const BusinessPortal = () => {
                             <div style={{ display: 'none' }}>
                                 <QRCodeCanvas id="hidden-qr" value={`${window.location.origin}/scanner?bizId=${selectedBiz.id}`} size={550} level="H" />
                             </div>
-
-                            <button onClick={() => {
-                                const main = document.createElement('canvas');
-                                main.width = 1118; main.height = 1588;
-                                const qr = document.getElementById('hidden-qr');
-                                const dataUrl = drawStandee(main, qr, selectedBiz.name);
-                                const link = document.createElement('a');
-                                link.download = `BFG_Standee_${selectedBiz.id}.png`;
-                                link.href = dataUrl;
-                                link.click();
-                            }} className="nav-btn active" style={{ fontSize: '0.85rem' }}>
-                                <i className="fa-solid fa-download"></i> Download A5 Standee
-                            </button>
                         </div>
-
-                        {selectedBiz.onboardingCode && (
-                            <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(var(--primary-rgb), 0.1)', border: '1px solid var(--primary-light)', borderRadius: '16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-                                    <div style={{ background: 'var(--primary)', padding: '12px', borderRadius: '12px' }}>
-                                        <i className="fa-solid fa-handshake" style={{ color: 'white', fontSize: '1.2rem' }}></i>
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h4 style={{ margin: 0, color: 'white' }}>The Advocate Handshake</h4>
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
-                                            Share this unique code with the member who recommended our network to you. When they enter it in their app, they will be recognized as your official <strong>Network Ambassador</strong>.
-                                        </p>
-                                        <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{ 
-                                                background: 'rgba(0,0,0,0.3)', 
-                                                padding: '10px 20px', 
-                                                borderRadius: '8px', 
-                                                fontFamily: 'monospace', 
-                                                fontSize: '1.2rem', 
-                                                letterSpacing: '2px',
-                                                color: 'var(--primary-light)',
-                                                border: '1px dashed var(--primary-light)'
-                                            }}>
-                                                {selectedBiz.onboardingCode}
-                                            </div>
-                                            <button 
-                                                className="btn-icon" 
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(selectedBiz.onboardingCode);
-                                                    alert("Code copied to clipboard!");
-                                                }}
-                                                style={{ padding: '10px', borderRadius: '8px' }}
-                                            >
-                                                <i className="fa-solid fa-copy"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                              <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -351,70 +378,43 @@ const BusinessPortal = () => {
                                 <div className="stat-label">Purchases from the Network</div>
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(76, 175, 80, 0.1)' }}>
-                                <div className="stat-value" style={{ color: '#4caf50' }}>{selectedBiz.isVerified ? 'VERIFIED' : 'PENDING'}</div>
-                                <div className="stat-label">Status</div>
+                                <div className="stat-value" style={{ color: '#4caf50' }}>{selectedBiz.isVerified ? 'VERIFIED' : 'ACTIVE'}</div>
+                                <div className="stat-label">Network Status</div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Intelligence Center (Aggregate & Bonds) */}
+                    {/* Operational Core */}
                     <div className="glass-card" style={{ marginBottom: '2.5rem', border: '1px solid var(--loyalty-glass-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <div>
                                 <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <i className="fa-solid fa-brain" style={{ color: '#ffb84d' }}></i>
-                                    {canSeeIntelligence ? 'Intelligence Center' : 'Operational Scanner'}
+                                    <i className="fa-solid fa-qrcode" style={{ color: '#ffb84d' }}></i>
+                                    Engagement Scanner
                                 </h3>
                                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                    {canSeeIntelligence ? 'Securely access customer loyalty and recognition data.' : 'Scan customer cards to record engagement.'}
+                                    Scan customer cards to record engagement and recognize loyalty.
                                 </p>
                             </div>
-                            <div className="portal-header-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-                                <button 
-                                    onClick={() => setShowScanner(true)}
-                                    className="nav-btn active" 
-                                    style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px' }}
-                                >
-                                    <i className="fa-solid fa-qrcode"></i> Scan Customer
-                                </button>
-                                {canSeeIntelligence && (
-                                    <button 
-                                        onClick={() => {
-                                            setScannedUserId('demo-user-id');
-                                            setShowIntelligence(true);
-                                        }}
-                                        className="nav-btn" 
-                                        style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '50px', background: 'rgba(255,255,255,0.05)' }}
-                                    >
-                                        <i className="fa-solid fa-eye"></i> Preview Intelligence UI
-                                    </button>
-                                )}
-                            </div>
+                            <button 
+                                onClick={() => setShowScanner(true)}
+                                className="nav-btn active feature-gradient" 
+                                style={{ borderRadius: 'var(--radius-full)', height: '50px', padding: '0 2rem' }}
+                            >
+                                <i className="fa-solid fa-camera"></i> Launch Scanner
+                            </button>
                         </div>
-
-                        {canSeeIntelligence && (
-                            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{selectedBiz.checkinsCount || 0}</div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Unique Visitors</div>
-                                </div>
-                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffb84d' }}>{selectedBiz.purchasesCount || 0}</div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Loyal Supporters</div>
-                                </div>
-                                <div style={{ padding: '1.2rem', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(selectedBiz.purchaseVolume || 0).toLocaleString()}</div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Community Impact</div>
-                                </div>
-                            </div>
-                        )}
 
                         <GratitudeBondsLog 
                             bizId={selectedBiz.id} 
                             canSeeIntelligence={canSeeIntelligence}
                             onSelectUser={(uid) => {
-                                setScannedUserId(uid);
-                                setShowIntelligence(true);
+                                if (canSeeIntelligence) {
+                                    setScannedUserId(uid);
+                                    setShowIntelligence(true);
+                                } else {
+                                    alert("Recognition details are restricted to Owners and Managers.");
+                                }
                             }} 
                         />
                     </div>
@@ -426,77 +426,30 @@ const BusinessPortal = () => {
                                 <h3 style={{ margin: 0 }}><i className="fa-solid fa-user-check" style={{ color: '#ffb84d' }}></i> Purchase Verification Queue</h3>
                                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Review and verify customer purchase logs to validate network impact.</p>
                             </div>
+                            <button 
+                                onClick={handleSyncLedger}
+                                disabled={isSyncingLedger}
+                                className="nav-btn"
+                                style={{ 
+                                    padding: '0.4rem 1rem', 
+                                    fontSize: '0.75rem', 
+                                    background: 'rgba(255,255,255,0.05)',
+                                    borderRadius: 'var(--radius-full)',
+                                    color: 'var(--text-secondary)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}
+                            >
+                                {isSyncingLedger ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate"></i>}
+                                Sync Ledger
+                            </button>
                         </div>
 
                         <PendingVerifications bizId={selectedBiz.id} />
                     </div>
 
-                    {canEditProfile && (
-                        <div className="glass-card slide-up">
-                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <i className="fa-solid fa-feather-pointed" style={{ color: 'var(--primary)' }}></i>
-                                Public Narrative
-                            </h3>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '1.5rem' }}>Manage how the conviction story is presented to the network.</p>
-                            
-                            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <div className="form-group">
-                                    <label>Founder's Story</label>
-                                    <textarea className="input-modern" rows="5" value={formData.story} onChange={(e) => setFormData({...formData, story: e.target.value})} placeholder="Tell the community about your conviction..." />
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group">
-                                        <label>Website URL</label>
-                                        <input type="url" className="input-modern" value={formData.website} onChange={(e) => setFormData({...formData, website: e.target.value})} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Contact Email</label>
-                                        <input type="email" className="input-modern" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
-                                    </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Public Purpose Statement</label>
-                                    <input type="text" className="input-modern" value={formData.purposeStatement} onChange={(e) => setFormData({...formData, purposeStatement: e.target.value})} placeholder="Describe your business' core mission..." />
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group">
-                                        <label>Founder Photo (URL)</label>
-                                        <input type="url" className="input-modern" value={formData.founderImg} onChange={(e) => setFormData({...formData, founderImg: e.target.value})} placeholder="https://..." />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Shopfront Banner (URL)</label>
-                                        <input type="url" className="input-modern" value={formData.shopfrontImg} onChange={(e) => setFormData({...formData, shopfrontImg: e.target.value})} placeholder="https://..." />
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group">
-                                        <label>Google Maps Pin (URL)</label>
-                                        <input type="url" className="input-modern" value={formData.googleMapsUrl} onChange={(e) => setFormData({...formData, googleMapsUrl: e.target.value})} placeholder="https://goo.gl/maps/..." />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Narrative Video (YouTube/Vimeo URL)</label>
-                                        <input type="url" className="input-modern" value={formData.videoUrl} onChange={(e) => setFormData({...formData, videoUrl: e.target.value})} placeholder="https://youtube.com/..." />
-                                    </div>
-                                </div>
-
-                                <button 
-                                    type="submit" 
-                                    disabled={isSaving} 
-                                    className="btn-save-modern"
-                                >
-                                    {isSaving ? (
-                                        <><i className="fa-solid fa-circle-notch fa-spin"></i> Synchronizing...</>
-                                    ) : (
-                                        <><i className="fa-solid fa-floppy-disk"></i> Finalize Profile Changes</>
-                                    )}
-                                </button>
-                            </form>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -534,8 +487,8 @@ const PendingVerifications = ({ bizId }) => {
 
     useEffect(() => {
         if (!bizId) return;
-        const unsubscribe = db.collection('transactions')
-            .where('bizId', '==', bizId)
+        // PIVOT: Query the partitioned sub-collection instead of the global ledger
+        const unsubscribe = db.collection('businesses').doc(bizId).collection('transactions')
             .where('status', '==', 'pending')
             .where('type', '==', 'purchase')
             .orderBy('timestamp', 'desc')
@@ -549,36 +502,26 @@ const PendingVerifications = ({ bizId }) => {
     const handleVerify = async (trans, isApproved) => {
         setProcessing(trans.id);
         try {
-            const batch = db.batch();
-            const transRef = db.collection('transactions').doc(trans.id);
-            const bizRef = db.collection('businesses').doc(bizId);
-            const userRef = db.collection('users').doc(trans.userId);
-            const statsRef = db.collection('system').doc('stats');
-
             if (isApproved) {
-                const amount = parseFloat(trans.amount) || 0;
-                
-                // Status update only. The system calculates impact from verified/pending transactions dynamically.
-                batch.update(transRef, { status: 'verified', verifiedAt: new Date().toISOString(), verifiedBy: currentUser.email });
-
-                // Log to Audit Trail
-                const logRef = db.collection('audit_logs').doc();
-                batch.set(logRef, {
-                    bizId,
-                    action: 'PURCHASE_VERIFIED',
-                    details: `Purchase of RM ${amount} by ${trans.userNickname} verified by Founder.`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentUser.email,
-                    userNickname: currentUser.nickname || currentUser.name || currentUser.email.split('@')[0] || 'Explorer'
-                });
+                // 3-POINT ATOMIC BATCH: Handled by server for absolute integrity
+                const verifyFn = firebase.functions().httpsCallable('verifypurchase');
+                await verifyFn({ txnId: trans.id, bizId });
             } else {
-                batch.update(transRef, { status: 'rejected', rejectedAt: new Date().toISOString(), rejectedBy: currentUser.email });
+                // Rejection remains simple
+                await db.collection('businesses').doc(bizId).collection('transactions').doc(trans.id).update({ 
+                    status: 'rejected', 
+                    rejectedAt: new Date().toISOString(), 
+                    rejectedBy: currentUser.email 
+                });
+                await db.collection('transactions').doc(trans.id).update({ 
+                    status: 'rejected', 
+                    rejectedAt: new Date().toISOString(), 
+                    rejectedBy: currentUser.email 
+                });
             }
-
-            await batch.commit();
         } catch (e) {
             console.error("Verification failed:", e);
-            alert("Verification failed. See console.");
+            alert("Verification failed: " + e.message);
         } finally {
             setProcessing(null);
         }
@@ -642,7 +585,7 @@ const GratitudeBondsLog = ({ bizId, onSelectUser, canSeeIntelligence }) => {
     useEffect(() => {
         if (!bizId) return;
         const now = new Date();
-        const unsubscribe = db.collection('gratitude_bond_records')
+        const unsubscribe = db.collection('gratitude_bond_transfer')
             .where('bizId', '==', bizId)
             .where('type', '==', 'handshake_scan')
             .where('expiresAt', '>', now)

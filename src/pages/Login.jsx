@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-    const { joinMovement, continueAsGuest, sendPasswordReset } = useAuth();
+    const { login, signup, continueAsGuest, sendPasswordReset } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -20,8 +20,8 @@ const Login = () => {
         }
     }, []);
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
+    const handleAuth = async (e, mode) => {
+        if (e) e.preventDefault();
         setError('');
         setMessage('');
         setIsProcessing(true);
@@ -33,11 +33,18 @@ const Login = () => {
                 localStorage.removeItem('bfg_remembered_email');
             }
             
-            // This now handles both existing login AND new registration automatically
-            await joinMovement(email, password);
+            if (mode === 'signup') {
+                await signup(email, password);
+            } else {
+                await login(email, password);
+            }
             navigate('/');
         } catch (err) {
-            setError(err.message || 'Authentication failed. Please check credentials.');
+            let msg = err.message;
+            if (err.code === 'auth/user-not-found') msg = "No account found with this email. Click 'Join the Movement' to register.";
+            if (err.code === 'auth/wrong-password') msg = "Incorrect password. Please try again.";
+            if (err.code === 'auth/email-already-in-use') msg = "An account already exists with this email. Please Log In instead.";
+            setError(msg || 'Authentication failed.');
         } finally {
             setIsProcessing(false);
         }
@@ -67,7 +74,13 @@ const Login = () => {
                 </p>
 
                 <div className="glass-card" style={{ width: '100%', padding: '2rem' }}>
-                    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <form onSubmit={(e) => handleAuth(e, 'login')} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {localStorage.getItem('bfg_personal_stats') && (
+                            <div className="glass-card" style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '12px', color: '#fcd34d', fontSize: '0.85rem', textAlign: 'center' }}>
+                                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '6px' }}></i> 
+                                <strong>Warning:</strong> Logging in as a different user will permanently overwrite your current anonymous impact data. If this is your first time, please Register to claim it.
+                            </div>
+                        )}
                         <div className="form-group">
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Email Address</label>
                             <input
@@ -114,14 +127,32 @@ const Login = () => {
                         {error && <div style={{ color: 'var(--accent)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.5rem' }}>{error}</div>}
                         {message && <div style={{ color: 'var(--accent-success)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.5rem' }}>{message}</div>}
 
-                        <button
-                            type="submit"
-                            className="btn btn-primary btn-block"
-                            disabled={isProcessing}
-                            style={{ padding: '1rem', marginTop: '0.5rem' }}
-                        >
-                            {isProcessing ? 'Processing...' : 'Join the Movement'}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                            <button
+                                type="button"
+                                onClick={(e) => handleAuth(e, 'login')}
+                                className="btn btn-primary"
+                                disabled={isProcessing}
+                                style={{ padding: '1rem', border: 'none' }}
+                            >
+                                {isProcessing ? 'Processing...' : 'Log In'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={(e) => handleAuth(e, 'signup')}
+                                className="btn"
+                                disabled={isProcessing}
+                                style={{ 
+                                    padding: '1rem', 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    color: 'white'
+                                }}
+                            >
+                                {isProcessing ? 'Processing...' : 'Join the Movement'}
+                            </button>
+                        </div>
                     </form>
 
                     <div style={{ textAlign: 'center', marginTop: '1.75rem' }}>

@@ -20,7 +20,7 @@ const OnboardingHub = () => {
         if (!currentUser) return;
 
         const unsubscribe = db.collection('applications')
-            .where('status', 'in', ['pending', 'draft'])
+            .where('status', 'in', ['draft', 'onboarding'])
             .onSnapshot(snap => {
                 setApplications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setLoading(false);
@@ -59,7 +59,7 @@ const OnboardingHub = () => {
     const handleUpdateApp = async (updates) => {
         setIsActioning(true);
         try {
-            const isActiveBusiness = editingApp.status === 'active' || !editingApp.status;
+            const isActiveBusiness = editingApp.status === 'approved' || !editingApp.status;
             if (isActiveBusiness) {
                 await db.collection('businesses').doc(editingApp.id).update(updates);
                 alert("Business profile updated successfully!");
@@ -92,22 +92,6 @@ const OnboardingHub = () => {
 
     return (
         <div style={{ paddingBottom: '3rem', maxWidth: '900px', margin: '0 auto' }}>
-            {/* Header Section */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', marginTop: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div className="glass-card" style={{ width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                        <i className="fa-solid fa-store fa-xl" style={{ color: '#3B82F6' }}></i>
-                    </div>
-                    <div>
-                        <h1 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0 }}>Merchant Portal</h1>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Growth & Strategic Support</p>
-                    </div>
-                </div>
-                <button onClick={() => navigate('/profile')} className="icon-btn glass-card" style={{ padding: '0.6rem 1rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <i className="fa-solid fa-arrow-left" style={{ fontSize: '1.1rem' }}></i>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8 }}>Back</span>
-                </button>
-            </div>
 
             {/* Navigation */}
             <div className="glass-card" style={{ display: 'inline-flex', padding: '0.4rem', borderRadius: 'var(--radius-full)', marginBottom: '2rem', gap: '0.4rem', background: 'rgba(255,255,255,0.02)' }}>
@@ -168,7 +152,7 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
     if (loading) return <div style={{ textAlign: 'center', padding: '4rem 0', opacity: 0.5 }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
     const myAssignments = applications.filter(a => a.assignedTo === currentUser.uid);
-    const unassigned = applications.filter(a => !a.assignedTo && a.status === 'pending');
+    const unassigned = applications.filter(a => !a.assignedTo && a.status === 'submitted');
 
     return (
         <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>

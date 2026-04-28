@@ -59,30 +59,9 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                     </div>
                 ) : (
                     <>
-                        {/* MOCK DATA OVERRIDE FOR REVIEW */}
-                        {(function() {
-                            if (!data) {
-                                window.mockData = {
-                                    nickname: 'Loyal Supporter (Demo)',
-                                    stats: { checkins: 42, purchases: 12, totalSpend: 1250.50 },
-                                    engagements: [
-                                        { id: 'e1', type: 'purchase', amount: 45.00, timestamp: new Date().toISOString(), receiptId: 'RCPT-001' },
-                                        { id: 'e2', type: 'checkin', timestamp: new Date(Date.now() - 3600000 * 2).toISOString() },
-                                        { id: 'e3', type: 'purchase', amount: 32.50, timestamp: new Date(Date.now() - 86400000).toISOString(), receiptId: 'RCPT-002' },
-                                        { id: 'e4', type: 'checkin', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
-                                        { id: 'e5', type: 'checkin', timestamp: new Date(Date.now() - 86400000 * 5).toISOString() }
-                                    ]
-                                };
-                            }
-                        })()}
-
-                        {(function() {
-                            const d = data || window.mockData;
-                            // Merge logs if using real data, or use mock engagements
-                            const allEngagements = d.engagements || [
-                                ...(d.purchaseLog || []).map(p => ({ ...p, type: 'purchase' })),
-                                ...(d.checkinLog || []).map(c => ({ ...c, type: 'checkin' }))
-                            ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                        {data && (function() {
+                            const d = data;
+                            const allEngagements = d.engagements || [];
 
                             return (
                                 <>
