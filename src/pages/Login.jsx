@@ -130,27 +130,27 @@ const Login = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                             <button
                                 type="button"
-                                onClick={(e) => handleAuth(e, 'login')}
-                                className="btn btn-primary"
+                                onClick={(e) => handleAuth(e, 'signup')}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', padding: '0.5rem 0' }}
                                 disabled={isProcessing}
-                                style={{ padding: '1rem', border: 'none' }}
                             >
-                                {isProcessing ? 'Processing...' : 'Log In'}
+                                {isProcessing ? 'Processing...' : 'Join the Movement'}
                             </button>
 
                             <button
                                 type="button"
-                                onClick={(e) => handleAuth(e, 'signup')}
+                                onClick={(e) => handleAuth(e, 'login')}
                                 className="btn"
                                 disabled={isProcessing}
                                 style={{ 
                                     padding: '1rem', 
                                     background: 'rgba(255,255,255,0.05)', 
                                     border: '1px solid rgba(255,255,255,0.1)',
-                                    color: 'white'
+                                    color: 'white',
+                                    fontWeight: '700'
                                 }}
                             >
-                                {isProcessing ? 'Processing...' : 'Join the Movement'}
+                                {isProcessing ? 'Processing...' : 'Log In'}
                             </button>
                         </div>
                     </form>
