@@ -33,19 +33,32 @@ export const AuthProvider = ({ children }) => {
     const syncRoles = async () => {
         setIsSyncing(true);
         try {
-            const syncFn = functions.httpsCallable('syncuserclaims');
-            await syncFn();
-            const tokenResult = await auth.currentUser.getIdTokenResult(true);
-            setCurrentClaims(tokenResult.claims);
-            setCurrentUser(prev => ({
-                ...(prev || {}),
-                isSuperAdmin: !!tokenResult.claims.isSuperAdmin,
-                isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin,
-                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin,
-                isOwner: !!tokenResult.claims.isOwner
-            }));
+            await functions.httpsCallable('syncuserclaims')();
+            const user = auth.currentUser;
+            if (user) {
+                // FORCE REFRESH: Force a fresh token with the new claims
+                const tokenResult = await user.getIdTokenResult(true);
+                setCurrentClaims(tokenResult.claims);
+                
+                // MANUAL STATE RECOVERY: Since listeners may be blocked, we manually pull the document once
+                const docSnap = await db.collection('users').doc(user.uid).get();
+                if (docSnap.exists) {
+                    const userData = docSnap.data();
+                    setCurrentUser({
+                        ...userData,
+                        uid: user.uid,
+                        email: user.email,
+                        isSuperAdmin: !!tokenResult.claims.isSuperAdmin || !!userData.isSuperAdmin,
+                        isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin || !!userData.isAuditor || !!userData.isSuperAdmin,
+                        isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin || !!userData.isCustomerSuccess || !!userData.isSuperAdmin,
+                        isOwner: !!tokenResult.claims.isOwner || !!userData.isOwner,
+                        isProvisioned: true
+                    });
+                }
+            }
             return { success: true };
         } catch (err) {
+            console.error("Sync failed:", err);
             return { success: false, error: err.message };
         } finally {
             setIsSyncing(false);

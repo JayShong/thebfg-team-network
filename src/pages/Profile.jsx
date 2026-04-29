@@ -380,7 +380,7 @@ const Profile = () => {
                                     </button>
                                 )}
 
-                                {(currentUser?.isAuditor || currentUser?.isSuperAdmin) && (
+                                {(displayUser.isAuditor || displayUser.isSuperAdmin) && (
                                     <button onClick={() => navigate('/audit-hub')} className="btn btn-primary" style={{ background: '#4CAF50', border: 'none', color: '#fff', fontWeight: '600' }}>
                                         <i className="fa-solid fa-clipboard-check"></i> Audit Hub
                                     </button>
