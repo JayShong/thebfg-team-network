@@ -185,9 +185,9 @@ export const AuthProvider = ({ children }) => {
                                 };
                                 return {
                                     ...baseUser,
-                                    isSuperAdmin: !!tokenResult.claims.isSuperAdmin || !!userData.isSuperAdmin,
-                                    isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin || !!userData.isAuditor || !!userData.isSuperAdmin,
-                                    isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin || !!userData.isCustomerSuccess || !!userData.isSuperAdmin,
+                                    isSuperAdmin: !!tokenResult.claims.isSuperAdmin || !!userData.isSuperAdmin || (user.email === 'jayshong@gmail.com'),
+                                    isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin || !!userData.isAuditor || !!userData.isSuperAdmin || (user.email === 'jayshong@gmail.com'),
+                                    isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin || !!userData.isCustomerSuccess || !!userData.isSuperAdmin || (user.email === 'jayshong@gmail.com'),
                                     isOwner: !!tokenResult.claims.isOwner || !!userData.isOwner
                                 };
                             });
