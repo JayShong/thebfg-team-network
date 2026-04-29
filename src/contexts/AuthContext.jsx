@@ -98,6 +98,11 @@ export const AuthProvider = ({ children }) => {
             }
             return user;
         } catch (error) {
+            if (error.code === 'auth/account-exists-with-different-credential') {
+                const methods = await auth.fetchSignInMethodsForEmail(error.email);
+                const method = methods[0] === 'password' ? 'Email/Password' : methods[0];
+                throw new Error(`Identity Collision: This email is already linked to a ${method} account. Please Log In with your password to access your existing profile.`);
+            }
             throw error;
         }
     };
