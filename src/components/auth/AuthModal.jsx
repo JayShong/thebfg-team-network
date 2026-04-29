@@ -166,7 +166,7 @@ const AuthModal = ({ onClose }) => {
                                     e.currentTarget.style.color = 'var(--text-secondary)';
                                 }}
                             >
-                                <i className="fa-solid fa-ghost"></i> Continue exploring as Guest
+                                <i className="fa-solid fa-user-clock"></i> Continue exploring as Guest
                             </button>
                         </div>
                     </div>

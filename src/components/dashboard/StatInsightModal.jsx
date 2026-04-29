@@ -151,7 +151,7 @@ const StatInsightModal = ({ isOpen, onClose, type, stats }) => {
                         <div className="insight-highlight">
                             <p>"Your presence proves the market for good exists. Every signal strengthens the foundation of a new economy."</p>
                         </div>
-                        <p className="insight-desc">Ghost Supports are anonymous signals, while Member Supports are verified impacts from our Ambassador network.</p>
+                        <p className="insight-desc">Guest Supports are anonymous signals, while Member Supports are verified impacts from our Ambassador network.</p>
                     </div>
                 );
 

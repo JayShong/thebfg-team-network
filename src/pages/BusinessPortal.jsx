@@ -88,7 +88,7 @@ const BusinessPortal = () => {
     const canSeeIntelligence = stewardshipLevel === 'founder' || stewardshipLevel === 'manager' || stewardshipLevel === 'support';
     const canVerifyPurchases = stewardshipLevel !== null;
 
-    const [shardedStats, setShardedStats] = useState({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+    const [shardedStats, setShardedStats] = useState({ checkins: 0, guestCheckins: 0, purchases: 0, volume: 0 });
 
     const handleSyncLedger = async () => {
         if (!selectedBiz || isSyncingLedger) return;
@@ -109,7 +109,7 @@ const BusinessPortal = () => {
 
     const handleSelectBiz = async (biz) => {
         setSelectedBiz(biz);
-        setShardedStats({ checkins: 0, ghostCheckins: 0, purchases: 0, volume: 0 });
+        setShardedStats({ checkins: 0, guestCheckins: 0, purchases: 0, volume: 0 });
         
         // INTELLIGENCE CENTER PIVOT: Pull from the specialized aggregation doc
         try {
@@ -118,7 +118,7 @@ const BusinessPortal = () => {
                 const data = intelSnap.data();
                 setShardedStats({
                     checkins: data.totalCheckins || 0,
-                    ghostCheckins: data.ghostCheckins || 0,
+                    guestCheckins: data.guestCheckins || 0,
                     purchases: data.totalPurchases || 0,
                     volume: data.communityImpact || 0,
                     loyalSupporters: data.loyalSupporters || 0,
@@ -128,18 +128,18 @@ const BusinessPortal = () => {
                 // Fallback to legacy shard summing if doc doesn't exist yet
                 const shardSnap = await db.collection('businesses').doc(biz.id).collection('shards').get();
                 let checkins = biz.checkinsCount || 0;
-                let ghostCheckins = biz.ghostCheckinsCount || 0;
+                let guestCheckins = biz.guestCheckinsCount || 0;
                 let purchases = biz.purchasesCount || 0;
                 let volume = biz.purchaseVolume || 0;
 
                 shardSnap.forEach(doc => {
                     const s = doc.data();
                     checkins += (s.checkinsCount || 0);
-                    ghostCheckins += (s.ghostCheckinsCount || 0);
+                    guestCheckins += (s.guestCheckinsCount || 0);
                     purchases += (s.purchasesCount || 0);
                     volume += (s.purchaseVolume || 0);
                 });
-                setShardedStats({ checkins: checkins - ghostCheckins, ghostCheckins, purchases, volume });
+                setShardedStats({ checkins: checkins - guestCheckins, guestCheckins, purchases, volume });
             }
         } catch (e) {
             console.warn("Intelligence fetch failed:", e);
@@ -413,9 +413,9 @@ const BusinessPortal = () => {
                                 <div className="stat-label">Member Check-ins</div>
                             </div>
                             <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                                <div className="stat-value" style={{ color: '#ffb84d' }}>{shardedStats.ghostCheckins || selectedBiz.ghostCheckinsCount || 0}</div>
+                                <div className="stat-value" style={{ color: '#ffb84d' }}>{shardedStats.guestCheckins || selectedBiz.guestCheckinsCount || 0}</div>
                                 <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                                    Ghost Check-ins 
+                                    Guest Check-ins 
                                     <i className="fa-solid fa-circle-question" title="Anonymous support acknowledgments from unregistered visitors. These are not linked to registered identities." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
                                 </div>
                             </div>

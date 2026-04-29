@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
     const [currentClaims, setCurrentClaims] = useState({});
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(() => localStorage.getItem('bfg_guest_mode') === 'true');
-    const [ghostId, setGhostId] = useState(() => localStorage.getItem('bfg_ghost_id'));
+    const [guestId, setGuestId] = useState(() => localStorage.getItem('bfg_guest_id'));
     const [isSyncing, setIsSyncing] = useState(false);
     const [pulseFeed, setPulseFeed] = useState([]);
     const [localActivities, setLocalActivities] = useState([]);
@@ -99,17 +99,17 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('bfg_guest_mode');
 
                 // Identity Handshake: Reclaim anonymous history
-                const storedGhostId = localStorage.getItem('bfg_ghost_id');
-                if (storedGhostId && !window._bfg_claiming) {
+                const storedGuestId = localStorage.getItem('bfg_guest_id');
+                if (storedGuestId && !window._bfg_claiming) {
                     window._bfg_claiming = true;
-                    console.log("🤝 AUTH: Reclaiming anonymous history for:", storedGhostId);
+                    console.log("🤝 AUTH: Reclaiming anonymous history for:", storedGuestId);
                     
-                    functions.httpsCallable('acceptinvitationtojoinnetwork')({ ghostId: storedGhostId })
+                    functions.httpsCallable('acceptinvitationtojoinnetwork')({ guestId: storedGuestId })
                         .then((result) => {
                             if (result.data?.success) {
-                                setGhostId(null);
+                                setGuestId(null);
                                 localStorage.removeItem('bfg_personal_stats');
-                                localStorage.removeItem('bfg_ghost_id');
+                                localStorage.removeItem('bfg_guest_id');
                                 console.log("🤝 AUTH: Handshake success. Guest cache purged.");
                             } else {
                                 console.warn("Handshake backend error:", result.data?.message);
@@ -222,10 +222,10 @@ export const AuthProvider = ({ children }) => {
                 const guestMode = localStorage.getItem('bfg_guest_mode') === 'true';
                 setIsGuest(guestMode);
                 
-                if (guestMode && !localStorage.getItem('bfg_ghost_id')) {
-                    const newId = `GHOST_${window.crypto.randomUUID()}`;
-                    setGhostId(newId);
-                    localStorage.setItem('bfg_ghost_id', newId);
+                if (guestMode && !localStorage.getItem('bfg_guest_id')) {
+                    const newId = `GUEST_${window.crypto.randomUUID()}`;
+                    setGuestId(newId);
+                    localStorage.setItem('bfg_guest_id', newId);
                 }
 
                 setCurrentUser(null);
@@ -253,7 +253,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setIsGuest(false);
         localStorage.removeItem('bfg_guest_mode');
-        // bfg_ghost_id and bfg_personal_stats are preserved for future claiming
+        // bfg_guest_id and bfg_personal_stats are preserved for future claiming
         setCurrentUser(null);
         setCurrentClaims({});
         return auth.signOut();
@@ -262,10 +262,10 @@ export const AuthProvider = ({ children }) => {
     const continueAsGuest = () => {
         setIsGuest(true);
         localStorage.setItem('bfg_guest_mode', 'true');
-        if (!localStorage.getItem('bfg_ghost_id')) {
-            const newId = `GHOST_${window.crypto.randomUUID()}`;
-            setGhostId(newId);
-            localStorage.setItem('bfg_ghost_id', newId);
+        if (!localStorage.getItem('bfg_guest_id')) {
+            const newId = `GUEST_${window.crypto.randomUUID()}`;
+            setGuestId(newId);
+            localStorage.setItem('bfg_guest_id', newId);
         }
     };
 
@@ -288,7 +288,7 @@ export const AuthProvider = ({ children }) => {
         continueAsGuest,
         sendPasswordReset,
         setLoading,
-        ghostId,
+        guestId,
         pulseFeed,
         localActivities,
         addLocalActivity,

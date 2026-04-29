@@ -176,7 +176,7 @@ export const evaluateBadges = async (user) => {
 
 /**
  * Helper to simulate badges for guests based on their session impact (localStorage)
- * This allows the Ghost Teaser Tier architecture to function correctly.
+ * This allows the Guest Teaser Tier architecture to function correctly.
  */
 export const getGuestBadges = (stats = {}) => {
     const badges = {};

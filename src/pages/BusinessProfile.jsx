@@ -93,7 +93,7 @@ const BusinessProfile = () => {
     );
 
     const stats = {
-        checkins: intelligence?.totalCheckins || (business?.checkinsCount || 0) + (business?.ghostCheckinsCount || 0),
+        checkins: intelligence?.totalCheckins || (business?.checkinsCount || 0) + (business?.guestCheckinsCount || 0),
         purchases: intelligence?.totalPurchases || business?.purchasesCount || 0,
         volume: intelligence?.communityImpact || business?.purchaseVolume || 0
     };

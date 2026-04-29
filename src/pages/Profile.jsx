@@ -270,7 +270,7 @@ const Profile = () => {
                         )}
                         {displayUser.isGuest && (
                             <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '0.2rem 0.6rem', borderRadius: '1rem', fontSize: '0.7rem', fontWeight: '600' }}>
-                                <i className="fa-solid fa-ghost"></i> Guest Supporter
+                                <i className="fa-solid fa-user-clock"></i> Guest Supporter
                             </span>
                         )}
                     </div>

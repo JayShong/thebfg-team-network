@@ -21,7 +21,7 @@ const Home = () => {
             }
         } catch (e) { console.warn("Global stats cache corrupt"); }
         return {
-            consumers: 0, businesses: 0, checkins: 0, ghostCheckins: 0,
+            consumers: 0, businesses: 0, checkins: 0, guestCheckins: 0,
             purchases: 0, purchaseVolume: 0, totalWaste: 0, totalTrees: 0,
             totalFamilies: 0, gdpPenetration: "0.01%", initiativeParticipation: 0,
             sentinelBlocks: 0
@@ -291,8 +291,8 @@ const Home = () => {
                         </h3>
                         <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                             {isLoading ? '...' : (stats.checkins || 0).toLocaleString()}
-                            <span style={{ color: 'var(--accent-ghost)', fontWeight: '400', fontSize: '1.2rem', marginLeft: '8px' }}>
-                                | {isLoading ? '...' : (stats.ghostCheckins || 0).toLocaleString()}
+                            <span style={{ color: 'var(--accent-guest)', fontWeight: '400', fontSize: '1.2rem', marginLeft: '8px' }}>
+                                | {isLoading ? '...' : (stats.guestCheckins || 0).toLocaleString()}
                             </span>
                         </div>
                     </div>

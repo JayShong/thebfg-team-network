@@ -5,7 +5,7 @@ import firebase from 'firebase/compat/app';
 import { updateLocalStatsBuffer } from '../../utils/impactEngine';
 
 const ReceiptLogger = ({ businesses }) => {
-    const { currentUser, isGuest, ghostId, addLocalActivity } = useAuth();
+    const { currentUser, isGuest, guestId, addLocalActivity } = useAuth();
     const [bizId, setBizId] = useState('');
     const [receipt, setReceipt] = useState('');
     const [amount, setAmount] = useState('');
@@ -41,16 +41,16 @@ const ReceiptLogger = ({ businesses }) => {
             const bizName = (businesses || []).find(b => b.id === bizId)?.name || 'Unknown Business';
 
             if (isGuest) {
-                const ghostPurchase = firebase.functions().httpsCallable('recordghostpurchase');
-                const result = await ghostPurchase({ 
+                const guestPurchase = firebase.functions().httpsCallable('recordguestpurchase');
+                const result = await guestPurchase({ 
                     bizId, 
-                    ghostId, 
+                    guestId, 
                     amount: parseFloat(amount), 
                     receiptId: receipt 
                 });
-
+ 
                 if (result.data.success) {
-                    setMessage({ text: 'Ghost Purchase logged! Accept the Invitation to claim your status.', type: 'success' });
+                    setMessage({ text: 'Guest Purchase logged! Accept the Invitation to claim your status.', type: 'success' });
                     updateLocalStats('purchase', parseFloat(amount));
                     addLocalActivity(`💳 Guest Supporter supported ${bizName}`);
                 } else {
@@ -63,7 +63,7 @@ const ReceiptLogger = ({ businesses }) => {
                     bizName: bizName,
                     userId: currentUser.uid,
                     userNickname: currentUser.nickname || currentUser.name || 'Ambassador',
-                    isGhost: false,
+                    isGuest: false,
                     receiptId: receipt,
                     amount: parseFloat(amount),
                     status: 'pending',

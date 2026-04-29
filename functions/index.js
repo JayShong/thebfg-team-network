@@ -86,7 +86,7 @@ exports.reconcilenetworkstats = onSchedule('0 3 * * *', async (event) => {
         ]);
 
         let globalCheckins = 0;
-        let globalGhostCheckins = 0;
+        let globalGuestCheckins = 0;
         let globalPurchases = 0;
         let globalVolume = 0;
         let globalAttendance = 0;
@@ -94,7 +94,7 @@ exports.reconcilenetworkstats = onSchedule('0 3 * * *', async (event) => {
         bizSnap.forEach(doc => {
             const b = doc.data();
             globalCheckins += (b.checkinsCount || 0);
-            globalGhostCheckins += (b.ghostCheckinsCount || 0);
+            globalGuestCheckins += (b.guestCheckinsCount || 0);
             globalPurchases += (b.purchasesCount || 0);
             globalVolume += (b.purchaseVolume || 0);
         });
@@ -109,7 +109,7 @@ exports.reconcilenetworkstats = onSchedule('0 3 * * *', async (event) => {
             consumers: uCount.data().count,
             businesses: bizSnap.size,
             checkins: globalCheckins,
-            ghostCheckins: globalGhostCheckins,
+            guestCheckins: globalGuestCheckins,
             purchases: globalPurchases,
             purchaseVolume: globalVolume,
             totalAttendance: globalAttendance,
@@ -139,7 +139,7 @@ exports.aggregateglobalshards = onSchedule('every 5 minutes', async (event) => {
     try {
         const shardsSnap = await db.collection('system').doc('stats').collection('shards').get();
         const totals = {
-            checkins: 0, ghostCheckins: 0, purchases: 0, 
+            checkins: 0, guestCheckins: 0, purchases: 0, 
             purchaseVolume: 0, totalAttendance: 0, consumers: 0
         };
 
@@ -158,7 +158,7 @@ exports.aggregateglobalshards = onSchedule('every 5 minutes', async (event) => {
 
         await db.collection('system').doc('stats').set({
             checkins: (base.checkins || 0) + totals.checkins,
-            ghostCheckins: (base.ghostCheckins || 0) + totals.ghostCheckins,
+            guestCheckins: (base.guestCheckins || 0) + totals.guestCheckins,
             purchases: (base.purchases || 0) + totals.purchases,
             purchaseVolume: (base.purchaseVolume || 0) + totals.purchaseVolume,
             totalAttendance: (base.totalAttendance || 0) + totals.totalAttendance,
@@ -187,7 +187,7 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
     const globalIncs = {};
     if (txn.type === 'checkin') {
         globalIncs.checkins = admin.firestore.FieldValue.increment(1);
-        if (txn.isGhost) globalIncs.ghostCheckins = admin.firestore.FieldValue.increment(1);
+        if (txn.isGuest) globalIncs.guestCheckins = admin.firestore.FieldValue.increment(1);
     } else if (txn.type === 'purchase') {
         globalIncs.purchases = admin.firestore.FieldValue.increment(1);
         if (txn.amount) globalIncs.purchaseVolume = admin.firestore.FieldValue.increment(txn.amount);
@@ -207,10 +207,10 @@ exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (
         const bizIncs = {};
         if (txn.type === 'checkin') {
             bizIncs.checkinsCount = admin.firestore.FieldValue.increment(1);
-            if (txn.isGhost) bizIncs.ghostCheckinsCount = admin.firestore.FieldValue.increment(1);
+            if (txn.isGuest) bizIncs.guestCheckinsCount = admin.firestore.FieldValue.increment(1);
         } else if (txn.type === 'purchase') {
             bizIncs.purchasesCount = admin.firestore.FieldValue.increment(1);
-            if (txn.isGhost) bizIncs.ghostPurchasesCount = admin.firestore.FieldValue.increment(1);
+            if (txn.isGuest) bizIncs.guestPurchasesCount = admin.firestore.FieldValue.increment(1);
             if (txn.amount) bizIncs.purchaseVolume = admin.firestore.FieldValue.increment(txn.amount);
         }
 
@@ -389,8 +389,8 @@ exports.publishapplication = onCall(async (request) => {
         checkinsCount: 0,
         purchasesCount: 0,
         purchaseVolume: 0,
-        ghostCheckinsCount: 0,
-        ghostPurchasesCount: 0,
+        guestCheckinsCount: 0,
+        guestPurchasesCount: 0,
         stewardship: { managers: [], crew: [] },
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         publishedBy: uid
@@ -456,7 +456,7 @@ exports.deleteuseraccount = onCall(async (request) => {
 });
 
 /**
- * GUEST FLOW: Ghost Activity Bridges
+ * GUEST FLOW: Guest Activity Bridges
  */
 
 /**
@@ -475,7 +475,7 @@ async function syncMerchantProjection(bizId, txnId, txnData, batch = null) {
     if (txnData.type) payload.type = txnData.type;
     if (txnData.userId) payload.userId = txnData.userId;
     if (txnData.userNickname) payload.userNickname = txnData.userNickname;
-    if (txnData.isGhost !== undefined) payload.isGhost = !!txnData.isGhost;
+    if (txnData.isGuest !== undefined) payload.isGuest = !!txnData.isGuest;
     if (txnData.status) payload.status = txnData.status;
     if (txnData.timestamp) payload.timestamp = txnData.timestamp;
     if (txnData.amount !== undefined) payload.amount = txnData.amount;
@@ -489,15 +489,15 @@ async function syncMerchantProjection(bizId, txnId, txnData, batch = null) {
     }
 }
 
-exports.recordghostcheckin = onCall(async (request) => {
-    const { bizId, ghostId } = request.data;
-    if (!bizId || !ghostId) throw new HttpsError('invalid-argument', 'bizId and ghostId are required.');
+exports.recordguestcheckin = onCall(async (request) => {
+    const { bizId, guestId } = request.data;
+    if (!bizId || !guestId) throw new HttpsError('invalid-argument', 'bizId and guestId are required.');
 
     const today = new Date().toISOString().split('T')[0];
-    const sessionRef = db.collection('ghost_sessions').doc(ghostId);
+    const sessionRef = db.collection('guest_sessions').doc(guestId);
     const sessionSnap = await sessionRef.get();
 
-    // 1. GHOST SENTINEL: Anti-Spam Check & 3-Strikes Lockout
+    // 1. GUEST SENTINEL: Anti-Spam Check & 3-Strikes Lockout
     if (sessionSnap.exists) {
         const sessionData = sessionSnap.data();
         
@@ -547,22 +547,22 @@ exports.recordghostcheckin = onCall(async (request) => {
         bizName: bizData.name,
         bizIndustry: bizData.industry || 'Unknown',
         bizLocation: bizData.location || 'Unknown',
-        userId: ghostId,
+        userId: guestId,
         userNickname: 'Guest Supporter',
-        isGhost: true,
+        isGuest: true,
         status: 'verified',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // 2. High-Performance Sharded Counter for Business
-    // ARCHITECTURAL PIVOT: Ghost counters are now reconciled by the hourly healer.
+    // ARCHITECTURAL PIVOT: Guest counters are now reconciled by the hourly healer.
 
     await batch.commit();
 
     // 3. Gratitude Bond & DISCOVERY STATS (For Badge Sync)
-    const ghostRef = db.collection('users').doc(ghostId);
-    batch.set(ghostRef.collection('gratitude_bonds').doc(bizId), {
+    const guestRef = db.collection('users').doc(guestId);
+    batch.set(guestRef.collection('gratitude_bonds').doc(bizId), {
         bizId,
         bizName: bizData.name,
         totalCheckins: admin.firestore.FieldValue.increment(1),
@@ -578,12 +578,12 @@ exports.recordghostcheckin = onCall(async (request) => {
     // Track Discovery Stats on the virtual user doc for badge evaluation
     // Note: The pulseengine_broadcast trigger will handle the primary counter increment.
     if (bizData.industry) {
-        // We still initialize the doc here for the virtual ghost user
-        batch.set(ghostRef, { lastActivity: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        // We still initialize the doc here for the virtual guest user
+        batch.set(guestRef, { lastActivity: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     }
 
     await batch.commit();
-    return { success: true, message: 'Ghost Check-in recorded.' };
+    return { success: true, message: 'Guest Check-in recorded.' };
 });
 
 // MOVED AND CONSOLIDATED recordinitiativeattendance TO REMOVE DUPLICATION
@@ -594,7 +594,7 @@ exports.recordghostcheckin = onCall(async (request) => {
  */
 exports.recordinitiativeattendance = onCall(async (request) => {
     const { initiativeId } = request.data;
-    const uid = request.auth?.uid || request.data.ghostId;
+    const uid = request.auth?.uid || request.data.guestId;
     if (!initiativeId || !uid) throw new HttpsError('invalid-argument', 'Missing initiativeId or identity.');
 
     const initiativeRef = db.collection('initiatives').doc(initiativeId);
@@ -638,7 +638,7 @@ exports.recordinitiativeattendance = onCall(async (request) => {
         initiativeTitle: initData.title || 'Unknown Initiative', // Double-mapped for legacy pulse engines
         userId: uid,
         userNickname: request.auth?.token?.nickname || 'Guest Supporter',
-        isGhost: !request.auth,
+        isGuest: !request.auth,
         status: 'verified',
         timestamp: timestamp,
         updatedAt: timestamp
@@ -648,18 +648,18 @@ exports.recordinitiativeattendance = onCall(async (request) => {
     return { success: true, message: 'Attendance registered.' };
 });
 
-exports.recordghostpurchase = onCall(async (request) => {
-    const { bizId, ghostId, amount, receiptId } = request.data;
-    if (!bizId || !ghostId || !amount || !receiptId) throw new HttpsError('invalid-argument', 'Missing required fields.');
+exports.recordguestpurchase = onCall(async (request) => {
+    const { bizId, guestId, amount, receiptId } = request.data;
+    if (!bizId || !guestId || !amount || !receiptId) throw new HttpsError('invalid-argument', 'Missing required fields.');
     
     const finalAmount = parseFloat(amount);
     if (isNaN(finalAmount) || finalAmount <= 0) throw new HttpsError('invalid-argument', 'Invalid amount.');
 
     const today = new Date().toISOString().split('T')[0];
-    const sessionRef = db.collection('ghost_sessions').doc(ghostId);
+    const sessionRef = db.collection('guest_sessions').doc(guestId);
     const sessionSnap = await sessionRef.get();
 
-    // GHOST SENTINEL: Check Global Lockout
+    // GUEST SENTINEL: Check Global Lockout
     if (sessionSnap.exists) {
         const sessionData = sessionSnap.data();
         if (sessionData.lockoutUntil) {
@@ -683,9 +683,9 @@ exports.recordghostpurchase = onCall(async (request) => {
         bizName: bizData.name,
         bizIndustry: bizData.industry || 'Unknown',
         bizLocation: bizData.location || 'Unknown',
-        userId: ghostId,
+        userId: guestId,
         userNickname: 'Guest Supporter',
-        isGhost: true,
+        isGuest: true,
         amount: finalAmount,
         receiptId,
         status: 'pending',
@@ -696,8 +696,8 @@ exports.recordghostpurchase = onCall(async (request) => {
     // ARCHITECTURAL PIVOT: Business Shards are now handled by the Pulse Engine trigger (ontransactioncreated).
     // This ensures O(1) performance for the callable and prevents double-counting.
 
-    const ghostRef = db.collection('users').doc(ghostId);
-    batch.set(ghostRef.collection('gratitude_bonds').doc(bizId), {
+    const guestRef = db.collection('users').doc(guestId);
+    batch.set(guestRef.collection('gratitude_bonds').doc(bizId), {
         bizId,
         bizName: bizData.name,
         totalPurchases: admin.firestore.FieldValue.increment(1),
@@ -712,7 +712,7 @@ exports.recordghostpurchase = onCall(async (request) => {
     // ARCHITECTURAL PIVOT: Merchant Projections are now pulled on-demand.
 
     await batch.commit();
-    return { success: true, message: 'Ghost Purchase recorded.' };
+    return { success: true, message: 'Guest Purchase recorded.' };
 });
 
 exports.claimbusinessrecommendation = onCall(async (request) => {
@@ -758,7 +758,7 @@ exports.pulseengine_broadcast = onDocumentCreated('transactions/{txnId}', async 
     if (!txn) return;
 
     const bizName = txn.bizName || 'a business';
-    const nickname = txn.isGhost ? 'Guest Supporter' : (txn.userNickname || 'Someone');
+    const nickname = txn.isGuest ? 'Guest Supporter' : (txn.userNickname || 'Someone');
     const userId = txn.userId;
     const type = txn.type;
     const industry = txn.bizIndustry;
@@ -1033,15 +1033,15 @@ exports.grantcustomerreward = onCall(async (request) => {
 
 exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
-    const { ghostId } = request.data;
+    const { guestId } = request.data;
     const uid = request.auth.uid;
 
-    if (!ghostId) throw new HttpsError('invalid-argument', 'ghostId is required.');
+    if (!guestId) throw new HttpsError('invalid-argument', 'guestId is required.');
 
-    // 1. Retrieve all ghost transactions & gratitude bonds
+    // 1. Retrieve all guest transactions & gratitude bonds
     const [txnSnap, bondSnap, userSnap] = await Promise.all([
-        db.collection('transactions').where('userId', '==', ghostId).get(),
-        db.collection('users').doc(ghostId).collection('gratitude_bonds').get(),
+        db.collection('transactions').where('userId', '==', guestId).get(),
+        db.collection('users').doc(guestId).collection('gratitude_bonds').get(),
         db.collection('users').doc(uid).get()
     ]);
 
@@ -1052,7 +1052,7 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
     const batch = db.batch();
     let checkins = 0;
     let purchases = 0;
-    const bizStatsMigration = {}; // bizId -> { ghostCheckins, ghostPurchases }
+    const bizStatsMigration = {}; // bizId -> { guestCheckins, guestPurchases }
 
     // Migrate Transactions
     txnSnap.forEach(doc => {
@@ -1063,7 +1063,7 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
         // Update Ledger
         batch.update(doc.ref, {
             userId: uid,
-            isGhost: false,
+            isGuest: false,
             userNickname: userNickname,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -1074,7 +1074,7 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
         const data = doc.data();
         const memberBondRef = db.collection('users').doc(uid).collection('gratitude_bonds').doc(doc.id);
         batch.set(memberBondRef, data, { merge: true });
-        batch.delete(doc.ref); // Cleanup ghost bond
+        batch.delete(doc.ref); // Cleanup guest bond
     });
 
     // 2. Update user profile stats
@@ -1087,11 +1087,11 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
 
     await batch.commit();
 
-    // 3. CLEANUP ORPHANED GHOST DATA
+    // 3. CLEANUP ORPHANED GUEST DATA
     try {
         const cleanupBatch = db.batch();
-        cleanupBatch.delete(db.collection('ghost_sessions').doc(ghostId));
-        cleanupBatch.delete(db.collection('users').doc(ghostId));
+        cleanupBatch.delete(db.collection('guest_sessions').doc(guestId));
+        cleanupBatch.delete(db.collection('users').doc(guestId));
         console.log("RECONCILE: Reconcile complete. Stats updated.");
     } catch (err) {
         console.error("RECONCILE: Reconciliation failed:", err);
@@ -1275,9 +1275,9 @@ exports.healplatformdata = onSchedule('every 1 hours', async (event) => {
     for (const bizId of affectedBizIds) {
         const bizTxns = await db.collection('transactions').where('bizId', '==', bizId).get();
         let checkins = 0;
-        let ghostCheckins = 0;
+        let guestCheckins = 0;
         let purchases = 0;
-        let ghostPurchases = 0;
+        let guestPurchases = 0;
         let volume = 0;
 
         bizTxns.forEach(doc => {
@@ -1286,10 +1286,10 @@ exports.healplatformdata = onSchedule('every 1 hours', async (event) => {
             
             if (d.type === 'checkin') {
                 checkins++;
-                if (d.isGhost) ghostCheckins++;
+                if (d.isGuest) guestCheckins++;
             } else if (d.type === 'purchase') {
                 purchases++;
-                if (d.isGhost) ghostPurchases++;
+                if (d.isGuest) guestPurchases++;
                 volume += (d.amount || 0);
             }
         });
@@ -1297,9 +1297,9 @@ exports.healplatformdata = onSchedule('every 1 hours', async (event) => {
         const bizRef = db.collection('businesses').doc(bizId);
         batch.set(bizRef, {
             checkinsCount: checkins,
-            ghostCheckinsCount: ghostCheckins,
+            guestCheckinsCount: guestCheckins,
             purchasesCount: purchases,
-            ghostPurchasesCount: ghostPurchases,
+            guestPurchasesCount: guestPurchases,
             purchaseVolume: volume,
             healedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -1475,7 +1475,7 @@ exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
     
     // 1. Calculate Absolute Truth from Ledger
     const txnSnap = await db.collection('transactions').get();
-    let global = { checkins: 0, ghostCheckins: 0, purchases: 0, purchaseVolume: 0, totalAttendance: 0 };
+    let global = { checkins: 0, guestCheckins: 0, purchases: 0, purchaseVolume: 0, totalAttendance: 0 };
     const bizStats = {};
 
     txnSnap.forEach(doc => {
@@ -1483,7 +1483,7 @@ exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
         // Global
         if (t.type === 'checkin') {
             global.checkins++;
-            if (t.isGhost) global.ghostCheckins++;
+            if (t.isGuest) global.guestCheckins++;
         } else if (t.type === 'purchase') {
             global.purchases++;
             if (t.amount) global.purchaseVolume += t.amount;
@@ -1493,14 +1493,14 @@ exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
 
         // Business Specific
         if (t.bizId) {
-            if (!bizStats[t.bizId]) bizStats[t.bizId] = { checkinsCount: 0, ghostCheckinsCount: 0, purchasesCount: 0, ghostPurchasesCount: 0, purchaseVolume: 0 };
+            if (!bizStats[t.bizId]) bizStats[t.bizId] = { checkinsCount: 0, guestCheckinsCount: 0, purchasesCount: 0, guestPurchasesCount: 0, purchaseVolume: 0 };
             const b = bizStats[t.bizId];
             if (t.type === 'checkin') {
                 b.checkinsCount++;
-                if (t.isGhost) b.ghostCheckinsCount++;
+                if (t.isGuest) b.guestCheckinsCount++;
             } else if (t.type === 'purchase') {
                 b.purchasesCount++;
-                if (t.isGhost) b.ghostPurchasesCount++;
+                if (t.isGuest) b.guestPurchasesCount++;
                 if (t.amount) b.purchaseVolume += t.amount;
             }
         }
@@ -1525,9 +1525,9 @@ exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
         const bRef = db.collection('businesses').doc(bizId);
         await bRef.update({
             "impact_metrics.checkinsCount": bizStats[bizId].checkinsCount,
-            "impact_metrics.ghostCheckinsCount": bizStats[bizId].ghostCheckinsCount,
+            "impact_metrics.guestCheckinsCount": bizStats[bizId].guestCheckinsCount,
             "impact_metrics.purchasesCount": bizStats[bizId].purchasesCount,
-            "impact_metrics.ghostPurchasesCount": bizStats[bizId].ghostPurchasesCount,
+            "impact_metrics.guestPurchasesCount": bizStats[bizId].guestPurchasesCount,
             "impact_metrics.purchaseVolume": bizStats[bizId].purchaseVolume,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });

@@ -10,7 +10,7 @@ import { updateLocalStatsBuffer } from '../utils/impactEngine';
 
 const Scanner = () => {
     const navigate = useNavigate();
-    const { currentUser, ghostId, addLocalActivity } = useAuth();
+    const { currentUser, guestId, addLocalActivity } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
     const [scannedInitiative, setScannedInitiative] = useState(null);
     const [error, setError] = useState('');
@@ -224,7 +224,7 @@ const Scanner = () => {
             const attendanceFn = firebase.functions().httpsCallable('recordinitiativeattendance');
             await attendanceFn({ 
                 initiativeId: scannedInitiative.id,
-                ghostId: !currentUser ? ghostId : null 
+                guestId: !currentUser ? guestId : null 
             });
 
             // Update Local Stats
@@ -253,7 +253,7 @@ const Scanner = () => {
         if (!scannedBusiness || isSubmitting) return;
         setIsSubmitting(true);
 
-        // 1. Handle Ghost Check-in (Anonymous)
+        // 1. Handle Guest Check-in (Anonymous)
         if (!currentUser) {
             // Guest Sentinel Check (Frontend optimization)
             const today = new Date().toISOString().split('T')[0];
@@ -270,8 +270,8 @@ const Scanner = () => {
             }
 
             try {
-                const ghostCheckin = firebase.functions().httpsCallable('recordghostcheckin');
-                const result = await ghostCheckin({ bizId: scannedBusiness.id, ghostId });
+                const guestCheckin = firebase.functions().httpsCallable('recordguestcheckin');
+                const result = await guestCheckin({ bizId: scannedBusiness.id, guestId });
 
                 if (result.data.success) {
                     setIsSuccess(true);
@@ -298,7 +298,7 @@ const Scanner = () => {
                     }
                 }
             } catch (e) {
-                console.error("Ghost checkin error", e);
+                console.error("Guest checkin error", e);
                 const msg = e.message || "";
                 setError(msg || "Network Error: Could not log anonymous support.");
                 if (msg.toLowerCase().includes('naughty')) {
@@ -405,8 +405,8 @@ const Scanner = () => {
     const [receiptId, setReceiptId] = useState('');
 
     const submitPurchase = async () => {
-        // Now allows either currentUser OR ghostId (Guest Mode)
-        const activeUserId = currentUser?.uid || ghostId;
+        // Now allows either currentUser OR guestId (Guest Mode)
+        const activeUserId = currentUser?.uid || guestId;
         if (!activeUserId || !amount || !receiptId || isSubmitting) {
             if (!amount) setError("Please enter the amount.");
             else if (!receiptId) setError("Receipt ID / Bill Number is mandatory for verification.");
@@ -426,10 +426,10 @@ const Scanner = () => {
             const isGuest = !currentUser;
 
             if (isGuest) {
-                const recordGhostPurchase = firebase.functions().httpsCallable('recordghostpurchase');
-                const result = await recordGhostPurchase({ 
+                const recordGuestPurchase = firebase.functions().httpsCallable('recordguestpurchase');
+                const result = await recordGuestPurchase({ 
                     bizId: scannedBusiness.id, 
-                    ghostId, 
+                    guestId, 
                     amount: finalAmount, 
                     receiptId
                 });
@@ -458,7 +458,7 @@ const Scanner = () => {
                     bizLocation: scannedBusiness.location || 'Unknown',
                     userId: activeUserId,
                     userNickname: currentUser.nickname || currentUser.name || 'Ambassador',
-                    isGhost: false,
+                    isGuest: false,
                     amount: finalAmount,
                     receiptId: receiptId,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -515,7 +515,7 @@ const Scanner = () => {
                             textAlign: 'left'
                         }}>
                             <h4 style={{ color: '#ffb84d', margin: '0 0 0.8rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}>
-                                <i className="fa-solid fa-ghost"></i> {successMsg.toLowerCase().includes('purchase') || successMsg.toLowerCase().includes('recorded') ? 'Ghost Purchase Successful' : 'Ghost Check-in Successful'}
+                                <i className="fa-solid fa-user-clock"></i> {successMsg.toLowerCase().includes('purchase') || successMsg.toLowerCase().includes('recorded') ? 'Guest Purchase Successful' : 'Guest Check-in Successful'}
                             </h4>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
                                 Your support was recorded anonymously. Create an identity to make every future support count permanently.
