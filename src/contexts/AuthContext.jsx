@@ -69,6 +69,39 @@ export const AuthProvider = ({ children }) => {
         return auth.signInWithEmailAndPassword(email, password);
     };
 
+    const loginWithGoogle = async () => {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+            const result = await auth.signInWithPopup(provider);
+            const user = result.user;
+            
+            // Handshake check: Does the profile exist?
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (!userDoc.exists) {
+                // Initialize as unprovisioned Ambassador
+                await db.collection('users').doc(user.uid).set({
+                    identity: {
+                        nickname: 'Ambassador',
+                        email: user.email,
+                        created_at: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    status: {
+                        isProvisioned: false,
+                        isFlagged: false
+                    },
+                    seasons: {
+                        totalCheckins: 0,
+                        totalPurchases: 0,
+                        lastSynced: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                });
+            }
+            return user;
+        } catch (error) {
+            throw error;
+        }
+    };
+
     const signup = (email, password) => {
         return auth.createUserWithEmailAndPassword(email, password);
     };
@@ -283,6 +316,7 @@ export const AuthProvider = ({ children }) => {
         syncRoles,
         joinMovement,
         login,
+        loginWithGoogle,
         signup,
         logout,
         continueAsGuest,

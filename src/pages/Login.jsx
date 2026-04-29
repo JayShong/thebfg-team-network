@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-    const { login, signup, continueAsGuest, sendPasswordReset } = useAuth();
+    const { login, loginWithGoogle, signup, continueAsGuest, sendPasswordReset } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -45,6 +45,20 @@ const Login = () => {
             if (err.code === 'auth/wrong-password') msg = "Incorrect password. Please try again.";
             if (err.code === 'auth/email-already-in-use') msg = "An account already exists with this email. Please Log In instead.";
             setError(msg || 'Authentication failed.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleGoogleAuth = async () => {
+        setError('');
+        setMessage('');
+        setIsProcessing(true);
+        try {
+            await loginWithGoogle();
+            navigate('/');
+        } catch (err) {
+            setError(err.message || 'Google authentication failed.');
         } finally {
             setIsProcessing(false);
         }
@@ -138,7 +152,7 @@ const Login = () => {
                             </button>
 
                             <button
-                                type="button"
+                                type="submit"
                                 onClick={(e) => handleAuth(e, 'login')}
                                 className="btn"
                                 disabled={isProcessing}
@@ -151,6 +165,34 @@ const Login = () => {
                                 }}
                             >
                                 {isProcessing ? 'Processing...' : 'Log In'}
+                            </button>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.5rem 0' }}>
+                                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>or</span>
+                                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleGoogleAuth}
+                                className="btn"
+                                disabled={isProcessing}
+                                style={{ 
+                                    padding: '0.85rem', 
+                                    background: 'white', 
+                                    color: '#1f2937',
+                                    fontWeight: '700',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    border: 'none',
+                                    fontSize: '0.95rem'
+                                }}
+                            >
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px', height: '18px' }} />
+                                {isProcessing ? 'Connecting...' : 'Continue with Google'}
                             </button>
                         </div>
                     </form>
