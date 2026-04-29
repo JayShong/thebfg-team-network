@@ -374,7 +374,7 @@ const Profile = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {(currentUser?.isSuperAdmin || displayUser.isSuperAdmin) && (
+                                {(currentUser?.isSuperAdmin) && (
                                     <button onClick={() => navigate('/admin')} className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #FFD700, #FF8C00)', color: '#000', border: 'none', fontWeight: '700' }}>
                                         <i className="fa-solid fa-crown"></i> Governance Portal
                                     </button>
