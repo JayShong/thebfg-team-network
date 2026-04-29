@@ -211,29 +211,14 @@ const Home = () => {
 
 
 
-                <button
+                <div 
+                    className={`sync-orb-container ${isSyncing ? 'syncing' : ''}`}
                     onClick={() => refreshDashboard(true)}
-                    disabled={isSyncing}
-                    className="btn"
-                    style={{
-                        background: 'rgba(255,255,255,0.08)',
-                        color: 'white',
-                        fontSize: '0.7rem',
-                        padding: '2px',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: 'fit-content',
-                        minWidth: '0',
-                        gap: '4px',
-                        height: 'auto',
-                        borderRadius: '6px'
-                    }}
+                    title="Sync Global Momentum"
                 >
-                    {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate" style={{ fontSize: '0.75rem' }}></i>}
-                    <span style={{ fontWeight: '600' }}>Refresh Dashboard</span>
-                </button>
+                    <img src="/assets/sync-orb.png" alt="Sync Orb" className="sync-orb" />
+                    <div className="sync-glow"></div>
+                </div>
             </div>
 
             {throttleMessage && (
