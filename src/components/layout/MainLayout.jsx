@@ -5,17 +5,8 @@ import BottomNav from './BottomNav';
 import { useAuth } from '../../contexts/AuthContext';
 
 const MainLayout = () => {
-    const { currentUser, isGuest, isSyncing, syncRoles, logout } = useAuth();
+    const { currentUser, isGuest, isSyncing, logout } = useAuth();
     const navigate = useNavigate();
-
-    const handleRefresh = async () => {
-        const result = await syncRoles();
-        if (result.success) {
-            console.log("✅ Roles synchronized successfully.");
-        } else {
-            console.error("❌ Sync failed:", result.error);
-        }
-    };
 
     return (
         <div id="app-container">
@@ -27,9 +18,6 @@ const MainLayout = () => {
                     TheBFG.Team
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="icon-btn" onClick={handleRefresh} title="Verify Identity Rights" disabled={isSyncing}>
-                        <i className={`fa-solid ${isSyncing ? 'fa-spinner fa-spin' : 'fa-sync-alt'}`}></i>
-                    </button>
                     <button className="icon-btn" onClick={() => navigate('/about')} title="Our Manifesto">
                         <i className="fa-solid fa-info-circle"></i>
                     </button>

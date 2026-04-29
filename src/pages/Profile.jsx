@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// CACHE_BREAKER: 2026-04-29-T14-34-FORCE-REFRESH
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import useBusinesses from '../hooks/useBusinesses';
