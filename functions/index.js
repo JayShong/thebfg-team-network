@@ -415,6 +415,54 @@ exports.publishapplication = onCall(async (request) => {
 });
 
 /**
+ * STEWARDSHIP SYNCHRONIZATION
+ * Automatically updates user profiles with their business stewardship metadata.
+ * Triggers on any change to the businesses collection.
+ */
+exports.syncbusinessstewardship = onDocumentWritten('businesses/{bizId}', async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const bizId = event.params.bizId;
+
+    const updates = [];
+
+    // Case 1: Ownership Transfer or Business Deletion (Cleanup Old Owner)
+    if (before && (!after || before.ownerEmail !== after.ownerEmail)) {
+        const oldOwnerEmail = before.ownerEmail.toLowerCase();
+        const oldOwnerSnap = await db.collection('users').where('identity.email', '==', oldOwnerEmail).get();
+        oldOwnerSnap.forEach(doc => {
+            updates.push(doc.ref.set({
+                stewardship: {
+                    isOwner: false,
+                    primaryBusinessId: null,
+                    primaryBusinessName: null
+                }
+            }, { merge: true }));
+        });
+    }
+
+    // Case 2: New Ownership or Business Update (Update New Owner)
+    if (after && after.ownerEmail) {
+        const newOwnerEmail = after.ownerEmail.toLowerCase();
+        const newOwnerSnap = await db.collection('users').where('identity.email', '==', newOwnerEmail).get();
+        newOwnerSnap.forEach(doc => {
+            updates.push(doc.ref.set({
+                stewardship: {
+                    isOwner: true,
+                    primaryBusinessId: bizId,
+                    primaryBusinessName: after.name
+                }
+            }, { merge: true }));
+        });
+    }
+
+    if (updates.length > 0) {
+        console.log(`STEWARDSHIP: Syncing business ${bizId} details to owner profiles.`);
+        await Promise.all(updates);
+    }
+});
+
+/**
  * APPLICATION MANAGEMENT: Deletion
  * Allows owners to discard drafts or staff to remove stale applications.
  */
