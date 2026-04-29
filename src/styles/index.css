@@ -43,6 +43,7 @@
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     --glass-border: rgba(255, 255, 255, 0.1);
+    --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
 }
 
 * {
@@ -1527,7 +1528,77 @@ p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 }
 
 /* StatInsightModal & Charts */
-.insight-content { padding: 1rem 0.5rem; }
+.insight-loading { text-align: center; padding: 2rem; color: var(--accent-primary); font-size: 0.9rem; display: flex; flexDirection: column; gap: 10px; }
+
+/* Intelligence Drawer (The Radical Fix) */
+.intelligence-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 500px; /* Desktop constraint */
+    background: rgba(20, 20, 30, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    border-radius: 32px 32px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    z-index: 1001;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.drawer-handle {
+    width: 40px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    margin: 12px auto 0;
+    cursor: pointer;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+}
+
+@keyframes slide-up-drawer {
+    from { transform: translate(-50%, 100%); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.intelligence-drawer.slide-up {
+    animation: slide-up-drawer 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem 1.5rem 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.modal-body {
+    padding: 0 1.5rem 2rem;
+}
+
+.insight-content { padding: 1rem 0; }
+
 .insight-title { font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.75rem; display: flex; alignItems: center; gap: 10px; }
 .insight-desc { font-size: 0.95rem; line-height: 1.6; color: rgba(255,255,255,0.7); margin-bottom: 1.5rem; }
 .insight-highlight { background: rgba(139, 92, 246, 0.1); border-left: 3px solid var(--accent-primary); padding: 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1.5rem; }

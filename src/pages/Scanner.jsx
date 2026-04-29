@@ -431,8 +431,7 @@ const Scanner = () => {
                     bizId: scannedBusiness.id, 
                     ghostId, 
                     amount: finalAmount, 
-                    receiptId,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    receiptId
                 });
 
                 if (result.data.success) {

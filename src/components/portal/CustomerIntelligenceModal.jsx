@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { db } from '../../services/firebase';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/functions';
 
-const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
+const CustomerIntelligenceDrawer = ({ userId, bizId, onClose }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -11,8 +12,22 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
     const [isGranting, setIsGranting] = useState(false);
     const [statusMessage, setStatusMessage] = useState(null);
 
+    // Cleanup scroll lock on unmount
     useEffect(() => {
+        if (userId) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [userId]);
+
+    useEffect(() => {
+        if (!userId) return;
         const fetchData = async () => {
+            setLoading(true);
             try {
                 const getIntelligence = firebase.functions().httpsCallable('getcustomerintelligence');
                 const result = await getIntelligence({ targetUserId: userId, bizId });
@@ -48,146 +63,143 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
         }
     };
 
-    return (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-            <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(255,184,77,0.4)' }}>
-                <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>
-                    <i className="fa-solid fa-xmark"></i>
-                </button>
+    if (!userId) return null;
 
-                {loading ? (
-                    <div style={{ padding: '4rem', textAlign: 'center' }}>
-                        <i className="fa-solid fa-circle-notch fa-spin fa-3x" style={{ color: '#ffb84d' }}></i>
-                        <p style={{ marginTop: '1rem' }}>Retrieving Loyalty Profile...</p>
-                    </div>
-                ) : (
-                    <>
-                        {data && (function() {
-                            const d = data;
-                            const allEngagements = d.engagements || [];
+    return ReactDOM.createPortal(
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="intelligence-drawer glass-card slide-up" onClick={e => e.stopPropagation()} style={{ borderTop: '1px solid rgba(255,184,77,0.3)' }}>
+                <div className="drawer-handle" onClick={onClose}></div>
+                <div className="modal-header">
+                    <button className="close-btn" onClick={onClose}>&times;</button>
+                </div>
+                
+                <div className="modal-body" style={{ padding: '0 1.5rem 2rem' }}>
+                    {loading ? (
+                        <div style={{ padding: '4rem', textAlign: 'center' }}>
+                            <i className="fa-solid fa-circle-notch fa-spin fa-3x" style={{ color: '#ffb84d' }}></i>
+                            <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Retrieving Loyalty Profile...</p>
+                        </div>
+                    ) : error ? (
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <i className="fa-solid fa-triangle-exclamation fa-2x" style={{ color: 'var(--accent)' }}></i>
+                            <p style={{ marginTop: '1rem' }}>{error}</p>
+                        </div>
+                    ) : (
+                        <div className="insight-content">
+                            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                                <div style={{ 
+                                    background: 'linear-gradient(135deg, #ffb84d, #ef6c00)', 
+                                    width: '70px', 
+                                    height: '70px', 
+                                    borderRadius: '50%', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    margin: '0 auto 1rem', 
+                                    boxShadow: '0 8px 20px rgba(239,108,0,0.3)',
+                                    border: '3px solid rgba(255,255,255,0.1)'
+                                }}>
+                                    <i className="fa-solid fa-user-check" style={{ color: '#fff', fontSize: '2rem' }}></i>
+                                </div>
+                                <h2 className="insight-title" style={{ margin: 0 }}>{data.nickname}</h2>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '5px' }}>
+                                    <span style={{ 
+                                        fontSize: '0.7rem', 
+                                        fontWeight: '800', 
+                                        textTransform: 'uppercase', 
+                                        color: '#ffb84d', 
+                                        background: 'rgba(255,184,77,0.1)', 
+                                        padding: '3px 10px', 
+                                        borderRadius: 'var(--radius-full)',
+                                        border: '1px solid rgba(255,184,77,0.2)'
+                                    }}>
+                                        {data.tier?.name || 'Explorer'} Tier
+                                    </span>
+                                </div>
+                            </div>
 
-                            return (
-                                <>
-                                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                                        <div style={{ background: 'linear-gradient(135deg, #ffb84d, #ef6c00)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', boxShadow: '0 8px 20px rgba(239,108,0,0.4)', border: '4px solid rgba(255,255,255,0.1)' }}>
-                                            <i className="fa-solid fa-user-check" style={{ color: '#fff', fontSize: '2.2rem' }}></i>
+                            <div className="loyalty-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
+                                <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#fff' }}>{data.stats.checkins}</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Visits</div>
+                                </div>
+                                <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#ffb84d' }}>{data.stats.purchases}</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Purchases</div>
+                                </div>
+                                <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(76, 175, 80, 0.05)', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {data.stats.totalSpend.toFixed(0)}</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Force</div>
+                                </div>
+                            </div>
+
+                            <div className="insight-highlight" style={{ background: 'rgba(255,184,77,0.05)', border: '1px solid rgba(255,184,77,0.1)', marginBottom: '1.5rem' }}>
+                                <h4 style={{ color: '#ffb84d', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.8rem' }}>Engagement History</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {data.engagements.slice(0, 3).map(e => (
+                                        <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <i className={`fa-solid ${e.type === 'purchase' ? 'fa-cart-shopping' : 'fa-location-dot'}`} style={{ color: e.type === 'purchase' ? '#ffb84d' : 'var(--accent-primary)', opacity: 0.8 }}></i>
+                                                <span>{e.type === 'purchase' ? `Purchase (RM ${parseFloat(e.amount).toFixed(2)})` : 'Check-in'}</span>
+                                            </div>
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{new Date(e.timestamp).toLocaleDateString()}</span>
                                         </div>
-                                        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>
-                                            {d.nickname}
-                                        </h2>
-                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                            {d.nickname === 'Guest Supporter' ? 'Temporary session until they Accept the Invitation' : 'Loyal Supporter recognized by your business'}
-                                        </p>
+                                    ))}
+                                    {data.engagements.length === 0 && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>No recent history found.</p>}
+                                </div>
+                            </div>
 
+                            {/* Recognition / Reward Portal */}
+                            {data.role !== 'crew' && (
+                                <div style={{ marginTop: '1rem' }}>
+                                    <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Strengthen Gratitude Bond</h4>
+                                    <form onSubmit={handleGrantReward} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        <textarea 
+                                            className="input-modern" 
+                                            rows="2" 
+                                            value={rewardText} 
+                                            onChange={(e) => setRewardText(e.target.value)}
+                                            placeholder="Enter a recognition gift (e.g. 10% Loyalty Bonus, Free Drink...)" 
+                                            style={{ width: '100%', fontSize: '0.9rem', background: 'rgba(0,0,0,0.2)' }}
+                                        />
+                                        <button 
+                                            type="submit" 
+                                            disabled={isGranting || !rewardText.trim()}
+                                            className="btn btn-primary feature-gradient" 
+                                            style={{ width: '100%', height: '50px', borderRadius: 'var(--radius-md)', border: 'none', fontWeight: '700' }}
+                                        >
+                                            {isGranting ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Grant Network Reward'}
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
-                                    </div>
-
-                                    <div className="loyalty-stats-grid">
-                                        <div className="loyalty-stat-card">
-                                            <div className="loyalty-stat-value">{d.stats.checkins}</div>
-                                            <div className="loyalty-stat-label">Check-ins</div>
-                                        </div>
-                                        <div className="loyalty-stat-card">
-                                            <div className="loyalty-stat-value" style={{ color: '#ffb84d' }}>{d.stats.purchases}</div>
-                                            <div className="loyalty-stat-label">Purchases</div>
-                                        </div>
-                                        <div className="loyalty-stat-card">
-                                            <div className="loyalty-stat-value" style={{ color: 'var(--accent-success)' }}>RM {d.stats.totalSpend.toFixed(0)}</div>
-                                            <div className="loyalty-stat-label">Impact</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Grant Reward Form (Founders & Managers Only) */}
-                                    {d.role !== 'crew' && (
-                                        <div className="reward-grant-box">
-                                            <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <i className="fa-solid fa-gift" style={{ color: 'var(--accent-primary)' }}></i>
-                                                Recognize this Supporter
-                                            </h4>
-                                            <form onSubmit={handleGrantReward}>
-                                                <textarea 
-                                                    className="input-modern" 
-                                                    rows="3" 
-                                                    value={rewardText} 
-                                                    onChange={(e) => setRewardText(e.target.value)}
-                                                    placeholder="Enter gift description (e.g. Free Coffee, 20% discount coupon...)" 
-                                                    style={{ width: '100%', marginBottom: '1.25rem', fontSize: '0.95rem', background: 'rgba(0,0,0,0.3)' }}
-                                                />
-                                                <button 
-                                                    type="submit" 
-                                                    disabled={isGranting || !rewardText.trim()}
-                                                    className="nav-btn active" 
-                                                    style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-full)', height: '55px', fontSize: '1.1rem' }}
-                                                >
-                                                    {isGranting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Strengthen Gratitude Bond'}
-                                                </button>
-                                            </form>
-                                        </div>
-                                    )}
-
-                                    {/* Full Engagement History */}
-                                    <div style={{ marginBottom: '1rem' }}>
-                                        <label className="loyalty-section-label">Engagement History</label>
-                                        {allEngagements.length === 0 ? (
-                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem' }}>No history found with your business.</p>
-                                        ) : (
-                                            allEngagements.map(e => (
-                                                <div key={e.id} className="loyalty-log-item">
-                                                    <div className="loyalty-log-info">
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                            <i className={`fa-solid ${e.type === 'purchase' ? 'fa-cart-shopping' : 'fa-location-dot'}`} style={{ color: e.type === 'purchase' ? '#ffb84d' : 'var(--accent-primary)', fontSize: '0.9rem' }}></i>
-                                                            <span className="loyalty-log-value">
-                                                                {e.type === 'purchase' ? (
-                                                                    <>
-                                                                        RM {parseFloat(e.amount).toFixed(2)}
-                                                                        {e.status === 'pending' && <span style={{ marginLeft: '8px', fontSize: '0.65rem', padding: '2px 6px', background: 'rgba(255,184,77,0.1)', color: '#ffb84d', borderRadius: '4px', border: '1px solid rgba(255,184,77,0.3)' }}>PENDING</span>}
-                                                                    </>
-                                                                ) : 'Check-in'}
-                                                            </span>
-                                                        </div>
-                                                        <span className="loyalty-log-meta">{e.receiptId ? `ID: ${e.receiptId}` : 'Verified Presence'}</span>
-                                                    </div>
-                                                    <span className="loyalty-log-meta">
-                                                        {new Date(e.timestamp).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </>
-                            );
-                        })()}
-
-                        <p className="loyalty-footer-note">
-                            <i className="fa-solid fa-lock"></i> All data revealed through this secure handshake is symmetrically shared with the user.
-                        </p>
-                    </>
-                )}
-
-                {/* Status Toast */}
+                {/* Internal Drawer Toast */}
                 {statusMessage && (
-                    <div style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', width: '90%', zIndex: 5000 }} className="slide-up">
+                    <div style={{ position: 'absolute', bottom: '1.5rem', left: '1.5rem', right: '1.5rem', zIndex: 5000 }} className="slide-up">
                         <div className="glass-card" style={{ 
                             padding: '0.8rem 1.2rem', 
-                            background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
-                                       statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
-                            color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                            background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 'rgba(34,197,94,0.2)',
+                            border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : '#22c55e'}`,
+                            color: statusMessage.type === 'error' ? '#ff4444' : '#22c55e',
                             borderRadius: 'var(--radius-sm)',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '10px',
-                            fontSize: '0.8rem',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                            fontSize: '0.8rem'
                         }}>
-                            <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
-                            <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                            <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check'}`}></i>
+                            <span>{statusMessage.text}</span>
                         </div>
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
-export default CustomerIntelligenceModal;
+export default CustomerIntelligenceDrawer;

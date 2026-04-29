@@ -150,9 +150,13 @@ export const AuthProvider = ({ children }) => {
                         const provisionPayload = {
                             email: user.email,
                             isProvisioned: !!IS_MOCKED_MODE, // Self-provision in mock mode
-                            nickname: "Ambassador",
                             last_handshake_at: new Date().toISOString()
                         };
+
+                        // Only set default nickname if identity is uninitialized
+                        if (!docSnap.exists || !docSnap.data()?.nickname) {
+                            provisionPayload.nickname = "Ambassador";
+                        }
 
                         if (IS_MOCKED_MODE) {
                             console.log("🛠️ AUTH: [MOCK MODE] Performing frontend self-provisioning...");
@@ -289,7 +293,7 @@ export const AuthProvider = ({ children }) => {
         localActivities,
         addLocalActivity,
         getStewardshipLevel,
-        userNickname: 'Ambassador',
+        userNickname: currentUser?.nickname || currentUser?.name || 'Ambassador',
         pendingApprovalCount: 0
     };
 

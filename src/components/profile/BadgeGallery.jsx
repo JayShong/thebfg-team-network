@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthModal from '../auth/AuthModal';
+import BadgeInsightDrawer from './BadgeInsightDrawer';
 import { BADGES_CONFIG, BADGE_CATEGORIES, getSeasonId, getGuestBadges } from '../../utils/badgeLogic';
 import { db, functions } from '../../services/firebase';
 
@@ -163,7 +164,7 @@ const BadgeGallery = () => {
                                     return (
                                         <div 
                                             key={b.id}
-                                            className={`badge-item ${stateClass}`} 
+                                            className={`badge-item ${stateClass} clickable`} 
                                             style={{ cursor: 'pointer', padding: '0.8rem 0.5rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}
                                             onClick={(e) => { e.stopPropagation(); setSelectedBadge(b); }}
                                         >
@@ -185,36 +186,12 @@ const BadgeGallery = () => {
                 );
             })}
 
-            {/* Simulated Badge Modal inline */}
-            {selectedBadge && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
-                        <button onClick={() => setSelectedBadge(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>
-                            <i className="fa-solid fa-xmark"></i>
-                        </button>
-                        
-                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                            <div style={{ fontSize: '3.5rem', color: BADGE_CATEGORIES[selectedBadge.category].color, margin: '1rem 0' }}>
-                                <i className={`fa-solid ${selectedBadge.icon}`}></i>
-                            </div>
-                            <h2 style={{ color: '#ffffff', marginBottom: '0.2rem' }}>{selectedBadge.title}</h2>
-                            <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.8rem', borderRadius: '1rem', color: 'var(--text-secondary)' }}>
-                                {selectedBadge.category} {selectedBadge.tier ? `· ${selectedBadge.tier}` : ''}
-                            </span>
-                        </div>
-
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>The Why</h4>
-                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#ffffff', lineHeight: '1.4' }}>{selectedBadge.why}</p>
-                        </div>
-
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
-                            <h4 style={{ color: BADGE_CATEGORIES[selectedBadge.category].color, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>How to Earn</h4>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{selectedBadge.how}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Intelligence Drawer Portal */}
+            <BadgeInsightDrawer 
+                isOpen={!!selectedBadge} 
+                onClose={() => setSelectedBadge(null)} 
+                badge={selectedBadge}
+            />
             {showAuthModal && (
                 <AuthModal 
                     isOpen={showAuthModal} 

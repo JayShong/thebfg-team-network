@@ -87,7 +87,7 @@ const Newsreel = () => {
                     action: () => setShowAuthModal(true)
                 });
             }
-        } else if (currentUser?.name === 'Ambassador') {
+        } else if (currentUser?.nickname === 'Ambassador') {
             queue.push({
                 text: "Introduce yourself to the network with a nickname.",
                 type: 'onboarding',

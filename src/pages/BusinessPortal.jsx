@@ -588,7 +588,18 @@ const PendingVerifications = ({ bizId, setStatus }) => {
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}>
                     <div>
                         <p style={{ margin: 0, fontWeight: 'bold' }}>RM {parseFloat(t.amount).toLocaleString()}</p>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Logged by {t.userNickname} on {new Date(t.timestamp).toLocaleDateString()}</p>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            Logged by <span 
+                                className="clickable" 
+                                style={{ color: 'var(--accent-primary)', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+                                onClick={() => {
+                                    setScannedUserId(t.userId);
+                                    setShowIntelligence(true);
+                                }}
+                            >
+                                {t.userNickname}
+                            </span> on {new Date(t.timestamp).toLocaleDateString()}
+                        </p>
                     </div>
                     <div style={{ display: 'flex', gap: '0.8rem' }}>
                         <button 
@@ -695,17 +706,16 @@ const GratitudeBondsLog = ({ bizId, onSelectUser, canSeeIntelligence }) => {
                         <div 
                             key={bond.id} 
                             onClick={() => onSelectUser(bond.userId)}
-                            className="glass-card" 
+                            className="glass-card clickable" 
                             style={{ 
                                 flex: '0 0 160px', 
                                 padding: '1rem', 
                                 textAlign: 'center', 
                                 cursor: 'pointer',
                                 background: 'rgba(255,184,77,0.05)',
-                                border: '1px solid rgba(255,184,77,0.2)'
+                                border: '1px solid rgba(255,184,77,0.2)',
+                                transition: 'all 0.2s ease'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,184,77,0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,184,77,0.05)'}
                         >
                             <div style={{ background: 'rgba(255,255,255,0.1)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.8rem' }}>
                                 <i className="fa-solid fa-user-check" style={{ color: '#ffb84d' }}></i>
