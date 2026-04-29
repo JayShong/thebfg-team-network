@@ -60,10 +60,22 @@ const Home = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [festiveLabel, setFestiveLabel] = useState('');
+    const [throttleMessage, setThrottleMessage] = useState('');
 
 
-    const refreshDashboard = async () => {
+    const refreshDashboard = async (isManual = false) => {
+        const lastRefresh = localStorage.getItem('bfg_last_stats_refresh');
+        const now = Date.now();
+        const FIVE_MINUTES = 300 * 1000;
+
+        if (isManual && lastRefresh && (now - lastRefresh < FIVE_MINUTES)) {
+            setThrottleMessage("Dashboard refreshes once every 5 minutes. Please try again 5 minutes later.");
+            setTimeout(() => setThrottleMessage(''), 5000);
+            return;
+        }
+
         setIsSyncing(true);
+        setThrottleMessage('');
         try {
             // 1. Fetch Reconciled Global Stats
             const statsDoc = await db.collection('system').doc('stats').get();
@@ -118,6 +130,8 @@ const Home = () => {
                     setQuantifiedImpact({ waste: 0, trees: 0, families: 0 });
                 }
             }
+            // Update the refresh timestamp only on success
+            localStorage.setItem('bfg_last_stats_refresh', Date.now());
         } catch (error) {
             console.error("REFRESH: Dashboard refresh failed:", error);
         } finally {
@@ -128,13 +142,11 @@ const Home = () => {
 
     useEffect(() => {
         // Trigger refresh if local storage is missing OR global stats are effectively zero
-
         const lastRefresh = localStorage.getItem('bfg_last_stats_refresh');
         const now = Date.now();
-        const oneMinute = 60 * 1000;
+        const FIVE_MINUTES = 5 * 60 * 1000;
 
-        if (!localStorage.getItem('bfg_global_stats') || (stats.consumers === 0 && (!lastRefresh || now - lastRefresh > oneMinute))) {
-            localStorage.setItem('bfg_last_stats_refresh', now);
+        if (!localStorage.getItem('bfg_global_stats') || (stats.consumers === 0 && (!lastRefresh || now - lastRefresh > FIVE_MINUTES))) {
             refreshDashboard();
         } else {
             setIsLoading(false);
@@ -200,7 +212,7 @@ const Home = () => {
 
 
                 <button
-                    onClick={refreshDashboard}
+                    onClick={() => refreshDashboard(true)}
                     disabled={isSyncing}
                     className="btn"
                     style={{
@@ -223,6 +235,15 @@ const Home = () => {
                     <span style={{ fontWeight: '600' }}>Refresh Dashboard</span>
                 </button>
             </div>
+
+            {throttleMessage && (
+                <div className="glass-card success-gradient slide-up" style={{ marginBottom: '1.5rem', padding: '0.75rem', textAlign: 'center', border: '1px solid rgba(139, 92, 246, 0.5)' }}>
+                    <p style={{ color: 'white', margin: 0, fontSize: '0.85rem', fontWeight: '600' }}>
+                        <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '8px' }}></i>
+                        {throttleMessage}
+                    </p>
+                </div>
+            )}
 
             <div className="glass-card" style={{ marginBottom: '2rem', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))', borderColor: 'rgba(139, 92, 246, 0.3)' }}>
                 <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '1.1rem', fontWeight: '500' }}>
