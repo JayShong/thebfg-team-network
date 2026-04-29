@@ -18,7 +18,7 @@ const CAUSES_LIST = [
 ];
 
 const Settings = () => {
-    const { currentUser, updateProfile, sendPasswordReset, logout, syncRoles } = useAuth();
+    const { currentUser, isGuest, updateProfile, sendPasswordReset, logout, syncRoles } = useAuth();
     const navigate = useNavigate();
 
     const [nickname, setNickname] = useState('');
@@ -138,15 +138,22 @@ const Settings = () => {
         }
     };
 
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [confirmReset, setConfirmReset] = useState(false);
+    const [deleteInput, setDeleteInput] = useState('');
+
     const handlePasswordReset = async () => {
         if (!currentUser?.email) return;
-        if (window.confirm(`Send a password reset email to ${currentUser.email}?`)) {
-            try {
-                await sendPasswordReset(currentUser.email);
-                setMessage({ text: 'Password reset email sent!', type: 'success' });
-            } catch (err) {
-                setMessage({ text: 'Failed to send reset email: ' + err.message, type: 'error' });
-            }
+        setLoading(true);
+        try {
+            await sendPasswordReset(currentUser.email);
+            setMessage({ text: 'Password reset email sent!', type: 'success' });
+            setConfirmReset(false);
+            setTimeout(() => setMessage({ text: '', type: '' }), 5000);
+        } catch (err) {
+            setMessage({ text: 'Failed to send reset email: ' + err.message, type: 'error' });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -157,6 +164,7 @@ const Settings = () => {
             const result = await syncRoles();
             if (result.success) {
                 setMessage({ text: 'Security badges refreshed successfully!', type: 'success' });
+                setTimeout(() => setMessage({ text: '', type: '' }), 3000);
             } else {
                 setMessage({ text: 'Refresh failed: ' + result.error, type: 'error' });
             }
@@ -168,26 +176,41 @@ const Settings = () => {
     };
 
     const handleDeleteAccount = async () => {
-        const confirm1 = window.confirm("CRITICAL: Are you sure you want to delete your account? This action is IRREVERSIBLE and will purge all your badges and personal history.");
-        if (!confirm1) return;
-
-        const confirm2 = window.prompt("To confirm deletion, please type DELETE in all caps:");
-        if (confirm2 !== "DELETE") return;
+        if (deleteInput !== "DELETE") {
+            setMessage({ text: "Please type 'DELETE' to confirm.", type: 'error' });
+            return;
+        }
 
         setLoading(true);
         try {
             const deleteFn = functions.httpsCallable('deleteuseraccount');
             await deleteFn();
-            alert("Account successfully deleted. Your impact has been anonymized for the national mission. Goodbye.");
-            await logout();
-            navigate('/login');
+            setMessage({ text: "Account successfully deleted. Goodbye.", type: 'success' });
+            setTimeout(async () => {
+                await logout();
+                navigate('/login');
+            }, 2000);
         } catch (err) {
-            console.error("Deletion failed:", err);
-            alert("Failed to delete account: " + err.message);
+            setMessage({ text: "Failed to delete account: " + err.message, type: 'error' });
         } finally {
             setLoading(false);
         }
     };
+
+    if (isGuest) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4rem', padding: '1rem' }}>
+                <i className="fa-solid fa-envelope-open-text fa-4x" style={{ color: 'var(--accent-primary)', marginBottom: '1rem', opacity: 0.8 }}></i>
+                <h2 style={{ letterSpacing: '1px', textTransform: 'uppercase', fontSize: '1.2rem', color: 'var(--accent-primary)', textAlign: 'center' }}>Member Settings Locked</h2>
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '300px', marginBottom: '2rem', lineHeight: '1.6' }}>
+                    Personalizing your identity and defining your Empathy Profile requires a verified account.
+                </p>
+                <button onClick={() => navigate('/profile')} className="btn btn-primary feature-gradient" style={{ padding: '1rem 2rem', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: '800' }}>
+                    Return to Profile
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div style={{ paddingBottom: '2rem' }}>
@@ -261,8 +284,20 @@ const Settings = () => {
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.1s' }}>
                     <h3 style={{ color: '#fff' }}><i className="fa-solid fa-key" style={{ color: 'var(--accent-secondary)' }}></i> Security & Permissions</h3>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        <button type="button" onClick={handlePasswordReset} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }}>
-                            <i className="fa-solid fa-envelope"></i> Send Password Reset
+                        {!confirmReset ? (
+                            <button type="button" onClick={() => setConfirmReset(true)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }}>
+                                <i className="fa-solid fa-envelope"></i> Send Password Reset
+                            </button>
+                        ) : (
+                            <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <span style={{ fontSize: '0.85rem' }}>Send reset email to {currentUser?.email}?</span>
+                                <button type="button" onClick={handlePasswordReset} className="btn btn-primary" style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>Confirm</button>
+                                <button type="button" onClick={() => setConfirmReset(false)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>Cancel</button>
+                            </div>
+                        )}
+                        
+                        <button type="button" onClick={handleSyncRoles} className="btn btn-secondary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} disabled={loading}>
+                            <i className="fa-solid fa-arrows-rotate"></i> Sync Identity Badges
                         </button>
                     </div>
                 </div>
@@ -297,18 +332,58 @@ const Settings = () => {
 
                 <div className="glass-card mt-4 slide-up" style={{ animationDelay: '0.3s', border: '1px solid rgba(255, 68, 68, 0.3)' }}>
                     <h3 style={{ color: '#ff4444' }}><i className="fa-solid fa-triangle-exclamation"></i> Danger Zone</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                        Irreversibly delete your account. Your personal data will be purged in compliance with GDPR, but your positive impact metrics will be safely anonymized to preserve the network's historical accuracy.
-                    </p>
-                    <button
-                        type="button"
-                        onClick={handleDeleteAccount}
-                        className="btn btn-secondary"
-                        style={{ width: 'auto', padding: '0.75rem 1.5rem', backgroundColor: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', borderColor: '#ff4444' }}
-                        disabled={loading}
-                    >
-                        <i className="fa-solid fa-trash-can"></i> Delete My Account Permanently
-                    </button>
+                    {!confirmDelete ? (
+                        <>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                                Irreversibly delete your account. Your personal data will be purged, but your impact metrics will be safely anonymized.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(true)}
+                                className="btn btn-secondary"
+                                style={{ width: 'auto', padding: '0.75rem 1.5rem', backgroundColor: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', borderColor: '#ff4444' }}
+                                disabled={loading}
+                            >
+                                <i className="fa-solid fa-trash-can"></i> Delete My Account
+                            </button>
+                        </>
+                    ) : (
+                        <div className="slide-up">
+                            <p style={{ fontSize: '0.9rem', color: '#ff4444', fontWeight: 'bold', marginBottom: '1rem' }}>
+                                FINAL WARNING: This action cannot be undone. All your badges and progress will be lost.
+                            </p>
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Type <strong style={{ color: '#fff' }}>DELETE</strong> to confirm:</label>
+                                <input 
+                                    type="text" 
+                                    className="input-modern" 
+                                    placeholder="Type DELETE here..."
+                                    value={deleteInput}
+                                    onChange={(e) => setDeleteInput(e.target.value)}
+                                    style={{ border: deleteInput === 'DELETE' ? '1px solid #ff4444' : '1px solid rgba(255,255,255,0.1)' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteAccount}
+                                    className="btn btn-primary"
+                                    style={{ flex: 1, background: '#ff4444', border: 'none' }}
+                                    disabled={loading || deleteInput !== 'DELETE'}
+                                >
+                                    Confirm Permanent Deletion
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setConfirmDelete(false); setDeleteInput(''); }}
+                                    className="btn btn-secondary"
+                                    style={{ flex: 1 }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
 

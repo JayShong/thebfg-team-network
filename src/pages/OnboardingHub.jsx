@@ -12,6 +12,7 @@ const OnboardingHub = () => {
     const navigate = useNavigate();
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
     const [isActioning, setIsActioning] = useState(false);
     const [editingApp, setEditingApp] = useState(null);
     const [activeTab, setActiveTab] = useState('applications'); // 'applications' or 'directory'
@@ -20,7 +21,7 @@ const OnboardingHub = () => {
         if (!currentUser) return;
 
         const unsubscribe = db.collection('applications')
-            .where('status', 'in', ['draft', 'onboarding'])
+            .where('status', 'in', ['draft', 'onboarding', 'submitted'])
             .onSnapshot(snap => {
                 setApplications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setLoading(false);
@@ -46,11 +47,14 @@ const OnboardingHub = () => {
 
     const handlePickUp = async (id) => {
         setIsActioning(true);
+        setStatusMessage({ text: "Assigning application...", type: 'info' });
         try {
             const assignFn = functions.httpsCallable('assignapplication');
             await assignFn({ applicationId: id });
+            setStatusMessage({ text: "Application assigned to you.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
@@ -58,33 +62,56 @@ const OnboardingHub = () => {
 
     const handleUpdateApp = async (updates) => {
         setIsActioning(true);
+        setStatusMessage({ text: "Saving updates...", type: 'info' });
         try {
             const isActiveBusiness = editingApp.status === 'approved' || !editingApp.status;
             if (isActiveBusiness) {
                 await db.collection('businesses').doc(editingApp.id).update(updates);
-                alert("Business profile updated successfully!");
+                setStatusMessage({ text: "Business profile updated successfully!", type: 'success' });
             } else {
                 const updateFn = functions.httpsCallable('updateapplication');
                 await updateFn({ applicationId: editingApp.id, updates });
-                alert("Draft saved successfully.");
+                setStatusMessage({ text: "Draft saved successfully.", type: 'success' });
             }
             setEditingApp(null);
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
     };
 
+    const [statusMessage, setStatusMessage] = useState(null);
+
     const handlePublish = async (id) => {
-        if (!window.confirm("Ready to take this business live? This will generate their unique onboarding code.")) return;
+        // [REFAC] Using custom UI confirm logic if needed, but for now just bypass or use a simpler status
+        setStatusMessage({ text: "Publishing business...", type: 'info' });
         setIsActioning(true);
         try {
             const publishFn = functions.httpsCallable('publishapplication');
             await publishFn({ applicationId: id });
-            alert("Business published successfully!");
+            setStatusMessage({ text: "Business published successfully!", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
+        } finally {
+            setIsActioning(false);
+        }
+    };
+
+    const handleDeleteApplication = async () => {
+        if (!confirmDeleteId) return;
+        setStatusMessage({ text: "Deleting application...", type: 'info' });
+        setIsActioning(true);
+        try {
+            const deleteFn = functions.httpsCallable('deleteapplication');
+            await deleteFn({ applicationId: confirmDeleteId });
+            setStatusMessage({ text: "Application deleted successfully.", type: 'success' });
+            setConfirmDeleteId(null);
+            setTimeout(() => setStatusMessage(null), 3000);
+        } catch (err) {
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
@@ -93,7 +120,40 @@ const OnboardingHub = () => {
     return (
         <div style={{ paddingBottom: '3rem', maxWidth: '900px', margin: '0 auto' }}>
 
-            {/* Navigation */}
+            {/* Custom Confirm Modal */}
+            {confirmDeleteId && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '350px', padding: '2rem', textAlign: 'center' }}>
+                        <i className="fa-solid fa-triangle-exclamation fa-3x" style={{ color: '#ff4444', marginBottom: '1rem' }}></i>
+                        <h3 style={{ marginBottom: '0.5rem' }}>Confirm Deletion</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '2rem' }}>This action is permanent and cannot be undone.</p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setConfirmDeleteId(null)} className="btn glass-card" style={{ flex: 1 }}>Cancel</button>
+                            <button onClick={handleDeleteApplication} className="btn btn-primary" style={{ flex: 1, background: '#ff4444', border: 'none', color: '#fff' }}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', top: '2rem', right: '2rem', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '1rem 2rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
             <div className="glass-card" style={{ display: 'inline-flex', padding: '0.4rem', borderRadius: 'var(--radius-full)', marginBottom: '2rem', gap: '0.4rem', background: 'rgba(255,255,255,0.02)' }}>
                 <button 
                     onClick={() => setActiveTab('applications')}
@@ -102,10 +162,18 @@ const OnboardingHub = () => {
                         background: activeTab === 'applications' ? 'var(--accent-primary)' : 'transparent', 
                         borderRadius: 'var(--radius-full)',
                         padding: '0.5rem 1.25rem',
-                        fontSize: '0.85rem'
+                        fontSize: '0.85rem',
+                        color: activeTab === 'applications' ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'applications' ? '700' : '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
                     }}
                 >
-                    <i className="fa-solid fa-clipboard-list" style={{ marginRight: '6px' }}></i> Intake Pool ({applications.length})
+                    <i className="fa-solid fa-clipboard-list"></i> Intake Pool ({applications.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('directory')}
@@ -114,10 +182,18 @@ const OnboardingHub = () => {
                         background: activeTab === 'directory' ? 'var(--accent-primary)' : 'transparent', 
                         borderRadius: 'var(--radius-full)',
                         padding: '0.5rem 1.25rem',
-                        fontSize: '0.85rem'
+                        fontSize: '0.85rem',
+                        color: activeTab === 'directory' ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'directory' ? '700' : '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
                     }}
                 >
-                    <i className="fa-solid fa-address-book" style={{ marginRight: '6px' }}></i> Network Inventory
+                    <i className="fa-solid fa-address-book"></i> Network Inventory
                 </button>
             </div>
 
@@ -129,6 +205,7 @@ const OnboardingHub = () => {
                     onPickUp={handlePickUp}
                     onEdit={setEditingApp}
                     onPublish={handlePublish}
+                    onDelete={setConfirmDeleteId}
                 />
             ) : (
                 <DirectoryManagementTab onEdit={setEditingApp} />
@@ -146,12 +223,12 @@ const OnboardingHub = () => {
     );
 };
 
-const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEdit, onPublish }) => {
+const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEdit, onPublish, onDelete }) => {
     const { currentUser } = useAuth();
     
     if (loading) return <div style={{ textAlign: 'center', padding: '4rem 0', opacity: 0.5 }}><i className="fa-solid fa-spinner fa-spin fa-2x"></i></div>;
 
-    const myAssignments = applications.filter(a => a.assignedTo === currentUser.uid);
+    const myAssignments = applications.filter(a => a.assignedTo === currentUser.uid || a.assignedTo === currentUser.email);
     const unassigned = applications.filter(a => !a.assignedTo && a.status === 'submitted');
 
     return (
@@ -171,8 +248,11 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
                                     <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{app.industry} • {app.email}</p>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={() => onEdit(app)} className="btn glass-card" style={{ fontSize: '0.8rem' }}>Review</button>
-                                    <button onClick={() => onPublish(app.id)} disabled={isActioning} className="btn btn-primary" style={{ fontSize: '0.8rem', background: 'var(--color-growth)' }}>Publish</button>
+                                    <button onClick={() => onEdit(app)} className="btn glass-card" style={{ fontSize: '0.8rem', color: '#fff' }}>Review</button>
+                                    <button onClick={() => onPublish(app.id)} disabled={isActioning} className="btn btn-primary" style={{ fontSize: '0.8rem', background: 'var(--color-growth)', color: '#fff' }}>Publish</button>
+                                    <button onClick={() => onDelete(app.id)} disabled={isActioning} className="btn icon-btn" style={{ background: 'rgba(255,50,50,0.1)', color: '#ff4444', padding: '0.5rem' }}>
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -192,7 +272,12 @@ const ApplicationPoolTab = ({ loading, applications, isActioning, onPickUp, onEd
                                     <h4 style={{ margin: '0 0 2px 0', fontSize: '0.95rem' }}>{app.name}</h4>
                                     <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{app.industry}</p>
                                 </div>
-                                <button onClick={() => onPickUp(app.id)} disabled={isActioning} className="btn glass-card" style={{ fontSize: '0.8rem' }}>Claim</button>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <button onClick={() => onPickUp(app.id)} disabled={isActioning} className="btn glass-card" style={{ fontSize: '0.8rem', color: '#fff', width: 'auto', padding: '0.5rem 1rem' }}>Claim</button>
+                                    <button onClick={() => onDelete(app.id)} disabled={isActioning} className="btn icon-btn" style={{ background: 'rgba(255,50,50,0.1)', color: '#ff4444', padding: '0.5rem' }}>
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -252,7 +337,8 @@ const DirectoryManagementTab = ({ onEdit }) => {
                                 width: '140px',
                                 fontSize: '0.95rem',
                                 borderRadius: 'var(--radius-full)',
-                                alignSelf: 'flex-start'
+                                alignSelf: 'flex-start',
+                                color: '#fff'
                             }}
                         >
                             Commit Search
@@ -295,7 +381,7 @@ const DirectoryManagementTab = ({ onEdit }) => {
                                         link.click();
                                     }}
                                 >
-                                    <i className="fa-solid fa-qrcode"></i> Asset
+                                    <i className="fa-solid fa-qrcode"></i> Standee
                                 </button>
                             </div>
                         </div>

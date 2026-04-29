@@ -60,6 +60,7 @@ function App() {
         <Route path="/privileges" element={<Privileges />} />
         
         {/* Auxiliary Routes */}
+        <Route path="/login" element={<Login />} />
         <Route path="/scanner" element={<Scanner />} />
 
         <Route path="/profile" element={<Profile />} />

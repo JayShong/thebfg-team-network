@@ -177,18 +177,25 @@ export const AuthProvider = ({ children }) => {
                                 localStorage.setItem('bfg_personal_stats', JSON.stringify(syncedStats));
                             }
 
-                            setCurrentUser(prev => ({ 
-                                ...prev,
-                                ...userData,
-                                isProvisioned: true,
-                                isSuperAdmin: !!tokenResult.claims.isSuperAdmin,
-                                isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin,
-                                isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin,
-                                isOwner: !!tokenResult.claims.isOwner
-                            }));
+                            setCurrentUser(prev => {
+                                const baseUser = { 
+                                    ...(prev || {}),
+                                    ...userData,
+                                    isProvisioned: true 
+                                };
+                                return {
+                                    ...baseUser,
+                                    isSuperAdmin: !!tokenResult.claims.isSuperAdmin || !!userData.isSuperAdmin,
+                                    isAuditor: !!tokenResult.claims.isAuditor || !!tokenResult.claims.isSuperAdmin || !!userData.isAuditor || !!userData.isSuperAdmin,
+                                    isCustomerSuccess: !!tokenResult.claims.isCustomerSuccess || !!tokenResult.claims.isSuperAdmin || !!userData.isCustomerSuccess || !!userData.isSuperAdmin,
+                                    isOwner: !!tokenResult.claims.isOwner || !!userData.isOwner
+                                };
+                            });
                         } else {
                             console.log("⏳ AUTH: Waiting for server-side provisioning...");
                         }
+                    }, err => {
+                        console.warn("User doc sub failed:", err);
                     });
 
                 } catch (err) {

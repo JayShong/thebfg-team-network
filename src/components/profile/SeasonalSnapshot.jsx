@@ -14,6 +14,7 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
     } = displayStats;
 
     const discoveries = Object.keys(uniqueBizIds).length;
+    const [statusMessage, setStatusMessage] = React.useState(null);
     
     // Calculate season progress
     const start = new Date(CURRENT_SEASON.startDate).getTime();
@@ -160,7 +161,14 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', position: 'relative' }}>
+                        {statusMessage && (
+                            <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', width: 'max-content', zIndex: 100 }} className="slide-up">
+                                <div className="glass-card" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: 'var(--radius-sm)' }}>
+                                    {statusMessage}
+                                </div>
+                            </div>
+                        )}
                         <button 
                             className="btn btn-primary"
                             style={{ 
@@ -168,7 +176,10 @@ const SeasonalSnapshot = ({ stats, onClose }) => {
                                 border: 'none',
                                 flex: 2
                             }}
-                            onClick={() => alert("Share feature coming soon! Take a screenshot to share your impact.")}
+                            onClick={() => {
+                                setStatusMessage("Share feature coming soon! Take a screenshot.");
+                                setTimeout(() => setStatusMessage(null), 3000);
+                            }}
                         >
                             <i className="fa-solid fa-share-nodes"></i> Share Impact
                         </button>

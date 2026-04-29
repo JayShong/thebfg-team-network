@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, functions } from '../services/firebase';
@@ -18,51 +18,61 @@ const MerchantPortal = () => {
     const [userApplication, setUserApplication] = useState(null);
     const [myBusinesses, setMyBusinesses] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [confirmDelete, setConfirmDelete] = useState(false);
     const [isActioning, setIsActioning] = useState(false);
     const [showEditor, setShowEditor] = useState(false);
 
     // 1. Data Fetching
+    const fetchMyBusinesses = useCallback(async () => {
+        if (!currentUser?.email) return;
+        try {
+            const email = currentUser.email;
+            const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
+                db.collection('businesses').where('ownerEmail', '==', email).get(),
+                db.collection('businesses').where('stewardship.managers', 'array-contains', email).get(),
+                db.collection('businesses').where('stewardship.crew', 'array-contains', email).get()
+            ]);
+
+            const all = [
+                ...ownedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                ...managedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                ...crewSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            ];
+            // Deduplicate
+            const unique = Array.from(new Map(all.map(b => [b.id, b])).values());
+            setMyBusinesses(unique);
+        } catch (err) {
+            console.warn("Failed to fetch my businesses:", err);
+        }
+    }, [currentUser?.email]);
+
     useEffect(() => {
         if (!currentUser?.email) return;
 
         // Fetch User's Application
         const unsubApp = db.collection('applications')
             .where('email', '==', currentUser.email)
-            .limit(1)
             .onSnapshot(snap => {
                 if (!snap.empty) {
-                    setUserApplication({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                    const apps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // Priority Sort: submitted > onboarding > draft (Approved apps are ignored in this portal view as they are businesses)
+                    const statusPriority = { 'submitted': 3, 'onboarding': 2, 'draft': 1, 'approved': 0 };
+                    const sortedApps = apps.sort((a, b) => (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0));
+                    
+                    setUserApplication(sortedApps[0]);
+                } else {
+                    setUserApplication(null);
                 }
                 setLoading(false);
+            }, err => {
+                console.warn("Application sub failed:", err);
+                setLoading(false);
             });
-
-        // Fetch User's Businesses (Owner or Steward)
-        const fetchMyBusinesses = async () => {
-            try {
-                const email = currentUser.email;
-                const [ownedSnap, managedSnap, crewSnap] = await Promise.all([
-                    db.collection('businesses').where('ownerEmail', '==', email).get(),
-                    db.collection('businesses').where('stewardship.managers', 'array-contains', email).get(),
-                    db.collection('businesses').where('stewardship.crew', 'array-contains', email).get()
-                ]);
-
-                const all = [
-                    ...ownedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    ...managedSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    ...crewSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-                ];
-                // Deduplicate
-                const unique = Array.from(new Map(all.map(b => [b.id, b])).values());
-                setMyBusinesses(unique);
-            } catch (err) {
-                console.warn("Failed to fetch my businesses:", err);
-            }
-        };
 
         fetchMyBusinesses();
 
         return () => unsubApp();
-    }, [currentUser]);
+    }, [currentUser, fetchMyBusinesses]);
 
     // Role-based defaults
     useEffect(() => {
@@ -75,19 +85,23 @@ const MerchantPortal = () => {
         }
     }, [currentUser, myBusinesses.length]);
 
+    const [statusMessage, setStatusMessage] = useState(null);
+
     const handleStartApplication = async () => {
         setIsActioning(true);
+        setStatusMessage({ text: "Creating application draft...", type: 'info' });
         try {
             const onboardFn = functions.httpsCallable('onboardbusinessapplication');
-            const result = await onboardFn({
+            await onboardFn({
                 name: "New Strategic Application",
                 email: currentUser.email,
                 phone: ""
             });
-            alert("Application draft created! Please fill in your business details.");
+            setStatusMessage({ text: "Application draft created!", type: 'success' });
             setShowEditor(true);
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
@@ -96,12 +110,32 @@ const MerchantPortal = () => {
     const handleSubmitApplication = async () => {
         if (!userApplication) return;
         setIsActioning(true);
+        setStatusMessage({ text: "Submitting application...", type: 'info' });
         try {
             const submitFn = functions.httpsCallable('submitapplication');
             await submitFn({ applicationId: userApplication.id });
-            alert("Application submitted! Our Customer Success team will review it shortly.");
+            setStatusMessage({ text: "Application submitted for review!", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 4000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
+        } finally {
+            setIsActioning(false);
+        }
+    };
+
+    const handleDeleteApplication = async () => {
+        if (!userApplication) return;
+        setIsActioning(true);
+        setStatusMessage({ text: "Deleting application...", type: 'info' });
+        try {
+            const deleteFn = functions.httpsCallable('deleteapplication');
+            await deleteFn({ applicationId: userApplication.id });
+            setStatusMessage({ text: "Application deleted successfully.", type: 'success' });
+            setUserApplication(null); // Clear local state
+            setConfirmDelete(false);
+            setTimeout(() => setStatusMessage(null), 3000);
+        } catch (err) {
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
@@ -109,13 +143,15 @@ const MerchantPortal = () => {
 
     const handleUpdateApplication = async (updates) => {
         setIsActioning(true);
+        setStatusMessage({ text: "Saving draft...", type: 'info' });
         try {
             const updateFn = functions.httpsCallable('updateapplication');
             await updateFn({ applicationId: userApplication.id, updates });
-            alert("Application draft saved.");
+            setStatusMessage({ text: "Application draft saved.", type: 'success' });
             setShowEditor(false);
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert(err.message);
+            setStatusMessage({ text: err.message, type: 'error' });
         } finally {
             setIsActioning(false);
         }
@@ -126,20 +162,25 @@ const MerchantPortal = () => {
             onClick={() => setActiveTab(id)}
             className={`nav-btn ${activeTab === id ? 'active' : ''}`}
             style={{ 
-                background: activeTab === id ? 'var(--accent-primary)' : 'transparent', 
+                background: activeTab === id ? 'var(--accent-primary)' : 'transparent',
                 borderRadius: 'var(--radius-full)',
-                padding: '0.6rem 1.5rem',
+                padding: '0.5rem 1.25rem',
                 fontSize: '0.85rem',
-                border: activeTab === id ? 'none' : '1px solid rgba(255,255,255,0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                transition: 'all 0.3s ease'
+                border: activeTab === id ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                color: activeTab === id ? '#fff' : 'var(--text-secondary)',
+                fontWeight: activeTab === id ? '800' : '500'
             }}
         >
-            <i className={`fa-solid ${icon}`}></i>
-            <span>{label}</span>
-            {count > 0 && <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>{count}</span>}
+            <i className={`fa-solid ${icon}`} style={{ fontSize: '1rem' }}></i>
+            <span style={{ display: 'inline-block' }}>{label}</span>
+            {count > 0 && <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', color: '#fff' }}>{count}</span>}
         </button>
     );
 
@@ -150,14 +191,49 @@ const MerchantPortal = () => {
                     <h1 style={{ fontSize: '2.4rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>Merchant Portal</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '4px' }}>Strategic Growth & Operations</p>
                 </div>
-                <button onClick={() => navigate('/profile')} className="icon-btn glass-card" style={{ padding: '0.8rem 1.2rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button onClick={() => navigate('/profile')} className="icon-btn glass-card" style={{ padding: '0.8rem 1.2rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
                     <i className="fa-solid fa-arrow-left"></i>
                     <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase' }}>Back</span>
                 </button>
             </div>
 
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', top: '2rem', right: '2rem', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '1rem 2rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirm Modal */}
+            {confirmDelete && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '350px', padding: '2rem', textAlign: 'center' }}>
+                        <i className="fa-solid fa-triangle-exclamation fa-3x" style={{ color: '#ff4444', marginBottom: '1rem' }}></i>
+                        <h3 style={{ marginBottom: '0.5rem' }}>Discard Draft?</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '2rem' }}>This application will be permanently removed from your dashboard.</p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setConfirmDelete(false)} className="btn glass-card" style={{ flex: 1 }}>Keep Draft</button>
+                            <button onClick={handleDeleteApplication} className="btn btn-primary" style={{ flex: 1, background: '#ff4444', border: 'none', color: '#fff' }}>Discard</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Tab Navigation */}
-            <div className="glass-card slide-up" style={{ 
+            <div className="glass-card slide-up no-scrollbar" style={{ 
                 display: 'flex', 
                 padding: '0.5rem', 
                 borderRadius: 'var(--radius-full)', 
@@ -223,22 +299,37 @@ const MerchantPortal = () => {
                                         </p>
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                        {userApplication.status === 'draft' && (
-                                            <button 
-                                                onClick={handleSubmitApplication} 
-                                                disabled={isActioning}
-                                                className="btn btn-primary feature-gradient"
-                                                style={{ border: 'none' }}
-                                            >
-                                                {isActioning ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-paper-plane"></i> Submit for Review</>}
-                                            </button>
+                                        {userApplication.status !== 'approved' && (
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button 
+                                                    onClick={() => setConfirmDelete(true)} 
+                                                    disabled={isActioning}
+                                                    className="btn icon-btn"
+                                                    style={{ background: 'rgba(255,50,50,0.1)', color: '#ff4444', padding: '0.6rem 0.8rem', borderRadius: '12px' }}
+                                                    title="Delete Draft"
+                                                >
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                                <button 
+                                                    onClick={handleSubmitApplication} 
+                                                    disabled={isActioning}
+                                                    className="btn btn-primary feature-gradient"
+                                                    style={{ border: 'none' }}
+                                                >
+                                                    {isActioning ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-paper-plane"></i> Submit for Review</>}
+                                                </button>
+                                            </div>
                                         )}
                                         {userApplication.status === 'approved' && !currentUser.isOwner && (
                                             <button 
                                                 onClick={async () => {
                                                     const res = await syncRoles();
-                                                    if (res.success) alert("Identity synced! Business Portal access activated.");
-                                                    else alert("Sync failed: " + res.error);
+                                                    if (res.success) {
+                                                        setStatusMessage({ text: "Identity synced! Business Portal access activated.", type: 'success' });
+                                                    } else {
+                                                        setStatusMessage({ text: "Sync failed: " + res.error, type: 'error' });
+                                                    }
+                                                    setTimeout(() => setStatusMessage(null), 3000);
                                                 }}
                                                 className="btn glass-card"
                                                 style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
@@ -326,20 +417,21 @@ const BusinessManagementSuite = ({ business, onRefresh }) => {
             });
             setShowEditor(false);
             onRefresh();
-            alert("Business identity updated successfully.");
+            setStatusMessage({ text: "Business identity updated successfully.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert("Update failed: " + err.message);
+            setStatusMessage({ text: "Update failed: " + err.message, type: 'error' });
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <div className="glass-card" style={{ padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                <div>
-                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{business.name}</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{business.industry} • {business.location || 'Remote'}</p>
+        <div className="glass-card" style={{ padding: 'var(--card-padding)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1.5rem' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px' }}>{business.name}</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '4px' }}>{business.industry} • {business.location || 'Remote'}</p>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px', color: 'var(--text-secondary)' }}>
                             Role: {stewardship?.toUpperCase()}
@@ -351,20 +443,21 @@ const BusinessManagementSuite = ({ business, onRefresh }) => {
                         )}
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     {canEdit && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button onClick={() => setShowCrewManager(true)} className="btn btn-secondary">
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button onClick={() => setShowCrewManager(true)} className="btn btn-secondary btn-sm">
                                 <i className="fa-solid fa-users-gear"></i> Manage Crew
                             </button>
-                            <button onClick={() => setShowEditor(true)} className="btn btn-secondary">
+                            <button onClick={() => setShowEditor(true)} className="btn btn-secondary btn-sm">
                                 <i className="fa-solid fa-pen-to-square"></i> Edit Identity
                             </button>
                         </div>
                     )}
                     <button 
                         onClick={() => navigate(`/business-portal?bizId=${business.id}`)} 
-                        className="btn btn-primary feature-gradient"
+                        className="btn btn-primary feature-gradient btn-sm"
+                        style={{ border: 'none' }}
                     >
                         <i className="fa-solid fa-gauge-high"></i> Operations Hub
                     </button>
@@ -372,22 +465,31 @@ const BusinessManagementSuite = ({ business, onRefresh }) => {
             </div>
 
             {canManage && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800' }}>{business.checkinsCount || 0}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Visitors</div>
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                    gap: '1.25rem', 
+                    background: 'rgba(0,0,0,0.25)', 
+                    padding: '1.5rem', 
+                    borderRadius: 'var(--radius-md)', 
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    marginTop: '1rem'
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#fff' }}>{business.checkinsCount || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Visitors</div>
                     </div>
-                    <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#ffb84d' }}>{business.purchasesCount || 0}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Supporters</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#ffb84d' }}>{business.purchasesCount || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Supporters</div>
                     </div>
-                    <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--accent-success)' }}>RM {(business.purchaseVolume || 0).toLocaleString()}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Impact Volume</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#10b981' }}>RM {(business.purchaseVolume || 0).toLocaleString()}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Impact Volume</div>
                     </div>
-                    <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--accent-primary)' }}>{business.stewardship?.crew?.length || 0}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Crew Members</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--accent-primary)' }}>{business.stewardship?.crew?.length || 0}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Crew Members</div>
                     </div>
                 </div>
             )}

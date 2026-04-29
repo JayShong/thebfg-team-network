@@ -30,6 +30,25 @@ const Profile = () => {
     const [userApplication, setUserApplication] = useState(null);
     const [showAppEditor, setShowAppEditor] = useState(false);
     const [isSavingApp, setIsSavingApp] = useState(false);
+    
+    const [editingAmountId, setEditingAmountId] = useState(null);
+    const [editAmountValue, setEditAmountValue] = useState('');
+    const [statusMessage, setStatusMessage] = useState(null);
+
+    const handleUpdateAmount = async (id) => {
+        if (!editAmountValue || isNaN(editAmountValue)) return;
+        try {
+            await db.collection('transactions').doc(id).update({ 
+                amount: parseFloat(editAmountValue),
+                updatedAt: new Date().toISOString()
+            });
+            setEditingAmountId(null);
+            setStatusMessage({ text: "Amount updated successfully.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
+        } catch (e) {
+            setStatusMessage({ text: "Update failed: " + e.message, type: 'error' });
+        }
+    };
 
     // Read stats from localStorage for guest view
     const getLocalStats = () => {
@@ -318,6 +337,9 @@ const Profile = () => {
                             <button onClick={() => setShowAuthModal(true)} className="btn btn-primary mt-3 feature-gradient" style={{ border: 'none', width: '100%' }}>
                                 Accept The Invitation
                             </button>
+                            <button onClick={logout} className="btn btn-secondary mt-2" style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', width: '100%' }}>
+                                <i className="fa-solid fa-right-from-bracket"></i> Leave Exploration Mode
+                            </button>
                             {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
                         </div>
                     ) : (
@@ -352,9 +374,31 @@ const Profile = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {(currentUser?.isSuperAdmin) && (
+                                    <button onClick={() => navigate('/admin')} className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #FFD700, #FF8C00)', color: '#000', border: 'none', fontWeight: '700' }}>
+                                        <i className="fa-solid fa-crown"></i> Governance Portal
+                                    </button>
+                                )}
+
+                                {(currentUser?.isAuditor || currentUser?.isSuperAdmin) && (
+                                    <button onClick={() => navigate('/audit-hub')} className="btn btn-primary" style={{ background: '#4CAF50', border: 'none', color: '#fff', fontWeight: '600' }}>
+                                        <i className="fa-solid fa-clipboard-check"></i> Audit Hub
+                                    </button>
+                                )}
+
                                 <button onClick={() => navigate('/merchant-portal')} className="btn btn-primary feature-gradient" style={{ border: 'none' }}>
                                     <i className="fa-solid fa-store"></i> Merchant Portal
                                 </button>
+
+                                {isSteward && myBusinesses.length > 0 && (
+                                    <button 
+                                        onClick={() => navigate(`/business-portal?bizId=${myBusinesses[0].id}`)} 
+                                        className="btn btn-secondary" 
+                                        style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
+                                    >
+                                        <i className="fa-solid fa-briefcase"></i> Operations Hub (Business Portal)
+                                    </button>
+                                )}
 
                                 <button onClick={logout} className="btn btn-secondary" style={{ border: '1px solid rgba(255,87,87,0.3)', color: '#ff5757' }}>
                                     <i className="fa-solid fa-right-from-bracket"></i> Sign Out
@@ -504,19 +548,32 @@ const Profile = () => {
                                         </div>
 
                                         {isPurchase && isPending && (
-                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                                <button
-                                                    onClick={() => {
-                                                        const newAmount = prompt("Enter corrected amount (RM):", item.amount);
-                                                        if (newAmount && !isNaN(newAmount)) {
-                                                            db.collection('transactions').doc(item.id).update({ amount: parseFloat(newAmount) })
-                                                                .catch(e => alert("Update failed: " + e.message));
-                                                        }
-                                                    }}
-                                                    style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                >
-                                                    <i className="fa-solid fa-pen"></i> Edit Amount
-                                                </button>
+                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
+                                                {editingAmountId === item.id ? (
+                                                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>RM</span>
+                                                        <input 
+                                                            type="number" 
+                                                            className="input-modern" 
+                                                            style={{ width: '80px', padding: '0.3rem', fontSize: '0.75rem' }} 
+                                                            value={editAmountValue}
+                                                            onChange={(e) => setEditAmountValue(e.target.value)}
+                                                            autoFocus
+                                                        />
+                                                        <button onClick={() => handleUpdateAmount(item.id)} className="btn-icon" style={{ padding: '4px' }}><i className="fa-solid fa-check" style={{ color: 'var(--accent-success)', fontSize: '0.7rem' }}></i></button>
+                                                        <button onClick={() => setEditingAmountId(null)} className="btn-icon" style={{ padding: '4px' }}><i className="fa-solid fa-times" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}></i></button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingAmountId(item.id);
+                                                            setEditAmountValue(item.amount);
+                                                        }}
+                                                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <i className="fa-solid fa-pen"></i> Edit Amount
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -524,6 +581,27 @@ const Profile = () => {
                             })}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', bottom: '5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '0.8rem 1.5rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontSize: '0.85rem'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
                 </div>
             )}
 

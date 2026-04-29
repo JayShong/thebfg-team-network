@@ -4,6 +4,7 @@ import BusinessCard from '../components/business/BusinessCard';
 import { db } from '../services/firebase';
 
 const Directory = () => {
+    const [inputValue, setInputValue] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('all');
     const [paradigmFilters, setParadigmFilters] = useState([]); // Array of 's', 'e', 'c', 'soc', 'env'
@@ -102,16 +103,26 @@ const Directory = () => {
             )}
 
             {/* Search Bar */}
-            <div className="search-bar" style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <i className="fa-solid fa-search" style={{ color: 'var(--text-secondary)' }}></i>
-                <input
-                    type="text"
-                    placeholder="Search for-good businesses..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-modern"
-                    style={{ background: 'none', border: 'none', color: 'var(--text-primary)', outline: 'none', width: '100%', marginLeft: '10px', padding: 0 }}
-                />
+            <div className="search-bar" style={{ marginTop: '1rem', width: '100%', display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <i className="fa-solid fa-search" style={{ color: 'var(--text-secondary)' }}></i>
+                    <input
+                        type="text"
+                        placeholder="Search for-good businesses..."
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && setSearchQuery(inputValue)}
+                        className="input-modern"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-primary)', outline: 'none', width: '100%', marginLeft: '10px', padding: 0 }}
+                    />
+                </div>
+                <button 
+                    onClick={() => setSearchQuery(inputValue)}
+                    className="btn btn-primary"
+                    style={{ borderRadius: 'var(--radius-full)', padding: '0 1.5rem', height: '48px', border: 'none', background: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: '700' }}
+                >
+                    Search
+                </button>
             </div>
 
             {/* Category Filters */}

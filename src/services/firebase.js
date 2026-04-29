@@ -59,9 +59,9 @@ export const functions = IS_MOCKED_MODE ? {
             }
 
             if (name === 'assignapplication') {
-                await db.collection('applications').doc(data.appId).update({
+                await db.collection('applications').doc(data.applicationId).update({
                     status: 'onboarding',
-                    assignedTo: user?.email
+                    assignedTo: user?.uid
                 });
                 return { data: { success: true } };
             }
@@ -88,6 +88,12 @@ export const functions = IS_MOCKED_MODE ? {
             }
 
             if (name === 'syncuserclaims') {
+                return { data: { success: true } };
+            }
+
+            if (name === 'deleteapplication') {
+                console.log(`[TEST MODE] Deleting application: ${data.applicationId}`);
+                await db.collection('applications').doc(data.applicationId).delete();
                 return { data: { success: true } };
             }
 

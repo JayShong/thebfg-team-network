@@ -12,6 +12,7 @@ const Admin = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
     const [networkStats, setNetworkStats] = useState({ consumers: 0, businesses: 0, checkins: 0, purchases: 0 });
+    const [statusMessage, setStatusMessage] = useState(null);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -36,6 +37,26 @@ const Admin = () => {
                 <p style={{ color: 'var(--text-secondary)' }}>High-Level Network Management</p>
             </div>
 
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', top: '2rem', right: '2rem', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '1rem 2rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
+
             {/* Network Health Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                 <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
@@ -53,18 +74,18 @@ const Admin = () => {
             </div>
 
             {/* Role Management Section */}
-            <RoleManager />
+            <RoleManager setStatus={setStatusMessage} />
 
             {/* Sentinel Governance: Flagged Identities */}
-            <FlaggedIdentities />
+            <FlaggedIdentities setStatus={setStatusMessage} />
 
             {/* Initiatives Management */}
-            <InitiativesManager />
+            <InitiativesManager setStatus={setStatusMessage} />
         </div>
     );
 };
 
-const FlaggedIdentities = () => {
+const FlaggedIdentities = ({ setStatus }) => {
     const [flaggedUsers, setFlaggedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -84,9 +105,10 @@ const FlaggedIdentities = () => {
             const fnName = actionType === 'clear' ? 'clearidentityflag' : 'resetlockout';
             const sentinelFn = functions.httpsCallable(fnName);
             await sentinelFn({ targetUserId: userId });
-            alert(`Identity updated successfully.`);
+            setStatus({ text: `Identity updated successfully.`, type: 'success' });
+            setTimeout(() => setStatus(null), 3000);
         } catch (e) {
-            alert(e.message);
+            setStatus({ text: e.message, type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -108,8 +130,8 @@ const FlaggedIdentities = () => {
                             <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>UID: {user.id}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button onClick={() => handleAction(user.id, 'reset')} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }}>Reset Lockout</button>
-                            <button onClick={() => handleAction(user.id, 'clear')} className="filter-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', fontSize: '0.75rem' }}>Clear Identity</button>
+                            <button onClick={() => handleAction(user.id, 'reset')} className="filter-btn" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.75rem' }} disabled={loading}>Reset Lockout</button>
+                            <button onClick={() => handleAction(user.id, 'clear')} className="filter-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', fontSize: '0.75rem' }} disabled={loading}>Clear Identity</button>
                         </div>
                     </div>
                 ))}
@@ -118,7 +140,8 @@ const FlaggedIdentities = () => {
     );
 };
 
-const RoleManager = () => {
+const RoleManager = ({ setStatus }) => {
+    const { currentUser } = useAuth();
     const [email, setEmail] = useState('');
     const [merchantEmails, setMerchantEmails] = useState([]);
     const [complianceEmails, setComplianceEmails] = useState([]);
@@ -138,7 +161,10 @@ const RoleManager = () => {
     }, []);
 
     const handleUpdate = async (targetEmail, roleType, isRemoving = false) => {
-        if (!targetEmail || !targetEmail.includes('@')) return alert("Enter a valid email.");
+        if (!targetEmail || !targetEmail.includes('@')) {
+            setStatus({ text: "Enter a valid email.", type: 'error' });
+            return;
+        }
         const action = isRemoving ? 'remove' : 'assign';
 
         try {
@@ -146,11 +172,12 @@ const RoleManager = () => {
             const manageRoleFn = functions.httpsCallable('managerole');
             const result = await manageRoleFn({ targetEmail, roleType, action });
             if (result.data.success) {
-                alert("Role updated successfully.");
+                setStatus({ text: "Role updated successfully.", type: 'success' });
                 setEmail('');
+                setTimeout(() => setStatus(null), 3000);
             }
         } catch (e) {
-            alert(e.message || "Failed to update role.");
+            setStatus({ text: e.message || "Failed to update role.", type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -165,7 +192,7 @@ const RoleManager = () => {
 
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <input type="email" className="input-modern" style={{ flex: 1 }} placeholder="Assign email..." value={email} onChange={e => setEmail(e.target.value)} />
-                <button className="nav-btn active" style={{ background: color }} onClick={() => handleUpdate(email, roleType, false)}>Add</button>
+                <button className="nav-btn active" style={{ background: color }} onClick={() => handleUpdate(email, roleType, false)} disabled={loading}>Add</button>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', padding: '0.8rem' }}>
@@ -173,7 +200,7 @@ const RoleManager = () => {
                     <div key={e} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span style={{ fontSize: '0.85rem' }}>{e}</span>
                         {e !== currentUser?.email && (
-                            <button onClick={() => handleUpdate(e, roleType, true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
+                            <button onClick={() => handleUpdate(e, roleType, true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer' }} disabled={loading}>
                                 <i className="fa-solid fa-trash-can"></i>
                             </button>
                         )}
@@ -194,9 +221,10 @@ const RoleManager = () => {
     );
 };
 
-const InitiativesManager = () => {
+const InitiativesManager = ({ setStatus }) => {
     const [inits, setInits] = useState([]);
     const [newInit, setNewInit] = useState({ title: '', narrative: '', mechanism: '', status: 'active' });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const unsubscribe = db.collection('initiatives').onSnapshot(snap => {
@@ -207,6 +235,8 @@ const InitiativesManager = () => {
 
     const saveInit = async (e) => {
         e.preventDefault();
+        setLoading(true);
+        setStatus({ text: "Publishing initiative...", type: 'info' });
         try {
             await db.collection('initiatives').add({ 
                 ...newInit, 
@@ -214,8 +244,13 @@ const InitiativesManager = () => {
                 createdAt: new Date().toISOString() 
             });
             setNewInit({ title: '', narrative: '', mechanism: '', status: 'active' });
-            alert("Initiative published to the network!");
-        } catch (e) { alert(e.message); }
+            setStatus({ text: "Initiative published to the network!", type: 'success' });
+            setTimeout(() => setStatus(null), 3000);
+        } catch (e) { 
+            setStatus({ text: e.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -239,6 +274,7 @@ const InitiativesManager = () => {
                 <button
                     type="submit"
                     className="nav-btn"
+                    disabled={loading}
                     style={{
                         marginTop: '1rem',
                         width: '100%',
@@ -251,10 +287,11 @@ const InitiativesManager = () => {
                         fontWeight: '700'
                     }}
                 >
-                    <i className="fa-solid fa-plus-circle"></i> Publish Initiative
+                    {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-plus-circle"></i> Publish Initiative</>}
                 </button>
             </form>
         </div>
     );
 };
+
 export default Admin;

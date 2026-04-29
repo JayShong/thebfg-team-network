@@ -74,8 +74,12 @@ const AuditHub = () => {
         return isAssignedToMe && l.status === 'PENDING_APPROVAL';
     });
 
+    const [statusMessage, setStatusMessage] = useState(null);
+    const [confirmAction, setConfirmAction] = useState(null); // { type, log, biz }
+    const [rejectionPrompt, setRejectionPrompt] = useState(null); // log
+
     const approveAudit = async (log) => {
-        if (!window.confirm(`Approve and publish audit for ${log.bizName}?`)) return;
+        setStatusMessage({ text: "Publishing audit...", type: 'info' });
         try {
             await db.collection('audit_logs').doc(log.id).update({
                 status: 'PUBLISHED',
@@ -83,23 +87,22 @@ const AuditHub = () => {
                 approvedBy: currentUser.email
             });
             
-            // Ensure we handle both string and object scores
             const finalScore = log.scores || log.score;
-            
             await db.collection('businesses').doc(log.bizId).update({
                 score: finalScore,
                 isVerified: true,
                 lastAuditDate: new Date().toISOString()
             });
-            alert("Audit published successfully.");
+            setStatusMessage({ text: "Audit published successfully.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
-            alert("Approval failed: " + e.message);
+            setStatusMessage({ text: "Approval failed: " + e.message, type: 'error' });
         }
     };
 
-    const rejectAudit = async (log) => {
-        const comment = window.prompt("Enter rejection comment / feedback for the auditor:");
+    const handleRejectSubmit = async (log, comment) => {
         if (!comment) return;
+        setStatusMessage({ text: "Returning audit...", type: 'info' });
         try {
             await db.collection('audit_logs').doc(log.id).update({
                 status: 'RETURNED',
@@ -107,14 +110,20 @@ const AuditHub = () => {
                 rejectedBy: currentUser.email,
                 rejectedAt: new Date().toISOString()
             });
-            alert("Audit returned to auditor.");
+            setStatusMessage({ text: "Audit returned to auditor.", type: 'success' });
+            setRejectionPrompt(null);
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
-            alert("Rejection failed: " + e.message);
+            setStatusMessage({ text: "Rejection failed: " + e.message, type: 'error' });
         }
     };
 
     const submitToSupervisor = async (log, summary, pillarComments, checklist, supervisor) => {
-        if (!summary) return alert("Please provide a public summary.");
+        if (!summary) {
+            setStatusMessage({ text: "Please provide a public summary.", type: 'error' });
+            return;
+        }
+        setStatusMessage({ text: "Submitting for review...", type: 'info' });
         try {
             await db.collection('audit_logs').doc(log.id).update({
                 publicSummary: summary,
@@ -123,18 +132,17 @@ const AuditHub = () => {
                 supervisorEmail: supervisor,
                 status: 'PENDING_APPROVAL',
                 submittedAt: new Date().toISOString(),
-                // Sync scores in case they changed in the draft UI
                 scores: log.scores
             });
-            alert("Submitted for review.");
+            setStatusMessage({ text: "Submitted for review.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
-            alert("Submission failed: " + e.message);
+            setStatusMessage({ text: "Submission failed: " + e.message, type: 'error' });
         }
     };
 
     const initiateAudit = (biz) => {
         setSelectedBiz(biz);
-        // Default to C if no score exists
         const baseScore = typeof biz.score === 'object' ? biz.score : { s: 'C', e: 'C', c: 'C', soc: 'C', env: 'C' };
         setAuditScores(baseScore);
         setShowInitiateModal(true);
@@ -142,6 +150,7 @@ const AuditHub = () => {
 
     const confirmInitiate = async () => {
         if (!selectedBiz) return;
+        setStatusMessage({ text: "Creating audit draft...", type: 'info' });
         try {
             await db.collection('audit_logs').add({
                 bizId: selectedBiz.id,
@@ -153,9 +162,10 @@ const AuditHub = () => {
             });
             setShowInitiateModal(false);
             setActiveTab('auditor');
-            alert("Audit draft created.");
+            setStatusMessage({ text: "Audit draft created.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
-            alert("Failed to initiate: " + e.message);
+            setStatusMessage({ text: "Failed to initiate: " + e.message, type: 'error' });
         }
     };
 
@@ -196,6 +206,72 @@ const AuditHub = () => {
                     <i className="fa-solid fa-arrow-left"></i> Back
                 </button>
             </div>
+
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', top: '2rem', right: '2rem', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '1rem 2rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirm Modal */}
+            {confirmAction && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '350px', padding: '2rem', textAlign: 'center' }}>
+                        <i className="fa-solid fa-circle-question fa-3x" style={{ color: 'var(--color-compliance)', marginBottom: '1rem' }}></i>
+                        <h3 style={{ marginBottom: '0.5rem' }}>{confirmAction.type === 'approve' ? 'Publish Audit?' : 'Confirm Action'}</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '2rem' }}>
+                            {confirmAction.type === 'approve' ? `Ready to take the audit for ${confirmAction.log.bizName} live?` : 'Are you sure?'}
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setConfirmAction(null)} className="btn glass-card" style={{ flex: 1 }}>Cancel</button>
+                            <button onClick={() => {
+                                if (confirmAction.type === 'approve') approveAudit(confirmAction.log);
+                                setConfirmAction(null);
+                            }} className="btn btn-primary" style={{ flex: 1, background: 'var(--color-compliance)', border: 'none' }}>Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rejection Prompt */}
+            {rejectionPrompt && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                    <div className="glass-card slide-up" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+                        <h3 style={{ marginBottom: '0.5rem' }}>Return Audit</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Provide feedback for the auditor on why this needs refinement.</p>
+                        <textarea 
+                            id="reject-comment"
+                            className="input-modern"
+                            placeholder="Reason for return..."
+                            style={{ minHeight: '100px', marginBottom: '1.5rem' }}
+                        />
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setRejectionPrompt(null)} className="btn glass-card" style={{ flex: 1 }}>Cancel</button>
+                            <button 
+                                onClick={() => handleRejectSubmit(rejectionPrompt, document.getElementById('reject-comment').value)} 
+                                className="btn btn-primary" 
+                                style={{ flex: 1, background: '#ff4444', border: 'none' }}
+                            >
+                                Return Draft
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="stats-grid" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
                 <div 
@@ -261,8 +337,8 @@ const AuditHub = () => {
                                             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scores: {JSON.stringify(log.scores)}</p>
                                         </div>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button onClick={() => approveAudit(log)} className="btn-icon" title="Approve"><i className="fa-solid fa-check" style={{color: 'var(--color-compliance)'}}></i></button>
-                                            <button onClick={() => rejectAudit(log)} className="btn-icon" title="Reject"><i className="fa-solid fa-xmark" style={{color: '#f44336'}}></i></button>
+                                            <button onClick={() => setConfirmAction({ type: 'approve', log })} className="btn-icon" title="Approve"><i className="fa-solid fa-check" style={{color: 'var(--color-compliance)'}}></i></button>
+                                            <button onClick={() => setRejectionPrompt(log)} className="btn-icon" title="Reject"><i className="fa-solid fa-xmark" style={{color: '#f44336'}}></i></button>
                                         </div>
                                     </div>
                                 </div>

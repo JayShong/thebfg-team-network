@@ -4,12 +4,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import useBusinesses from '../hooks/useBusinesses';
 import { db } from '../services/firebase';
+import useSafeSnapshot from '../hooks/useSafeSnapshot';
 import FeedbackModal from '../components/profile/FeedbackModal';
 
 const BusinessProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { currentUser, isGuest, logout } = useAuth();
+    const { currentUser, isGuest, logout, getStewardshipLevel } = useAuth();
     const { businesses, loading } = useBusinesses();
     
     const [business, setBusiness] = useState(null);
@@ -17,15 +18,18 @@ const BusinessProfile = () => {
     const [liveAuditLog, setLiveAuditLog] = useState([]);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [recommendCount, setRecommendCount] = useState(0);
+    const [statusMessage, setStatusMessage] = useState(null);
 
     useEffect(() => {
         if (!id) return;
-        const unsubscribe = db.collection('feedback')
+        const query = db.collection('feedback')
             .where('bizId', '==', id)
-            .where('type', '==', 'Recommendation')
-            .onSnapshot(snap => {
-                setRecommendCount(snap.size);
-            });
+            .where('type', '==', 'Recommendation');
+            
+        const unsubscribe = query.onSnapshot(snap => {
+            setRecommendCount(snap.size);
+        }, err => console.warn("Feedback count sub failed:", err));
+        
         return () => unsubscribe();
     }, [id]);
 
@@ -40,12 +44,16 @@ const BusinessProfile = () => {
             }
         } else {
             await navigator.clipboard.writeText(text);
-            alert("Link copied! Share it with someone who chooses conviction.");
+            setStatusMessage({ text: "Link copied! Share it with someone who chooses conviction.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         }
     };
 
     const handleRecommend = async () => {
-        if (!currentUser) return alert("Please log in to recommend this business.");
+        if (!currentUser) {
+            setStatusMessage({ text: "Please log in to recommend this business.", type: 'error' });
+            return;
+        }
         try {
             await db.collection('feedback').add({
                 type: 'Recommendation',
@@ -54,9 +62,10 @@ const BusinessProfile = () => {
                 userName: currentUser.displayName || getNickname(currentUser.email),
                 timestamp: new Date().toISOString()
             });
-            alert("Your recommendation strengthens this business's signal in the network.");
+            setStatusMessage({ text: "Your recommendation strengthens this business's signal in the network.", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
-            alert("Failed to recommend: " + e.message);
+            setStatusMessage({ text: "Failed to recommend: " + e.message, type: 'error' });
         }
     };
 
@@ -70,14 +79,18 @@ const BusinessProfile = () => {
     }, [id, businesses, loading]);
 
     const [intelligence, setIntelligence] = useState(null);
-    useEffect(() => {
-        if (!id) return;
-        const unsubscribe = db.collection('businesses').doc(id).collection('intelligence').doc('latest')
-            .onSnapshot(doc => {
-                if (doc.exists) setIntelligence(doc.data());
-            });
-        return () => unsubscribe();
-    }, [id]);
+    // Intelligence Center PIVOT: Only stewards can see real-time sharded aggregates
+    const stewardshipLevel = business ? getStewardshipLevel(business) : null;
+    const isSteward = stewardshipLevel !== null;
+
+    useSafeSnapshot(
+        db.collection('businesses').doc(id).collection('intelligence').doc('latest'),
+        doc => {
+            if (doc.exists) setIntelligence(doc.data());
+        },
+        err => console.warn("Intelligence sub failed (Standard behavior for non-stewards):", err),
+        [id, isSteward] // Only subscribe if id changes or stewardship status changes
+    );
 
     const stats = {
         checkins: intelligence?.totalCheckins || (business?.checkinsCount || 0) + (business?.ghostCheckinsCount || 0),
@@ -85,22 +98,22 @@ const BusinessProfile = () => {
         volume: intelligence?.communityImpact || business?.purchaseVolume || 0
     };
 
-    useEffect(() => {
-        if (!id) return;
-        
-        const unsubscribe = db.collection('businesses').doc(id).collection('transactions')
+    // System Audit Trail PIVOT: Only stewards can see the raw transaction stream
+    useSafeSnapshot(
+        db.collection('businesses').doc(id).collection('transactions')
             .where('status', '==', 'verified')
             .orderBy('timestamp', 'desc')
-            .limit(20) // Scale safeguard
-            .onSnapshot(snapshot => {
-                const logs = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setLiveAuditLog(logs);
-            });
-        return () => unsubscribe();
-    }, [id, business]);
+            .limit(20),
+        snapshot => {
+            const logs = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setLiveAuditLog(logs);
+        },
+        err => console.warn("Audit trail sub failed (Standard behavior for non-stewards):", err),
+        [id, business, isSteward]
+    );
 
     const getNickname = (email) => {
         if (!email) return 'Operator';
@@ -505,6 +518,27 @@ const BusinessProfile = () => {
                     onClose={() => setShowFeedbackModal(false)} 
                 />
             )}
+
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', bottom: '5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '0.8rem 1.5rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontSize: '0.85rem'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -529,6 +563,9 @@ const UserLoyaltyConnection = ({ bizId, userId }) => {
                         totalSpend: data.totalSpend || 0
                     });
                 }
+                setLoading(false);
+            }, err => {
+                console.warn("Gratitude bond sub failed:", err);
                 setLoading(false);
             });
             

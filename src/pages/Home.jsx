@@ -129,7 +129,12 @@ const Home = () => {
     useEffect(() => {
         // Trigger refresh if local storage is missing OR global stats are effectively zero
 
-        if (!localStorage.getItem('bfg_global_stats') || stats.consumers === 0) {
+        const lastRefresh = localStorage.getItem('bfg_last_stats_refresh');
+        const now = Date.now();
+        const oneMinute = 60 * 1000;
+
+        if (!localStorage.getItem('bfg_global_stats') || (stats.consumers === 0 && (!lastRefresh || now - lastRefresh > oneMinute))) {
+            localStorage.setItem('bfg_last_stats_refresh', now);
             refreshDashboard();
         } else {
             setIsLoading(false);
@@ -290,7 +295,7 @@ const Home = () => {
                     <i className="fa-solid fa-users-viewfinder stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Movement Actions</h3>
-                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.initiativeParticipation || 0).toLocaleString()}</p>
+                        <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats?.totalAttendance || 0).toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-card glass-card" style={{ background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>

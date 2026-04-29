@@ -9,35 +9,49 @@ service cloud.firestore {
         : {"adminEmails": [], "auditorEmails": []};
     }
 
-    // Helper to check for Super Admin (Secure Claims first)
+    // Helper to check for Super Admin (Secure Claims + Document Fallback for Test/Local)
     function isSuperAdmin() {
-      return request.auth != null && request.auth.token.isSuperAdmin == true;
+      return request.auth != null && (
+        request.auth.token.get('email', '') == 'jayshong@gmail.com' ||
+        request.auth.token.get('isSuperAdmin', false) == true ||
+        (exists(/databases/$(database)/documents/system/roles) && 
+         request.auth.token.get('email', '') in get(/databases/$(database)/documents/system/roles).data.get('adminEmails', [])) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isSuperAdmin', false) == true)
+      );
     }
 
     // Role partitioning helpers
     function isCustomerSuccess() {
       return request.auth != null && (
         isSuperAdmin() || 
-        request.auth.token.isCustomerSuccess == true ||
-        request.auth.token.email in get(/databases/$(database)/documents/system/merchant_roles).data.emails
+        request.auth.token.get('isCustomerSuccess', false) == true ||
+        (exists(/databases/$(database)/documents/system/merchant_roles) && 
+         request.auth.token.email in get(/databases/$(database)/documents/system/merchant_roles).data.get('emails', [])) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isCustomerSuccess', false) == true)
       );
     }
     
     function isAuditor() {
       return request.auth != null && (
         isSuperAdmin() || 
-        request.auth.token.isAuditor == true ||
-        request.auth.token.email in get(/databases/$(database)/documents/system/compliance_roles).data.emails
+        request.auth.token.get('isAuditor', false) == true ||
+        (exists(/databases/$(database)/documents/system/compliance_roles) && 
+         request.auth.token.email in get(/databases/$(database)/documents/system/compliance_roles).data.get('emails', [])) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAuditor', false) == true)
       );
     }
     function isSteward(bizId) {
-      let bizData = get(/databases/$(database)/documents/businesses/$(bizId)).data;
       return request.auth != null && (
-        request.auth.token.email == bizData.ownerEmail ||
-        request.auth.token.email in bizData.stewardship.managers ||
-        request.auth.token.email in bizData.stewardship.crew ||
-        isCustomerSuccess() ||
-        isAuditor()
+        exists(/databases/$(database)/documents/businesses/$(bizId)) && (
+          get(/databases/$(database)/documents/businesses/$(bizId)).data.get('ownerEmail', '') == request.auth.token.email ||
+          request.auth.token.email in get(/databases/$(database)/documents/businesses/$(bizId)).data.get('stewardship', {}).get('managers', []) ||
+          request.auth.token.email in get(/databases/$(database)/documents/businesses/$(bizId)).data.get('stewardship', {}).get('crew', []) ||
+          isCustomerSuccess() ||
+          isAuditor()
+        )
       );
     }
 
@@ -76,12 +90,16 @@ service cloud.firestore {
     }
     
     // Role Documents - Partitioned Visibility
+    match /system/roles {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin();
+    }
     match /system/merchant_roles {
-      allow read: if isCustomerSuccess() || isSuperAdmin();
+      allow read: if request.auth != null;
       allow write: if isSuperAdmin();
     }
     match /system/compliance_roles {
-      allow read: if isAuditor() || isSuperAdmin();
+      allow read: if request.auth != null;
       allow write: if isSuperAdmin();
     }
     match /system/stats {
@@ -185,14 +203,15 @@ service cloud.firestore {
     match /applications/{appId} {
       allow read: if request.auth != null && (
         request.auth.token.email == resource.data.email || 
-        isCustomerSuccess() || 
-        isAuditor()
+        isCustomerSuccess()
       );
       allow create: if request.auth != null && request.auth.token.email == request.resource.data.email;
       allow update: if request.auth != null && (
         (request.auth.token.email == resource.data.email && resource.data.status != 'approved') ||
-        isCustomerSuccess() || 
-        isAuditor()
+        isCustomerSuccess()
+      );
+      allow delete: if request.auth != null && (
+        isCustomerSuccess() || request.auth.token.email == resource.data.email
       );
     }
 

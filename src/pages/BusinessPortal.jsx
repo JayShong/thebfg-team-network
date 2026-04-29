@@ -20,6 +20,7 @@ const BusinessPortal = () => {
     const adminEditId = searchParams.get('edit') || searchParams.get('bizId');
     
     const [myBusinesses, setMyBusinesses] = useState([]);
+    const [switcherInput, setSwitcherInput] = useState('');
     const [selectedBiz, setSelectedBiz] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [formData, setFormData] = useState({
@@ -37,6 +38,7 @@ const BusinessPortal = () => {
     const [scannedUserId, setScannedUserId] = useState(null);
     const [showIntelligence, setShowIntelligence] = useState(false);
     const [isSyncingLedger, setIsSyncingLedger] = useState(false);
+    const [statusMessage, setStatusMessage] = useState(null);
 
     const isSupportMode = (currentUser?.isSuperAdmin || currentUser?.isAuditor || currentUser?.isCustomerSuccess) && adminEditId;
 
@@ -91,13 +93,15 @@ const BusinessPortal = () => {
     const handleSyncLedger = async () => {
         if (!selectedBiz || isSyncingLedger) return;
         setIsSyncingLedger(true);
+        setStatusMessage({ text: "Synchronizing merchant ledger...", type: 'info' });
         try {
             const syncFn = firebase.functions().httpsCallable('syncmerchantledger');
             const result = await syncFn({ bizId: selectedBiz.id });
-            console.log(`SYNC: Pulled ${result.data?.count || 0} transactions into projection.`);
+            setStatusMessage({ text: `Sync complete. Pulled ${result.data?.count || 0} transactions into projection.`, type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (e) {
             console.error("Manual sync failed:", e);
-            alert("Sync failed: " + e.message);
+            setStatusMessage({ text: "Sync failed: " + e.message, type: 'error' });
         } finally {
             setIsSyncingLedger(false);
         }
@@ -158,9 +162,10 @@ const BusinessPortal = () => {
         setIsSaving(true);
         try {
             await db.collection('businesses').doc(selectedBiz.id).update(formData);
-            alert("Business profile updated successfully!");
+            setStatusMessage({ text: "Business profile updated successfully!", type: 'success' });
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert("Failed to update profile: " + err.message);
+            setStatusMessage({ text: "Failed to update profile: " + err.message, type: 'error' });
         } finally {
             setIsSaving(false);
         }
@@ -183,7 +188,10 @@ const BusinessPortal = () => {
         const main = document.createElement('canvas');
         main.width = 1118; main.height = 1588;
         const qr = document.getElementById('hidden-qr');
-        if (!qr) return alert("QR Generator not ready. Please try again.");
+        if (!qr) {
+            setStatusMessage({ text: "QR Generator not ready. Please try again.", type: 'error' });
+            return;
+        }
         
         const dataUrl = drawStandee(main, qr, selectedBiz.name);
         const link = document.createElement('a');
@@ -236,6 +244,27 @@ const BusinessPortal = () => {
                 <i className="fa-solid fa-arrow-left"></i> Back to Profile
             </button>
 
+            {/* Status Toast */}
+            {statusMessage && (
+                <div style={{ position: 'fixed', bottom: '5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 5000 }} className="slide-up">
+                    <div className="glass-card" style={{ 
+                        padding: '0.8rem 1.5rem', 
+                        background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                   statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontSize: '0.85rem'
+                    }}>
+                        <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                        <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                    </div>
+                </div>
+            )}
+
             {isSupportMode && (
                 <div className="glass-card" style={{ background: 'rgba(255,184,77,0.1)', border: '1px solid rgba(255,184,77,0.2)', padding: '1.2rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <div style={{ background: 'rgba(255,184,77,0.2)', width: '45px', height: '45px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -270,22 +299,42 @@ const BusinessPortal = () => {
                     <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginBottom: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
                         <i className="fa-solid fa-magnifying-glass"></i> Switch Stewardship Context (Search Businesses)
                     </label>
-                    <input 
-                        type="text" 
-                        placeholder="Search for a business name or ID..."
-                        className="input-modern"
-                        style={{ width: '100%', marginBottom: '1rem' }}
-                        onChange={(e) => {
-                            const term = e.target.value.toLowerCase();
-                            if (term.length > 1) {
-                                const found = businesses.filter(b => b.name.toLowerCase().includes(term) || b.id.toLowerCase().includes(term));
-                                setMyBusinesses(found);
-                            } else {
-                                // Reset to user's actual businesses or default list
-                                setMyBusinesses(businesses.slice(0, 10));
-                            }
-                        }}
-                    />
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                            type="text" 
+                            placeholder="Search for a business name or ID..."
+                            className="input-modern"
+                            style={{ flex: 1 }}
+                            value={switcherInput}
+                            onChange={(e) => setSwitcherInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const term = switcherInput.toLowerCase();
+                                    if (term.length > 0) {
+                                        const found = businesses.filter(b => b.name.toLowerCase().includes(term) || b.id.toLowerCase().includes(term));
+                                        setMyBusinesses(found);
+                                    } else {
+                                        setMyBusinesses(businesses.slice(0, 10));
+                                    }
+                                }
+                            }}
+                        />
+                        <button 
+                            onClick={() => {
+                                const term = switcherInput.toLowerCase();
+                                if (term.length > 0) {
+                                    const found = businesses.filter(b => b.name.toLowerCase().includes(term) || b.id.toLowerCase().includes(term));
+                                    setMyBusinesses(found);
+                                } else {
+                                    setMyBusinesses(businesses.slice(0, 10));
+                                }
+                            }}
+                            className="btn btn-primary"
+                            style={{ height: '45px', borderRadius: 'var(--radius-md)', padding: '0 1rem', fontSize: '0.8rem' }}
+                        >
+                            Find
+                        </button>
+                    </div>
                     <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', maxHeight: '120px', overflowY: 'auto', padding: '4px' }}>
                         {myBusinesses.slice(0, 15).map(b => (
                             <button 
@@ -413,7 +462,7 @@ const BusinessPortal = () => {
                                     setScannedUserId(uid);
                                     setShowIntelligence(true);
                                 } else {
-                                    alert("Recognition details are restricted to Owners and Managers.");
+                                    setStatusMessage({ text: "Recognition details are restricted to Owners and Managers.", type: 'error' });
                                 }
                             }} 
                         />
@@ -447,7 +496,7 @@ const BusinessPortal = () => {
                             </button>
                         </div>
 
-                        <PendingVerifications bizId={selectedBiz.id} />
+                        <PendingVerifications bizId={selectedBiz.id} setStatus={setStatusMessage} />
                     </div>
 
                 </div>
@@ -480,7 +529,7 @@ const BusinessPortal = () => {
     );
 };
 
-const PendingVerifications = ({ bizId }) => {
+const PendingVerifications = ({ bizId, setStatus }) => {
     const [pending, setPending] = useState([]);
     const [processing, setProcessing] = useState(null);
     const { currentUser } = useAuth();
@@ -501,11 +550,13 @@ const PendingVerifications = ({ bizId }) => {
 
     const handleVerify = async (trans, isApproved) => {
         setProcessing(trans.id);
+        setStatus({ text: isApproved ? "Verifying purchase..." : "Rejecting purchase...", type: 'info' });
         try {
             if (isApproved) {
                 // 3-POINT ATOMIC BATCH: Handled by server for absolute integrity
                 const verifyFn = firebase.functions().httpsCallable('verifypurchase');
                 await verifyFn({ txnId: trans.id, bizId });
+                setStatus({ text: "Purchase verified successfully!", type: 'success' });
             } else {
                 // Rejection remains simple
                 await db.collection('businesses').doc(bizId).collection('transactions').doc(trans.id).update({ 
@@ -518,10 +569,12 @@ const PendingVerifications = ({ bizId }) => {
                     rejectedAt: new Date().toISOString(), 
                     rejectedBy: currentUser.email 
                 });
+                setStatus({ text: "Purchase rejected.", type: 'info' });
             }
+            setTimeout(() => setStatus(null), 3000);
         } catch (e) {
             console.error("Verification failed:", e);
-            alert("Verification failed: " + e.message);
+            setStatus({ text: "Verification failed: " + e.message, type: 'error' });
         } finally {
             setProcessing(null);
         }
@@ -580,6 +633,7 @@ const PendingVerifications = ({ bizId }) => {
 const GratitudeBondsLog = ({ bizId, onSelectUser, canSeeIntelligence }) => {
     const [bonds, setBonds] = useState([]);
     const [search, setSearch] = useState('');
+    const [searchInput, setSearchInput] = useState('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -611,14 +665,24 @@ const GratitudeBondsLog = ({ bizId, onSelectUser, canSeeIntelligence }) => {
                     <i className="fa-solid fa-clock-rotate-left"></i> {canSeeIntelligence ? 'Active Stewardship Bonds' : 'Recent Scan Log'} (48h)
                 </label>
                 {canSeeIntelligence && (
-                    <input 
-                        type="text" 
-                        placeholder="Search scans..." 
-                        className="input-modern"
-                        style={{ fontSize: '0.7rem', padding: '4px 10px', width: '150px' }}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                            type="text" 
+                            placeholder="Search scans..." 
+                            className="input-modern"
+                            style={{ fontSize: '0.7rem', padding: '4px 10px', width: '120px' }}
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && setSearch(searchInput)}
+                        />
+                        <button 
+                            onClick={() => setSearch(searchInput)}
+                            className="btn-icon" 
+                            style={{ fontSize: '0.8rem', opacity: 0.7 }}
+                        >
+                            <i className="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
                 )}
             </div>
             {filtered.length === 0 ? (

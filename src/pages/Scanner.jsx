@@ -20,6 +20,7 @@ const Scanner = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isNaughtyWarning, setIsNaughtyWarning] = useState(false);
 
     // Sentinel State
     const [sentinelState, setSentinelState] = useState({ lockoutUntil: null, lastCheckins: {}, spamAttempts: {} });
@@ -70,6 +71,8 @@ const Scanner = () => {
                 if (data.lockoutUntil) {
                     const diff = Math.ceil((data.lockoutUntil.toDate() - new Date()) / 1000);
                     if (diff > 0) setLockoutTimer(diff);
+                } else {
+                    setLockoutTimer(0);
                 }
             }
         });
@@ -212,14 +215,17 @@ const Scanner = () => {
         let pStats = personalSaved ? JSON.parse(personalSaved) : { attendanceDays: 0, lastInitiativeAttendance: {} };
 
         if (pStats.lastInitiativeAttendance?.[scannedInitiative.id] === today) {
-            alert("Conviction noted! You have already registered your attendance for this initiative today.");
+            setError("Conviction noted! You have already registered your attendance for this initiative today.");
             setIsSubmitting(false);
             return;
         }
 
         try {
             const attendanceFn = firebase.functions().httpsCallable('recordinitiativeattendance');
-            await attendanceFn({ initiativeId: scannedInitiative.id });
+            await attendanceFn({ 
+                initiativeId: scannedInitiative.id,
+                ghostId: !currentUser ? ghostId : null 
+            });
 
             // Update Local Stats
             pStats.attendanceDays = (pStats.attendanceDays || 0) + 1;
@@ -237,7 +243,7 @@ const Scanner = () => {
             setScannedInitiative(null);
         } catch (e) {
             console.error("Attendance error", e);
-            alert(e.message || "Could not register attendance. Ensure you are logged in.");
+            setError(e.message || "Could not register attendance. Ensure you are logged in.");
         } finally {
             setIsSubmitting(false);
         }
@@ -256,7 +262,7 @@ const Scanner = () => {
             try { if (personalSaved) pStats = JSON.parse(personalSaved); } catch (e) {}
             
             if (pStats.lastCheckins?.[scannedBusiness.id] === today) {
-                alert("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
+                setError("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
                 setScannedBusiness(null);
                 setScanning(true);
                 setIsSubmitting(false);
@@ -273,7 +279,11 @@ const Scanner = () => {
                     
                     // Optimistic UI & Feed
                     updateLocalStats('checkin');
-                    addLocalActivity(`📍 Guest Supporter checked-in at ${scannedBusiness.name}`);
+                    const bizName = scannedBusiness.name;
+                    setScannedBusiness(null);
+                    
+                    // Inject local activity AFTER success
+                    addLocalActivity(`📍 Guest Supporter checked-in at ${bizName}`);
 
                     const { evaluateBadges } = await import('../utils/badgeLogic');
                     const newBadges = await evaluateBadges(null);
@@ -281,12 +291,19 @@ const Scanner = () => {
                         setSuccessMsg(prev => `${prev}\n\n🏆 Discovery Noted: You would have unlocked: ${newBadges.join(', ')}! Accept the invitation to claim them.`);
                     }
                 } else {
-                    alert(result.data.message || "Could not record acknowledgment.");
+                    setError(result.data.message || "Could not record acknowledgment.");
+                    // Check if it's the 'naughty' warning from backend (Strike 2)
+                    if (result.data.message?.toLowerCase().includes('naughty')) {
+                        setIsNaughtyWarning(true);
+                    }
                 }
-                setScannedBusiness(null);
             } catch (e) {
                 console.error("Ghost checkin error", e);
-                alert("Network Error: Could not log anonymous support.");
+                const msg = e.message || "";
+                setError(msg || "Network Error: Could not log anonymous support.");
+                if (msg.toLowerCase().includes('naughty')) {
+                    setIsNaughtyWarning(true);
+                }
             } finally {
                 setIsSubmitting(false);
             }
@@ -307,20 +324,33 @@ const Scanner = () => {
                     lockoutUntil: firebase.firestore.Timestamp.fromDate(lockoutDate),
                     [`spamAttempts.${scannedBusiness.id}`]: 0
                 }, { merge: true });
-                alert("Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.");
+                setError("Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.");
+                setIsNaughtyWarning(false);
                 setScannedBusiness(null);
                 setScanning(true);
+            } else if (attempts === 2) {
+                await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
+                    [`spamAttempts.${scannedBusiness.id}`]: attempts
+                }, { merge: true });
+                setError("You have been naughty. This is your final signal before a security lockout.");
+                setIsNaughtyWarning(true);
             } else {
                 await db.collection('users').doc(currentUser.uid).collection('sentinel').doc('state').set({
                     [`spamAttempts.${scannedBusiness.id}`]: attempts
                 }, { merge: true });
-                alert("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
-                setScannedBusiness(null);
-                setScanning(true);
+                setError("Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.");
+                setIsNaughtyWarning(false);
             }
             setIsSubmitting(false);
             return;
         }
+
+    const resetScanner = () => {
+        setError('');
+        setIsNaughtyWarning(false);
+        setScannedBusiness(null);
+        navigate('/'); // Redirect to Home as per updated Sentinel Recovery protocol
+    };
 
         try {
             const batch = db.batch();
@@ -351,7 +381,7 @@ const Scanner = () => {
             const bizName = scannedBusiness.name;
             setScannedBusiness(null);
 
-            // Inject local activity for instant newsreel feedback
+            // Inject local activity for instant newsreel feedback AFTER success
             addLocalActivity(currentUser?.nickname || currentUser?.name
                 ? `📍 ${currentUser.nickname || currentUser.name} checked-in at ${bizName}`
                 : `📍 Guest Supporter checked-in at ${bizName}`
@@ -364,7 +394,7 @@ const Scanner = () => {
             }
         } catch (e) {
             console.error(e);
-            alert("Network Error: Could not log activity.");
+            setError("Network Error: Could not log activity.");
         } finally {
             setIsSubmitting(false);
         }
@@ -378,8 +408,8 @@ const Scanner = () => {
         // Now allows either currentUser OR ghostId (Guest Mode)
         const activeUserId = currentUser?.uid || ghostId;
         if (!activeUserId || !amount || !receiptId || isSubmitting) {
-            if (!amount) alert("Please enter the amount.");
-            else if (!receiptId) alert("Receipt ID / Bill Number is mandatory for verification.");
+            if (!amount) setError("Please enter the amount.");
+            else if (!receiptId) setError("Receipt ID / Bill Number is mandatory for verification.");
             return;
         }
 
@@ -387,7 +417,7 @@ const Scanner = () => {
         setIsSubmitting(true);
 
         if (isNaN(finalAmount) || finalAmount <= 0) {
-            alert("Please enter a valid amount.");
+            setError("Please enter a valid amount.");
             setIsSubmitting(false);
             return;
         }
@@ -418,7 +448,7 @@ const Scanner = () => {
                         setSuccessMsg(prev => `${prev}\n\n🏆 Discovery Noted: You would have unlocked: ${newBadges.join(', ')}! Accept the invitation to claim them.`);
                     }
                 } else {
-                    alert(result.data.message || "Failed to log purchase.");
+                    setError(result.data.message || "Failed to log purchase.");
                 }
             } else {
                 await db.collection('transactions').add({
@@ -456,7 +486,7 @@ const Scanner = () => {
             setReceiptId('');
         } catch (e) {
             console.error(e);
-            alert("Failed to log purchase.");
+            setError("Failed to log purchase.");
         } finally {
             setIsSubmitting(false);
         }
@@ -544,8 +574,26 @@ const Scanner = () => {
 
 
                     {error && (
-                        <div style={{ color: 'var(--accent)', marginTop: '1.5rem', padding: '1rem', background: 'rgba(255,87,87,0.1)', borderRadius: '10px', fontSize: '0.9rem', width: '100%', textAlign: 'center' }}>
-                            <i className="fa-solid fa-triangle-exclamation"></i> {error}
+                        <div style={{ color: 'var(--accent)', marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(255,87,87,0.1)', borderRadius: '15px', fontSize: '0.9rem', width: '100%', textAlign: 'center', border: '1px solid rgba(255,87,87,0.2)' }}>
+                            <div style={{ marginBottom: isNaughtyWarning ? '1rem' : '0' }}>
+                                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '8px' }}></i> {error}
+                            </div>
+                            {isNaughtyWarning && (
+                                <button 
+                                    onClick={resetScanner}
+                                    className="btn btn-naughty"
+                                    style={{ 
+                                        width: '100%', 
+                                        marginTop: '1rem',
+                                        padding: '0.8rem',
+                                        borderRadius: '10px',
+                                        fontWeight: '700',
+                                        fontSize: '0.8rem'
+                                    }}
+                                >
+                                    I would stop now.
+                                </button>
+                            )}
                         </div>
                     )}
                 </>

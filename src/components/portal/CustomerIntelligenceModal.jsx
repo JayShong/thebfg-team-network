@@ -9,6 +9,7 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
     const [error, setError] = useState(null);
     const [rewardText, setRewardText] = useState('');
     const [isGranting, setIsGranting] = useState(false);
+    const [statusMessage, setStatusMessage] = useState(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -29,17 +30,19 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
         e.preventDefault();
         if (!rewardText.trim()) return;
         setIsGranting(true);
+        setStatusMessage({ text: "Granting reward...", type: 'info' });
         try {
             const grantReward = firebase.functions().httpsCallable('grantcustomerreward');
             await grantReward({ targetUserId: userId, bizId, description: rewardText });
-            alert("Gratitude Bond strengthened! Reward granted.");
+            setStatusMessage({ text: "Gratitude Bond strengthened! Reward granted.", type: 'success' });
             setRewardText('');
             // Refresh data
             const getIntelligence = firebase.functions().httpsCallable('getcustomerintelligence');
             const result = await getIntelligence({ targetUserId: userId, bizId });
             setData(result.data);
+            setTimeout(() => setStatusMessage(null), 3000);
         } catch (err) {
-            alert("Failed to grant reward: " + err.message);
+            setStatusMessage({ text: "Failed to grant reward: " + err.message, type: 'error' });
         } finally {
             setIsGranting(false);
         }
@@ -159,6 +162,28 @@ const CustomerIntelligenceModal = ({ userId, bizId, onClose }) => {
                             <i className="fa-solid fa-lock"></i> All data revealed through this secure handshake is symmetrically shared with the user.
                         </p>
                     </>
+                )}
+
+                {/* Status Toast */}
+                {statusMessage && (
+                    <div style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', width: '90%', zIndex: 5000 }} className="slide-up">
+                        <div className="glass-card" style={{ 
+                            padding: '0.8rem 1.2rem', 
+                            background: statusMessage.type === 'error' ? 'rgba(255,50,50,0.2)' : 
+                                       statusMessage.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                            color: statusMessage.type === 'error' ? '#ff4444' : statusMessage.type === 'success' ? '#22c55e' : '#fff',
+                            borderRadius: 'var(--radius-sm)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            fontSize: '0.8rem',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                        }}>
+                            <i className={`fa-solid ${statusMessage.type === 'error' ? 'fa-circle-xmark' : statusMessage.type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                            <span style={{ fontWeight: '600' }}>{statusMessage.text}</span>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

@@ -19,6 +19,21 @@ function getSeasonId() {
 }
 
 /**
+ * UTILS: Sharded Global Counters
+ */
+async function incrementGlobalStats(updates) {
+    const shardId = Math.floor(Math.random() * 10).toString();
+    const shardRef = db.collection('system').doc('stats').collection('shards').doc(shardId);
+    
+    const incrementPayload = {};
+    for (const [key, value] of Object.entries(updates)) {
+        incrementPayload[key] = admin.firestore.FieldValue.increment(value);
+    }
+    
+    await shardRef.set(incrementPayload, { merge: true });
+}
+
+/**
  * 0. UNIVERSAL ACCESS PROVISIONING (V2)
  * This trigger is the server-side authority that populates new users.
  * Using onDocumentWritten to provide self-healing for existing unprovisioned docs.
@@ -40,6 +55,7 @@ exports.onuserprovisioning = onDocumentWritten('users/{userId}', async (event) =
             isCustomerSuccess: userData.isCustomerSuccess || false,
             currentTier: { name: 'Seed', badgeCount: 0 },
             nickname: userData.nickname || 'Ambassador',
+            attendanceDays: admin.firestore.FieldValue.increment(0),
             isProvisioned: true,
             provisionedAt: admin.firestore.FieldValue.serverTimestamp()
         };
@@ -57,20 +73,23 @@ exports.onuserprovisioning = onDocumentWritten('users/{userId}', async (event) =
 });
 
 /**
- * SELF-HEALING: Automated Reconciliation (V2)
- * Aggregates global network impact from the transactions ledger.
+ * SELF-HEALING: Nightly Aggregator & Shard Reconciler (V2)
+ * Reconciles global network impact and resets shards to the authoritative truth.
  */
-exports.reconcilenetworkstats = onSchedule('every 5 minutes', async (event) => {
+exports.reconcilenetworkstats = onSchedule('0 3 * * *', async (event) => {
     try {
-        const [uCount, bizSnap] = await Promise.all([
+        console.log("RECONCILE: Starting nightly truth-reset...");
+        const [uCount, bizSnap, initSnap] = await Promise.all([
             db.collection('users').count().get(),
-            db.collection('businesses').get()
+            db.collection('businesses').get(),
+            db.collection('initiatives').get()
         ]);
 
         let globalCheckins = 0;
         let globalGhostCheckins = 0;
         let globalPurchases = 0;
         let globalVolume = 0;
+        let globalAttendance = 0;
         
         bizSnap.forEach(doc => {
             const b = doc.data();
@@ -80,18 +99,131 @@ exports.reconcilenetworkstats = onSchedule('every 5 minutes', async (event) => {
             globalVolume += (b.purchaseVolume || 0);
         });
 
-        await db.collection('system').doc('stats').set({
+        initSnap.forEach(doc => {
+            const i = doc.data();
+            globalAttendance += (i.attendanceCount || 0);
+        });
+
+        // 1. Update the Main Stats Document
+        const finalStats = {
             consumers: uCount.data().count,
             businesses: bizSnap.size,
             checkins: globalCheckins,
             ghostCheckins: globalGhostCheckins,
             purchases: globalPurchases,
             purchaseVolume: globalVolume,
+            totalAttendance: globalAttendance,
             lastAutoReconcile: admin.firestore.FieldValue.serverTimestamp()
+        };
+        await db.collection('system').doc('stats').set(finalStats, { merge: true });
+
+        // 2. RESET SHARDS: To avoid double-counting, we clear the shards
+        // and set the authoritative total into the shards if necessary, 
+        // but typically we just clear them and let the next scans increment.
+        const shardsSnap = await db.collection('system').doc('stats').collection('shards').get();
+        const batch = db.batch();
+        shardsSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        console.log(`GLOBAL STATS: Healed ${bizSnap.size} businesses and ${uCount.data().count} users. Shards reset.`);
+    } catch (e) { console.error("Global Stats Reconcile Failed:", e); }
+});
+
+/**
+ * DASHBOARD SYNC: Lightweight Shard Aggregator
+ * Runs frequently to sum shards into the main stats doc for the Home Dashboard.
+ */
+exports.aggregateglobalshards = onSchedule('every 5 minutes', async (event) => {
+    try {
+        const shardsSnap = await db.collection('system').doc('stats').collection('shards').get();
+        const totals = {
+            checkins: 0, ghostCheckins: 0, purchases: 0, 
+            purchaseVolume: 0, totalAttendance: 0, consumers: 0
+        };
+
+        shardsSnap.forEach(doc => {
+            const d = doc.data();
+            for (const key in totals) {
+                totals[key] += (d[key] || 0);
+            }
+        });
+
+        // Add to existing authoritative numbers if they exist, or just use shard total
+        // For simplicity in this architecture, system/stats stores the Authoritative Base 
+        // and the shards store the Delta.
+        const statsDoc = await db.collection('system').doc('stats').get();
+        const base = statsDoc.exists ? statsDoc.data() : {};
+
+        await db.collection('system').doc('stats').set({
+            checkins: (base.checkins || 0) + totals.checkins,
+            ghostCheckins: (base.ghostCheckins || 0) + totals.ghostCheckins,
+            purchases: (base.purchases || 0) + totals.purchases,
+            purchaseVolume: (base.purchaseVolume || 0) + totals.purchaseVolume,
+            totalAttendance: (base.totalAttendance || 0) + totals.totalAttendance,
+            consumers: (base.consumers || 0) + totals.consumers,
+            lastShardSync: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        console.log(`GLOBAL STATS: Reconciled ${bizSnap.size} businesses and ${uCount.data().count} users.`);
-    } catch (e) { console.error("Global Stats Reconcile Failed:", e); }
+    } catch (e) { console.error("Shard Aggregation Failed:", e); }
+});
+
+/**
+ * PULSE ENGINE: Sharded Ingestion Trigger
+ * Automatically maps transaction types to global and business-specific shards.
+ * This is the central ingestion point for all economic momentum.
+ */
+exports.ontransactioncreated = onDocumentCreated('transactions/{txnId}', async (event) => {
+    const txn = event.data.data();
+    if (!txn) return;
+
+    const batch = db.batch();
+
+    // 1. GLOBAL NETWORK MOMENTUM (SHARDED)
+    const globalShardId = Math.floor(Math.random() * 10).toString();
+    const globalShardRef = db.collection('system').doc('stats').collection('shards').doc(globalShardId);
+
+    const globalIncs = {};
+    if (txn.type === 'checkin') {
+        globalIncs.checkins = admin.firestore.FieldValue.increment(1);
+        if (txn.isGhost) globalIncs.ghostCheckins = admin.firestore.FieldValue.increment(1);
+    } else if (txn.type === 'purchase') {
+        globalIncs.purchases = admin.firestore.FieldValue.increment(1);
+        if (txn.amount) globalIncs.purchaseVolume = admin.firestore.FieldValue.increment(txn.amount);
+    } else if (txn.type === 'attendance') {
+        globalIncs.totalAttendance = admin.firestore.FieldValue.increment(1);
+    }
+
+    if (Object.keys(globalIncs).length > 0) {
+        batch.set(globalShardRef, globalIncs, { merge: true });
+    }
+
+    // 2. BUSINESS-SPECIFIC MOMENTUM (SHARDED)
+    if (txn.bizId) {
+        const bizShardId = Math.floor(Math.random() * 10).toString();
+        const bizShardRef = db.collection('businesses').doc(txn.bizId).collection('shards').doc(bizShardId);
+        
+        const bizIncs = {};
+        if (txn.type === 'checkin') {
+            bizIncs.checkinsCount = admin.firestore.FieldValue.increment(1);
+            if (txn.isGhost) bizIncs.ghostCheckinsCount = admin.firestore.FieldValue.increment(1);
+        } else if (txn.type === 'purchase') {
+            bizIncs.purchasesCount = admin.firestore.FieldValue.increment(1);
+            if (txn.isGhost) bizIncs.ghostPurchasesCount = admin.firestore.FieldValue.increment(1);
+            if (txn.amount) bizIncs.purchaseVolume = admin.firestore.FieldValue.increment(txn.amount);
+        }
+
+        if (Object.keys(bizIncs).length > 0) {
+            batch.set(bizShardRef, bizIncs, { merge: true });
+        }
+    }
+
+    // 3. NEWSREEL BROADCAST (Pulse Engine Hook)
+    // Note: pulseengine_broadcast is a separate trigger on transactions/{txnId}
+    // but we ensure this one runs for shard integrity.
+    
+    await batch.commit();
 });
 
 
@@ -282,6 +414,39 @@ exports.publishapplication = onCall(async (request) => {
     return { success: true, bizId };
 });
 
+/**
+ * APPLICATION MANAGEMENT: Deletion
+ * Allows owners to discard drafts or staff to remove stale applications.
+ */
+exports.deleteapplication = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required.');
+    const { applicationId } = request.data;
+    const email = request.auth.token.email;
+
+    const appRef = db.collection('applications').doc(applicationId);
+    const appSnap = await appRef.get();
+    
+    if (!appSnap.exists) throw new HttpsError('not-found', 'Application not found.');
+    
+    const appData = appSnap.data();
+    
+    // Security: Only owner or CustomerSuccess staff
+    const isOwner = appData.email === email;
+    const isStaff = request.auth.token.isCustomerSuccess || request.auth.token.isSuperAdmin;
+    
+    if (!isOwner && !isStaff) {
+        throw new HttpsError('permission-denied', 'Unauthorized to delete this application.');
+    }
+    
+    // Safety check: Cannot delete approved applications (already published to businesses)
+    if (appData.status === 'approved') {
+        throw new HttpsError('failed-precondition', 'Cannot delete an approved application.');
+    }
+
+    await appRef.delete();
+    return { success: true };
+});
+
 exports.deleteuseraccount = onCall(async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
     const uid = request.auth.uid;
@@ -332,11 +497,40 @@ exports.recordghostcheckin = onCall(async (request) => {
     const sessionRef = db.collection('ghost_sessions').doc(ghostId);
     const sessionSnap = await sessionRef.get();
 
-    // 1. GHOST SENTINEL: Anti-Spam Check
+    // 1. GHOST SENTINEL: Anti-Spam Check & 3-Strikes Lockout
     if (sessionSnap.exists) {
         const sessionData = sessionSnap.data();
+        
+        // A. Check Global Lockout
+        if (sessionData.lockoutUntil) {
+            const lockoutDate = sessionData.lockoutUntil.toDate();
+            if (new Date() < lockoutDate) {
+                throw new HttpsError('permission-denied', 'Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.');
+            }
+        }
+
+        // B. Check Per-Business Spam
         if (sessionData.lastCheckins && sessionData.lastCheckins[bizId] === today) {
-            throw new HttpsError('resource-exhausted', 'Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.');
+            const attempts = (sessionData.spamAttempts?.[bizId] || 0) + 1;
+
+            if (attempts >= 3) {
+                const lockoutDate = new Date(Date.now() + 10 * 60 * 1000);
+                await sessionRef.set({
+                    lockoutUntil: admin.firestore.Timestamp.fromDate(lockoutDate),
+                    [`spamAttempts.${bizId}`]: 0
+                }, { merge: true });
+                throw new HttpsError('permission-denied', 'Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.');
+            } else if (attempts === 2) {
+                await sessionRef.set({
+                    [`spamAttempts.${bizId}`]: attempts
+                }, { merge: true });
+                throw new HttpsError('failed-precondition', 'You have been naughty. This is your final signal before a security lockout.');
+            } else {
+                await sessionRef.set({
+                    [`spamAttempts.${bizId}`]: attempts
+                }, { merge: true });
+                throw new HttpsError('resource-exhausted', 'Wow! You are such an enthusiastic supporter. You can support this merchant again tomorrow.');
+            }
         }
     }
 
@@ -392,6 +586,68 @@ exports.recordghostcheckin = onCall(async (request) => {
     return { success: true, message: 'Ghost Check-in recorded.' };
 });
 
+// MOVED AND CONSOLIDATED recordinitiativeattendance TO REMOVE DUPLICATION
+/**
+ * INITIATIVE MANAGEMENT: Attendance Recording
+ * Securely logs attendance for verified members or anonymous guests.
+ * Triggers the Pulse Engine for Newsreel broadcasting.
+ */
+exports.recordinitiativeattendance = onCall(async (request) => {
+    const { initiativeId } = request.data;
+    const uid = request.auth?.uid || request.data.ghostId;
+    if (!initiativeId || !uid) throw new HttpsError('invalid-argument', 'Missing initiativeId or identity.');
+
+    const initiativeRef = db.collection('initiatives').doc(initiativeId);
+    const initiativeSnap = await initiativeRef.get();
+    if (!initiativeSnap.exists) throw new HttpsError('not-found', 'Initiative not found.');
+    const initData = initiativeSnap.data();
+
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+
+    // 1. Increment Initiative Count
+    batch.update(initiativeRef, {
+        attendanceCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: timestamp
+    });
+
+    // 2. Create Audit Record
+    const attendeeRef = initiativeRef.collection('attendees').doc(`${uid}_${Date.now()}`);
+    batch.set(attendeeRef, {
+        userId: uid,
+        timestamp: timestamp
+    });
+
+    // 3. Update User Seasonal Stats (Attendance Days) - Only if profile exists
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (userDoc.exists) {
+        const seasonId = getSeasonId();
+        const seasonRef = db.collection('users').doc(uid).collection('seasons').doc(seasonId);
+        batch.set(seasonRef, {
+            attendanceDays: admin.firestore.FieldValue.increment(1),
+            lastSynced: timestamp
+        }, { merge: true });
+    }
+
+    // 4. Record Transaction for Master Ledger (Unified for Pulse Engine)
+    const txnRef = db.collection('transactions').doc();
+    batch.set(txnRef, {
+        type: 'attendance',
+        bizId: initiativeId,
+        bizName: initData.title || 'Unknown Initiative', // Pulse Engine expects bizName or initiativeTitle
+        initiativeTitle: initData.title || 'Unknown Initiative', // Double-mapped for legacy pulse engines
+        userId: uid,
+        userNickname: request.auth?.token?.nickname || 'Guest Supporter',
+        isGhost: !request.auth,
+        status: 'verified',
+        timestamp: timestamp,
+        updatedAt: timestamp
+    });
+
+    await batch.commit();
+    return { success: true, message: 'Attendance registered.' };
+});
+
 exports.recordghostpurchase = onCall(async (request) => {
     const { bizId, ghostId, amount, receiptId } = request.data;
     if (!bizId || !ghostId || !amount || !receiptId) throw new HttpsError('invalid-argument', 'Missing required fields.');
@@ -401,6 +657,18 @@ exports.recordghostpurchase = onCall(async (request) => {
 
     const today = new Date().toISOString().split('T')[0];
     const sessionRef = db.collection('ghost_sessions').doc(ghostId);
+    const sessionSnap = await sessionRef.get();
+
+    // GHOST SENTINEL: Check Global Lockout
+    if (sessionSnap.exists) {
+        const sessionData = sessionSnap.data();
+        if (sessionData.lockoutUntil) {
+            const lockoutDate = sessionData.lockoutUntil.toDate();
+            if (new Date() < lockoutDate) {
+                throw new HttpsError('permission-denied', 'Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.');
+            }
+        }
+    }
 
     const bizDoc = await db.collection('businesses').doc(bizId).get();
     if (!bizDoc.exists) throw new HttpsError('not-found', 'Business not found.');
@@ -425,14 +693,8 @@ exports.recordghostpurchase = onCall(async (request) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // High-Performance Sharded Counter for Business
-    const shardId = Math.floor(Math.random() * 10).toString();
-    const bizShardRef = db.collection('businesses').doc(bizId).collection('shards').doc(shardId);
-    batch.set(bizShardRef, {
-        purchasesCount: admin.firestore.FieldValue.increment(1),
-        ghostPurchasesCount: admin.firestore.FieldValue.increment(1),
-        purchaseVolume: admin.firestore.FieldValue.increment(finalAmount)
-    }, { merge: true });
+    // ARCHITECTURAL PIVOT: Business Shards are now handled by the Pulse Engine trigger (ontransactioncreated).
+    // This ensures O(1) performance for the callable and prevents double-counting.
 
     const ghostRef = db.collection('users').doc(ghostId);
     batch.set(ghostRef.collection('gratitude_bonds').doc(bizId), {
@@ -484,41 +746,7 @@ exports.claimbusinessrecommendation = onCall(async (request) => {
     return { success: true, bizName: bizData.name };
 });
 
-exports.recordinitiativeattendance = onCall(async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required.');
-    const { initiativeId } = request.data;
-    const uid = request.auth.uid;
-    
-    const initRef = db.collection('initiatives').doc(initiativeId);
-    const initSnap = await initRef.get();
-    if (!initSnap.exists) throw new HttpsError('not-found', 'Initiative not found.');
-    
-    const batch = db.batch();
-    batch.update(initRef, {
-        attendanceCount: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    batch.set(initRef.collection('attendees').doc(uid), {
-        attendedAt: admin.firestore.FieldValue.serverTimestamp(),
-        userId: uid
-    });
-
-    // 2. MASTER LEDGER ENTRY (For Newsreel & Healing)
-    const txnRef = db.collection('transactions').doc();
-    batch.set(txnRef, {
-        type: 'attendance',
-        initiativeId,
-        initiativeTitle: initSnap.data().title || 'Unknown Initiative',
-        userId: uid,
-        userNickname: (await db.collection('users').doc(uid).get()).data()?.nickname || 'Ambassador',
-        status: 'verified',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    
-    await batch.commit();
-    return { success: true };
-});
+// Duplicate recordinitiativeattendance removed to prevent guest-flow blocking.
 
 /**
  * PULSE ENGINE: Automated Broadcasting, Stats Rebalancing & Discovery Tracking
@@ -1153,4 +1381,90 @@ exports.managecrew = onCall(async (request) => {
     }
 
     return { success: true };
+});
+
+/**
+ * THE HEALER: Nightly Authoritative Reconciliation (3 AM)
+ * Resets all global and business shards to 0 and calculates absolute truth from the Master Ledger.
+ */
+exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
+    console.log("HEALER: Starting 3 AM Authoritative Calibration...");
+    
+    // 1. Calculate Absolute Truth from Ledger
+    const txnSnap = await db.collection('transactions').get();
+    let global = { checkins: 0, ghostCheckins: 0, purchases: 0, purchaseVolume: 0, totalAttendance: 0 };
+    const bizStats = {};
+
+    txnSnap.forEach(doc => {
+        const t = doc.data();
+        // Global
+        if (t.type === 'checkin') {
+            global.checkins++;
+            if (t.isGhost) global.ghostCheckins++;
+        } else if (t.type === 'purchase') {
+            global.purchases++;
+            if (t.amount) global.purchaseVolume += t.amount;
+        } else if (t.type === 'attendance') {
+            global.totalAttendance++;
+        }
+
+        // Business Specific
+        if (t.bizId) {
+            if (!bizStats[t.bizId]) bizStats[t.bizId] = { checkinsCount: 0, ghostCheckinsCount: 0, purchasesCount: 0, ghostPurchasesCount: 0, purchaseVolume: 0 };
+            const b = bizStats[t.bizId];
+            if (t.type === 'checkin') {
+                b.checkinsCount++;
+                if (t.isGhost) b.ghostCheckinsCount++;
+            } else if (t.type === 'purchase') {
+                b.purchasesCount++;
+                if (t.isGhost) b.ghostPurchasesCount++;
+                if (t.amount) b.purchaseVolume += t.amount;
+            }
+        }
+    });
+
+    // 2. Update Global Root & Reset Shards
+    const statsRef = db.collection('system').doc('stats');
+    await statsRef.set({
+        ...global,
+        consumers: (await db.collection('users').get()).size,
+        businesses: (await db.collection('businesses').get()).size,
+        lastHealed: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    const globalShards = await statsRef.collection('shards').get();
+    let batch = db.batch();
+    globalShards.forEach(s => batch.delete(s.ref));
+    await batch.commit();
+
+    // 3. Update Business Roots & Reset Shards
+    for (const bizId in bizStats) {
+        const bRef = db.collection('businesses').doc(bizId);
+        await bRef.update({
+            "impact_metrics.checkinsCount": bizStats[bizId].checkinsCount,
+            "impact_metrics.ghostCheckinsCount": bizStats[bizId].ghostCheckinsCount,
+            "impact_metrics.purchasesCount": bizStats[bizId].purchasesCount,
+            "impact_metrics.ghostPurchasesCount": bizStats[bizId].ghostPurchasesCount,
+            "impact_metrics.purchaseVolume": bizStats[bizId].purchaseVolume,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        const bizShards = await bRef.collection('shards').get();
+        const bBatch = db.batch();
+        bizShards.forEach(s => bBatch.delete(s.ref));
+        await bBatch.commit();
+    }
+
+    // 4. Update Initiative Roots (Nightly Reconciliation)
+    const initSnap = await db.collection('initiatives').get();
+    for (const initDoc of initSnap.docs) {
+        const attendeesSnap = await initDoc.ref.collection('attendees').get();
+        await initDoc.ref.update({
+            attendanceCount: attendeesSnap.size,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    }
+
+    console.log("HEALER: Network reconciled. Shards reset.");
+    return null;
 });

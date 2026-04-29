@@ -69,7 +69,7 @@ const InitiativeCard = ({ initiative }) => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {(initiative.totalAttendance || 0).toLocaleString()}
+                        {(initiative.attendanceCount || 0).toLocaleString()}
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         Conviction Participants
