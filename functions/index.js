@@ -1092,12 +1092,95 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
         const cleanupBatch = db.batch();
         cleanupBatch.delete(db.collection('ghost_sessions').doc(ghostId));
         cleanupBatch.delete(db.collection('users').doc(ghostId));
-        await cleanupBatch.commit();
+        console.log("RECONCILE: Reconcile complete. Stats updated.");
     } catch (err) {
-        console.warn("Cleanup of ghost data failed:", err);
+        console.error("RECONCILE: Reconciliation failed:", err);
     }
+});
 
-    return { success: true, count: txnSnap.size };
+/**
+ * INTELLIGENCE: Daily Demographic Aggregator (V2)
+ * Compiles anonymized network percentages for Gender, Geography, and Age.
+ * Enforces a 5% Privacy Floor per category.
+ */
+exports.aggregatenetworkdemographics = onSchedule('0 3 * * *', async (event) => {
+    try {
+        console.log("INTELLIGENCE: Starting demographic aggregation...");
+        const usersSnap = await db.collection('users').get();
+        const total = usersSnap.size;
+        
+        if (total === 0) return;
+
+        const counts = {
+            gender: { Male: 0, Female: 0, Private: 0 },
+            location: {},
+            age: { "18-25": 0, "26-35": 0, "36-45": 0, "46-60": 0, "60+": 0, "Private": 0 }
+        };
+
+        const now = new Date();
+
+        usersSnap.forEach(doc => {
+            const u = doc.data();
+            
+            // 1. Gender
+            if (u.gender) counts.gender[u.gender] = (counts.gender[u.gender] || 0) + 1;
+            else counts.gender.Private++;
+
+            // 2. Location (City/District)
+            const loc = u.city || 'Private';
+            counts.location[loc] = (counts.location[loc] || 0) + 1;
+
+            // 3. Age
+            if (u.dob) {
+                const birthDate = new Date(u.dob);
+                let age = now.getFullYear() - birthDate.getFullYear();
+                const m = now.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
+
+                if (age < 18) return; // Exclude minors per policy
+                if (age <= 25) counts.age["18-25"]++;
+                else if (age <= 35) counts.age["26-35"]++;
+                else if (age <= 45) counts.age["36-45"]++;
+                else if (age <= 60) counts.age["46-60"]++;
+                else counts.age["60+"]++;
+            } else {
+                counts.age.Private++;
+            }
+        });
+
+        // Calculate Percentages with 5% Floor
+        const calculatePercentages = (categoryCounts) => {
+            const res = {};
+            let otherTotal = 0;
+            
+            for (const [key, count] of Object.entries(categoryCounts)) {
+                const pct = (count / total) * 100;
+                if (pct < 5 && key !== 'Private') {
+                    otherTotal += count;
+                } else {
+                    res[key] = Number(pct.toFixed(1));
+                }
+            }
+            
+            if (otherTotal > 0) {
+                res["Other"] = Number(((otherTotal / total) * 100).toFixed(1));
+            }
+            return res;
+        };
+
+        const demographics = {
+            gender: calculatePercentages(counts.gender),
+            location: calculatePercentages(counts.location),
+            age: calculatePercentages(counts.age),
+            totalAmbassadors: total,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        await db.collection('system').doc('demographics').set(demographics);
+        console.log("INTELLIGENCE: Demographic aggregation complete.");
+    } catch (err) {
+        console.error("INTELLIGENCE: Aggregation failed:", err);
+    }
 });
 
 /**
@@ -1468,3 +1551,93 @@ exports.reconcilenetworkstats = onSchedule("0 3 * * *", async (event) => {
     console.log("HEALER: Network reconciled. Shards reset.");
     return null;
 });
+
+/**
+ * INTELLIGENCE: Daily Demographic Aggregator (V2)
+ * Compiles anonymized network percentages for Gender, Geography, and Age.
+ * Enforces a 5% Privacy Floor per category.
+ */
+exports.aggregatenetworkdemographics = onSchedule('0 3 * * *', async (event) => {
+    try {
+        const admin = require("firebase-admin");
+        const db = admin.firestore();
+        console.log("INTELLIGENCE: Starting demographic aggregation...");
+        const usersSnap = await db.collection('users').get();
+        const total = usersSnap.size;
+        
+        if (total === 0) return null;
+
+        const counts = {
+            gender: { Male: 0, Female: 0, Private: 0 },
+            location: {},
+            age: { "18-25": 0, "26-35": 0, "36-45": 0, "46-60": 0, "60+": 0, "Private": 0 }
+        };
+
+        const now = new Date();
+
+        usersSnap.forEach(doc => {
+            const u = doc.data();
+            
+            // 1. Gender
+            if (u.gender) counts.gender[u.gender] = (counts.gender[u.gender] || 0) + 1;
+            else counts.gender.Private++;
+
+            // 2. Location (City/District)
+            const loc = u.city || 'Private';
+            counts.location[loc] = (counts.location[loc] || 0) + 1;
+
+            // 3. Age
+            if (u.dob) {
+                const birthDate = new Date(u.dob);
+                let age = now.getFullYear() - birthDate.getFullYear();
+                const m = now.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
+
+                if (age < 18) return; // Exclude minors per policy
+                if (age <= 25) counts.age["18-25"]++;
+                else if (age <= 35) counts.age["26-35"]++;
+                else if (age <= 45) counts.age["36-45"]++;
+                else if (age <= 60) counts.age["46-60"]++;
+                else counts.age["60+"]++;
+            } else {
+                counts.age.Private++;
+            }
+        });
+
+        // Calculate Percentages with 5% Floor
+        const calculatePercentages = (categoryCounts) => {
+            const res = {};
+            let otherTotal = 0;
+            
+            for (const [key, count] of Object.entries(categoryCounts)) {
+                const pct = (count / total) * 100;
+                if (pct < 5 && key !== 'Private') {
+                    otherTotal += count;
+                } else {
+                    res[key] = Number(pct.toFixed(1));
+                }
+            }
+            
+            if (otherTotal > 0) {
+                res["Other"] = Number(((otherTotal / total) * 100).toFixed(1));
+            }
+            return res;
+        };
+
+        const demographics = {
+            gender: calculatePercentages(counts.gender),
+            location: calculatePercentages(counts.location),
+            age: calculatePercentages(counts.age),
+            totalAmbassadors: total,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        await db.collection('system').doc('demographics').set(demographics);
+        console.log("INTELLIGENCE: Demographic aggregation complete.");
+        return null;
+    } catch (err) {
+        console.error("INTELLIGENCE: Aggregation failed:", err);
+        return null;
+    }
+});
+

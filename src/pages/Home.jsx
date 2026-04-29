@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import StatInsightModal from '../components/dashboard/StatInsightModal';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { getSeasonId } from '../utils/badgeLogic';
 
@@ -61,6 +62,8 @@ const Home = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [festiveLabel, setFestiveLabel] = useState('');
     const [throttleMessage, setThrottleMessage] = useState('');
+    const [showStatModal, setShowStatModal] = useState(false);
+    const [selectedStat, setSelectedStat] = useState(null);
 
 
     const refreshDashboard = async (isManual = false) => {
@@ -138,6 +141,11 @@ const Home = () => {
             setIsSyncing(false);
             setIsLoading(false);
         }
+    };
+
+    const handleStatClick = (type) => {
+        setSelectedStat(type);
+        setShowStatModal(true);
     };
 
     useEffect(() => {
@@ -261,26 +269,25 @@ const Home = () => {
                         <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'white', letterSpacing: '0.5px' }}>Retrieving Network Stats...</span>
                     </div>
                 )}
-                <div className="stat-card glass-card">
+                <div className="stat-card glass-card clickable" onClick={() => handleStatClick('ambassadors')}>
                     <i className="fa-solid fa-users stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Ambassadors</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.consumers || 0).toLocaleString()}</p>
                     </div>
                 </div>
-                <div className="stat-card glass-card">
+                <div className="stat-card glass-card clickable" onClick={() => handleStatClick('founders')}>
                     <i className="fa-solid fa-store stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Founders</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.businesses || 0).toLocaleString()}</p>
                     </div>
                 </div>
-                <div className="stat-card glass-card feature-gradient">
+                <div className="stat-card glass-card feature-gradient clickable" onClick={() => handleStatClick('supports')}>
                     <i className="fa-solid fa-location-dot stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
                             Supports
-                            <i className="fa-solid fa-circle-question" title="Every support says: I see you, and I choose you. Ghost supports are from anonymous, non-registered visitors." style={{ fontSize: '0.7rem', cursor: 'help' }}></i>
                         </h3>
                         <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                             {isLoading ? '...' : (stats.checkins || 0).toLocaleString()}
@@ -290,21 +297,21 @@ const Home = () => {
                         </div>
                     </div>
                 </div>
-                <div className="stat-card glass-card success-gradient">
+                <div className="stat-card glass-card success-gradient clickable" onClick={() => handleStatClick('economic-proof')}>
                     <i className="fa-solid fa-receipt stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-success)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Economic Proof</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats.purchases || 0).toLocaleString()}</p>
                     </div>
                 </div>
-                <div className="stat-card glass-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+                <div className="stat-card glass-card clickable" onClick={() => handleStatClick('movement-actions')} style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
                     <i className="fa-solid fa-users-viewfinder stat-icon" style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Movement Actions</h3>
                         <p className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>{(stats?.totalAttendance || 0).toLocaleString()}</p>
                     </div>
                 </div>
-                <div className="stat-card glass-card" style={{ background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
+                <div className="stat-card glass-card clickable" onClick={() => handleStatClick('goal-30')} style={{ background: 'linear-gradient(135deg, rgba(255, 160, 0, 0.1), rgba(0,0,0,0.3))', borderColor: 'rgba(255, 160, 0, 0.2)' }}>
                     <i className="fa-solid fa-chart-pie stat-icon" style={{ color: '#FFA000', fontSize: '1.5rem' }}></i>
                     <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                         <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>The 30% Goal</h3>
@@ -350,17 +357,17 @@ const Home = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1.5rem' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                    <div className="clickable" onClick={() => handleStatClick('impact-waste')} style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                         <i className="fa-solid fa-recycle" style={{ color: 'var(--accent-success)', fontSize: '1.4rem', marginBottom: '0.5rem' }}></i>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(stats.totalWaste || 0).toLocaleString()} <span style={{ fontSize: '0.8rem' }}>kg</span></div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '0.25rem' }}>Waste Diverted</div>
                     </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                    <div className="clickable" onClick={() => handleStatClick('impact-trees')} style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                         <i className="fa-solid fa-tree" style={{ color: '#2ecc71', fontSize: '1.4rem', marginBottom: '0.5rem' }}></i>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(stats.totalTrees || 0).toLocaleString()} <span style={{ fontSize: '0.8rem' }}>Trees</span></div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '0.25rem' }}>Planted</div>
                     </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                    <div className="clickable" onClick={() => handleStatClick('impact-families')} style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                         <i className="fa-solid fa-users" style={{ color: 'var(--accent-primary)', fontSize: '1.4rem', marginBottom: '0.5rem' }}></i>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(stats.totalFamilies || 0).toLocaleString()} <span style={{ fontSize: '0.8rem' }}>Families</span></div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '0.25rem' }}>Supported</div>
@@ -421,6 +428,14 @@ const Home = () => {
                         </div>
                     </div>
                 </>
+            )}
+            {showStatModal && (
+                <StatInsightModal 
+                    isOpen={showStatModal} 
+                    onClose={() => setShowStatModal(false)} 
+                    type={selectedStat} 
+                    stats={stats}
+                />
             )}
         </div>
     );
