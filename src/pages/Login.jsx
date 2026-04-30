@@ -40,11 +40,21 @@ const Login = () => {
             }
             navigate('/');
         } catch (err) {
-            let msg = err.message;
-            if (err.code === 'auth/user-not-found') msg = "No account found with this email. Click 'Join the Movement' to register.";
-            if (err.code === 'auth/wrong-password') msg = "Incorrect password. Please try again.";
-            if (err.code === 'auth/email-already-in-use') msg = "An account already exists with this email. Please Log In instead.";
-            setError(msg || 'Authentication failed.');
+            let msg = "The handshake failed. Please check your connection and try again.";
+            
+            if (err.code === 'auth/user-not-found') {
+                msg = "Seems like you are new here. Are you looking to join the movement?";
+            } else if (err.code === 'auth/wrong-password') {
+                msg = "Sorry I could not catch your password. Please try again.";
+            } else if (err.code === 'auth/invalid-credential') {
+                msg = "I am having difficulty understanding you. Please enter your email address and password again please?";
+            } else if (err.code === 'auth/email-already-in-use') {
+                msg = "Oh no! There seems to be another you? Try with another email.";
+            } else if (err.code === 'auth/too-many-requests') {
+                msg = "I am having difficulty opening the door for you. Please try again later.";
+            }
+            
+            setError(msg);
         } finally {
             setIsProcessing(false);
         }
@@ -89,7 +99,7 @@ const Login = () => {
 
                 <div className="glass-card" style={{ width: '100%', padding: '2rem' }}>
                     <form onSubmit={(e) => handleAuth(e, 'login')} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        {localStorage.getItem('bfg_personal_stats') && (
+                        {localStorage.getItem('bfg_guest_id') && (
                             <div className="glass-card" style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '12px', color: '#fcd34d', fontSize: '0.85rem', textAlign: 'center' }}>
                                 <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '6px' }}></i> 
                                 <strong>Warning:</strong> Logging in as a different user will permanently overwrite your current anonymous impact data. If this is your first time, please Register to claim it.

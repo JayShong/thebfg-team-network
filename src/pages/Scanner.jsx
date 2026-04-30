@@ -10,7 +10,7 @@ import { updateLocalStatsBuffer } from '../utils/impactEngine';
 
 const Scanner = () => {
     const navigate = useNavigate();
-    const { currentUser, guestId, addLocalActivity } = useAuth();
+    const { currentUser, isGuest, guestId, addLocalActivity } = useAuth();
     const [scannedBusiness, setScannedBusiness] = useState(null);
     const [scannedInitiative, setScannedInitiative] = useState(null);
     const [error, setError] = useState('');
@@ -147,7 +147,8 @@ const Scanner = () => {
 
 
     const updateLocalStats = (type, amount = 0) => {
-        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        const key = !currentUser ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+        const personalSaved = localStorage.getItem(key);
         let currentStats = {
             totalCheckins: 0, totalPurchases: 0, totalWaste: 0, totalTrees: 0, totalFamilies: 0,
             uniqueBizIds: {}, uniqueLocations: {}, uniqueIndustries: {},
@@ -184,7 +185,7 @@ const Scanner = () => {
                 }
             }
         }
-        localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+        localStorage.setItem(key, JSON.stringify(pStats));
 
         // 2. Update Global Stats (Estimated)
         const globalSaved = localStorage.getItem('bfg_global_stats');
@@ -200,9 +201,8 @@ const Scanner = () => {
         // 3. Update Last Checkins for Sentinel (Frontend Spam Prevention)
         if (type === 'checkin' && scannedBusiness) {
             const today = new Date().toISOString().split('T')[0];
-            if (!pStats.lastCheckins) pStats.lastCheckins = {};
             pStats.lastCheckins[scannedBusiness.id] = today;
-            localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+            localStorage.setItem(key, JSON.stringify(pStats));
         }
     };
 
@@ -211,7 +211,8 @@ const Scanner = () => {
         setIsSubmitting(true);
 
         const today = new Date().toISOString().split('T')[0];
-        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        const key = !currentUser ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+        const personalSaved = localStorage.getItem(key);
         let pStats = personalSaved ? JSON.parse(personalSaved) : { attendanceDays: 0, lastInitiativeAttendance: {} };
 
         if (pStats.lastInitiativeAttendance?.[scannedInitiative.id] === today) {
@@ -230,7 +231,7 @@ const Scanner = () => {
             // Update Local Stats
             pStats.attendanceDays = (pStats.attendanceDays || 0) + 1;
             pStats.lastInitiativeAttendance = { ...pStats.lastInitiativeAttendance, [scannedInitiative.id]: today };
-            localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+            localStorage.setItem(key, JSON.stringify(pStats));
 
             setIsSuccess(true);
             setSuccessMsg(`Attendance registered for: ${scannedInitiative.title}. Thank you for mobilising.`);
@@ -257,7 +258,7 @@ const Scanner = () => {
         if (!currentUser) {
             // Guest Sentinel Check (Frontend optimization)
             const today = new Date().toISOString().split('T')[0];
-            const personalSaved = localStorage.getItem('bfg_personal_stats');
+            const personalSaved = localStorage.getItem('bfg_guest_personal_stats');
             let pStats = {};
             try { if (personalSaved) pStats = JSON.parse(personalSaved); } catch (e) {}
             

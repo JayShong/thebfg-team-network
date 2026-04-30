@@ -13,7 +13,8 @@ const ReceiptLogger = ({ businesses }) => {
     const [message, setMessage] = useState({ text: '', type: '' });
 
     const updateLocalStats = (type, amt = 0) => {
-        const personalSaved = localStorage.getItem('bfg_personal_stats');
+        const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+        const personalSaved = localStorage.getItem(key);
         let currentStats = { totalCheckins: 0, totalPurchases: 0 };
         try {
             if (personalSaved) currentStats = JSON.parse(personalSaved);
@@ -22,7 +23,7 @@ const ReceiptLogger = ({ businesses }) => {
         const business = (businesses || []).find(b => b.id === bizId);
         const pStats = updateLocalStatsBuffer(currentStats, type, business, amt);
         
-        localStorage.setItem('bfg_personal_stats', JSON.stringify(pStats));
+        localStorage.setItem(key, JSON.stringify(pStats));
     };
 
     const handleSubmit = async (e) => {

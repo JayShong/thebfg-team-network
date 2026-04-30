@@ -1,9 +1,12 @@
 import React from 'react';
 import { CURRENT_SEASON } from '../../utils/badgeLogic';
+import { useAuth } from '../../contexts/AuthContext';
 
 const SeasonalSnapshot = ({ stats, onClose }) => {
+    const { isGuest } = useAuth();
     // Fallback to local if not provided
-    const displayStats = stats || JSON.parse(localStorage.getItem('bfg_personal_stats') || '{}');
+    const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+    const displayStats = stats || JSON.parse(localStorage.getItem(key) || '{}');
     
     const {
         totalCheckins = 0,

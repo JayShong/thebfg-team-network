@@ -97,6 +97,47 @@ export const functions = IS_MOCKED_MODE ? {
                 return { data: { success: true } };
             }
 
+            if (name === 'recordguestcheckin') {
+                const txnRef = db.collection('transactions').doc();
+                await txnRef.set({
+                    ...data,
+                    type: 'checkin',
+                    isGuest: true,
+                    status: 'verified',
+                    timestamp: new Date().toISOString()
+                });
+                return { data: { success: true } };
+            }
+
+            if (name === 'recordguestpurchase') {
+                const txnRef = db.collection('transactions').doc();
+                await txnRef.set({
+                    ...data,
+                    type: 'purchase',
+                    isGuest: true,
+                    status: 'pending',
+                    timestamp: new Date().toISOString()
+                });
+                return { data: { success: true } };
+            }
+
+            if (name === 'recordinitiativeattendance') {
+                const txnRef = db.collection('transactions').doc();
+                await txnRef.set({
+                    ...data,
+                    type: 'attendance',
+                    isGuest: data.guestId ? true : false,
+                    status: 'verified',
+                    timestamp: new Date().toISOString()
+                });
+                return { data: { success: true } };
+            }
+
+            if (name === 'acceptinvitationtojoinnetwork') {
+                console.log(`[TEST MODE] Migrating guest ${data.guestId} to member ${user?.uid}`);
+                return { data: { success: true } };
+            }
+
             return { data: { success: true } };
         };
     }

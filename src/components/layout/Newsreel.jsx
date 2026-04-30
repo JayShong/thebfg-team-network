@@ -80,7 +80,7 @@ const Newsreel = () => {
                 action: () => setShowAuthModal(true)
             });
 
-            if (localStorage.getItem('bfg_personal_stats')) {
+            if (localStorage.getItem('bfg_guest_personal_stats')) {
                 queue.push({
                     text: "⚠️ Warning: Your anonymous impact data will be permanently lost if a different user logs into this device. Please Register to claim it.",
                     type: 'alert',

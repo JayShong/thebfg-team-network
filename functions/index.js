@@ -645,6 +645,28 @@ exports.recordinitiativeattendance = onCall(async (request) => {
     const uid = request.auth?.uid || request.data.guestId;
     if (!initiativeId || !uid) throw new HttpsError('invalid-argument', 'Missing initiativeId or identity.');
 
+    const isGuest = !request.auth;
+    const sessionRef = isGuest ? db.collection('guest_sessions').doc(uid) : null;
+
+    // 1. GUEST SENTINEL: Anti-Spam Check & lockout
+    if (isGuest) {
+        const sessionSnap = await sessionRef.get();
+        if (sessionSnap.exists) {
+            const sessionData = sessionSnap.data();
+            if (sessionData.lockoutUntil) {
+                const lockoutDate = sessionData.lockoutUntil.toDate();
+                if (new Date() < lockoutDate) {
+                    throw new HttpsError('permission-denied', 'Security Triggered: Excessive attempts detected. Scanner locked for 10 minutes.');
+                }
+            }
+            // Check per-initiative spam (guests can join an initiative once per 10 mins to prevent count inflation)
+            const lastAttendance = sessionData.lastInitiativeAttendance?.[initiativeId]?.toDate();
+            if (lastAttendance && (Date.now() - lastAttendance.getTime() < 10 * 60 * 1000)) {
+                throw new HttpsError('resource-exhausted', 'You have already signaled your support for this initiative recently.');
+            }
+        }
+    }
+
     const initiativeRef = db.collection('initiatives').doc(initiativeId);
     const initiativeSnap = await initiativeRef.get();
     if (!initiativeSnap.exists) throw new HttpsError('not-found', 'Initiative not found.');
@@ -653,40 +675,49 @@ exports.recordinitiativeattendance = onCall(async (request) => {
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
 
-    // 1. Increment Initiative Count
+    // 2. Increment Initiative Count
     batch.update(initiativeRef, {
         attendanceCount: admin.firestore.FieldValue.increment(1),
         updatedAt: timestamp
     });
 
-    // 2. Create Audit Record
+    // 3. Create Audit Record
     const attendeeRef = initiativeRef.collection('attendees').doc(`${uid}_${Date.now()}`);
     batch.set(attendeeRef, {
         userId: uid,
         timestamp: timestamp
     });
 
-    // 3. Update User Seasonal Stats (Attendance Days) - Only if profile exists
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-        const seasonId = getSeasonId();
-        const seasonRef = db.collection('users').doc(uid).collection('seasons').doc(seasonId);
-        batch.set(seasonRef, {
-            attendanceDays: admin.firestore.FieldValue.increment(1),
-            lastSynced: timestamp
+    // 4. Update User Seasonal Stats (Attendance Days)
+    // Initialize/Update the user doc (even for guests) to track momentum
+    const userRef = db.collection('users').doc(uid);
+    batch.set(userRef, { lastActivity: timestamp }, { merge: true });
+
+    const seasonId = getSeasonId();
+    const seasonRef = userRef.collection('seasons').doc(seasonId);
+    batch.set(seasonRef, {
+        attendanceDays: admin.firestore.FieldValue.increment(1),
+        lastSynced: timestamp
+    }, { merge: true });
+
+    // 5. Update Guest Session for sentinel tracking
+    if (isGuest) {
+        batch.set(sessionRef, {
+            lastInitiativeAttendance: { [initiativeId]: timestamp },
+            lastActivity: timestamp
         }, { merge: true });
     }
 
-    // 4. Record Transaction for Master Ledger (Unified for Pulse Engine)
+    // 6. Record Transaction for Master Ledger (Unified for Pulse Engine)
     const txnRef = db.collection('transactions').doc();
     batch.set(txnRef, {
         type: 'attendance',
         bizId: initiativeId,
-        bizName: initData.title || 'Unknown Initiative', // Pulse Engine expects bizName or initiativeTitle
-        initiativeTitle: initData.title || 'Unknown Initiative', // Double-mapped for legacy pulse engines
+        bizName: initData.title || 'Unknown Initiative',
+        initiativeTitle: initData.title || 'Unknown Initiative',
         userId: uid,
         userNickname: request.auth?.token?.nickname || 'Guest Supporter',
-        isGuest: !request.auth,
+        isGuest: isGuest,
         status: 'verified',
         timestamp: timestamp,
         updatedAt: timestamp
@@ -754,6 +785,11 @@ exports.recordguestpurchase = onCall(async (request) => {
 
     // Update ephemeral session for sentinel tracking (Purchases don't have a daily limit but we track activity)
     batch.set(sessionRef, {
+        lastActivity: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    // Ensure virtual guest user doc is initialized for stats
+    batch.set(guestRef, {
         lastActivity: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
@@ -1105,8 +1141,23 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
     // Migrate Transactions
     txnSnap.forEach(doc => {
         const data = doc.data();
-        if (data.type === 'checkin') checkins++;
-        else if (data.type === 'purchase') purchases++;
+        const bizId = data.bizId;
+        
+        if (!bizStatsMigration[bizId]) {
+            bizStatsMigration[bizId] = { checkins: 0, purchases: 0, volume: 0 };
+        }
+
+        if (data.type === 'checkin') {
+            checkins++;
+            bizStatsMigration[bizId].checkins++;
+        } else if (data.type === 'purchase') {
+            purchases++;
+            bizStatsMigration[bizId].purchases++;
+            bizStatsMigration[bizId].volume += (parseFloat(data.amount) || 0);
+        } else if (data.type === 'attendance') {
+            // Attendance is tracked on the user season doc as attendanceDays
+            // We'll count it here too
+        }
 
         // Update Ledger
         batch.update(doc.ref, {
@@ -1131,6 +1182,30 @@ exports.acceptinvitationtojoinnetwork = onCall(async (request) => {
         checkins: admin.firestore.FieldValue.increment(checkins),
         purchases: admin.firestore.FieldValue.increment(purchases),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    // 3. Migrate Business Stats (Shards)
+    Object.entries(bizStatsMigration).forEach(([bizId, m]) => {
+        const shardId = Math.floor(Math.random() * 10).toString();
+        const shardRef = db.collection('businesses').doc(bizId).collection('shards').doc(shardId);
+        
+        batch.set(shardRef, {
+            checkinsCount: admin.firestore.FieldValue.increment(m.checkins),
+            guestCheckinsCount: admin.firestore.FieldValue.increment(-m.checkins),
+            purchasesCount: admin.firestore.FieldValue.increment(m.purchases),
+            purchaseVolume: admin.firestore.FieldValue.increment(m.volume)
+        }, { merge: true });
+    });
+
+    // 4. Migrate Seasonal Stats (including attendanceDays)
+    const seasonId = getSeasonId();
+    const attendanceCount = txnSnap.docs.filter(d => d.data().type === 'attendance').length;
+
+    batch.set(userRef.collection('seasons').doc(seasonId), {
+        totalCheckins: admin.firestore.FieldValue.increment(checkins),
+        totalPurchases: admin.firestore.FieldValue.increment(purchases),
+        attendanceDays: admin.firestore.FieldValue.increment(attendanceCount),
+        lastSynced: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
     await batch.commit();

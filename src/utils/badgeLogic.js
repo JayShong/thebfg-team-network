@@ -150,7 +150,8 @@ export const BADGES_CONFIG = [
 export const evaluateBadges = async (user) => {
     // If no user, we are in Guest Mode. We still evaluate for 0ms feedback/teasers.
     try {
-        const saved = localStorage.getItem('bfg_personal_stats');
+        const key = !user ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+        const saved = localStorage.getItem(key);
         if (!saved) return [];
 
         const stats = JSON.parse(saved);

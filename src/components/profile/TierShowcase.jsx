@@ -17,7 +17,8 @@ const TierShowcase = ({ currentUser }) => {
         if (!isGuest) return currentUser?.badges || {};
         
         try {
-            const saved = localStorage.getItem('bfg_personal_stats');
+            const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+            const saved = localStorage.getItem(key);
             if (saved) {
                 const stats = JSON.parse(saved);
                 return getGuestBadges(stats);

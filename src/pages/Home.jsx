@@ -30,7 +30,8 @@ const Home = () => {
 
     const [quantifiedImpact, setQuantifiedImpact] = useState(() => {
         try {
-            const saved = localStorage.getItem('bfg_personal_stats');
+            const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+            const saved = localStorage.getItem(key);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 return {
@@ -45,7 +46,8 @@ const Home = () => {
 
     const [personalStats, setPersonalStats] = useState(() => {
         try {
-            const saved = localStorage.getItem('bfg_personal_stats');
+            const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+            const saved = localStorage.getItem(key);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 return {
@@ -154,7 +156,11 @@ const Home = () => {
         const now = Date.now();
         const FIVE_MINUTES = 5 * 60 * 1000;
 
-        if (!localStorage.getItem('bfg_global_stats') || (stats.consumers === 0 && (!lastRefresh || now - lastRefresh > FIVE_MINUTES))) {
+        const hasNoGlobal = !localStorage.getItem('bfg_global_stats');
+        const hasNoPersonal = currentUser && !localStorage.getItem('bfg_personal_stats');
+        const isStale = stats.consumers === 0 && (!lastRefresh || now - lastRefresh > FIVE_MINUTES);
+
+        if (hasNoGlobal || hasNoPersonal || isStale) {
             refreshDashboard();
         } else {
             setIsLoading(false);
@@ -401,6 +407,30 @@ const Home = () => {
                             <div className="stat-info" style={{ marginTop: '0.75rem' }}>
                                 <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Attendance Days</h3>
                                 <p className="stat-value">{personalStats.attendanceDays || 0}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="stats-grid personal mt-3" style={{ marginTop: '1rem' }}>
+                        <div className="stat-card glass-card">
+                            <i className="fa-solid fa-recycle stat-icon" style={{ color: 'var(--accent-success)' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Waste Diverted</h3>
+                                <p className="stat-value">{quantifiedImpact.waste} <span style={{fontSize: '0.8rem'}}>kg</span></p>
+                            </div>
+                        </div>
+                        <div className="stat-card glass-card">
+                            <i className="fa-solid fa-tree stat-icon" style={{ color: '#2ecc71' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Trees Planted</h3>
+                                <p className="stat-value">{quantifiedImpact.trees}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card glass-card">
+                            <i className="fa-solid fa-users stat-icon" style={{ color: 'var(--accent-primary)' }}></i>
+                            <div className="stat-info" style={{ marginTop: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Families Supported</h3>
+                                <p className="stat-value">{quantifiedImpact.families}</p>
                             </div>
                         </div>
                     </div>

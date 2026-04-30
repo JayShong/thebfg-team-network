@@ -54,7 +54,8 @@ const Profile = () => {
     // Read stats from localStorage for guest view
     const getLocalStats = () => {
         try {
-            const saved = localStorage.getItem('bfg_personal_stats');
+            const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+            const saved = localStorage.getItem(key);
             if (saved) {
                 return JSON.parse(saved);
             }

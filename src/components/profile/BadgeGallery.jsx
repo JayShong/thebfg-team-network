@@ -17,13 +17,14 @@ const BadgeGallery = () => {
     const [claimError, setClaimError] = useState(null);
 
     useEffect(() => {
-        const saved = localStorage.getItem('bfg_personal_stats');
+        const key = isGuest ? 'bfg_guest_personal_stats' : 'bfg_personal_stats';
+        const saved = localStorage.getItem(key);
         if (saved) {
             try {
                 setLocalStats(JSON.parse(saved));
             } catch (e) { }
         }
-    }, []);
+    }, [isGuest]);
 
     useEffect(() => {
         if (!currentUser || isGuest) return;

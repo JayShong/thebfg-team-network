@@ -146,7 +146,8 @@ export const AuthProvider = ({ children }) => {
                         .then((result) => {
                             if (result.data?.success) {
                                 setGuestId(null);
-                                localStorage.removeItem('bfg_personal_stats');
+                                localStorage.removeItem('bfg_guest_personal_stats');
+                                localStorage.removeItem('bfg_personal_stats'); // Cleanup legacy key
                                 localStorage.removeItem('bfg_guest_id');
                                 console.log("🤝 AUTH: Handshake success. Guest cache purged.");
                             } else {
@@ -265,6 +266,13 @@ export const AuthProvider = ({ children }) => {
                     setGuestId(newId);
                     localStorage.setItem('bfg_guest_id', newId);
                 }
+                
+                // Initialize guest stats if missing
+                if (guestMode && !localStorage.getItem('bfg_guest_personal_stats')) {
+                    localStorage.setItem('bfg_guest_personal_stats', JSON.stringify({
+                        totalCheckins: 0, totalPurchases: 0, lastRefreshed: new Date().toISOString()
+                    }));
+                }
 
                 setCurrentUser(null);
                 setCurrentClaims({});
@@ -291,7 +299,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setIsGuest(false);
         localStorage.removeItem('bfg_guest_mode');
-        // bfg_guest_id and bfg_personal_stats are preserved for future claiming
+        // bfg_guest_id, bfg_personal_stats, and bfg_guest_personal_stats are preserved for future claiming
         setCurrentUser(null);
         setCurrentClaims({});
         return auth.signOut();
@@ -304,6 +312,13 @@ export const AuthProvider = ({ children }) => {
             const newId = `GUEST_${window.crypto.randomUUID()}`;
             setGuestId(newId);
             localStorage.setItem('bfg_guest_id', newId);
+        }
+
+        // Fresh guest stats initialization
+        if (!localStorage.getItem('bfg_guest_personal_stats')) {
+            localStorage.setItem('bfg_guest_personal_stats', JSON.stringify({
+                totalCheckins: 0, totalPurchases: 0, lastRefreshed: new Date().toISOString()
+            }));
         }
     };
 

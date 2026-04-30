@@ -234,5 +234,11 @@ service cloud.firestore {
       );
       allow write: if false; // System only via Cloud Functions
     }
+
+    // Guest Sessions - Private Anonymized Tracking
+    match /guest_sessions/{sessionId} {
+      allow read: if false; // Only accessible via Admin SDK / Cloud Functions
+      allow write: if false;
+    }
   }
 }
